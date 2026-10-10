@@ -247,8 +247,10 @@ los lee cada 15 segundos y los envía.
 - Cada caso de uso que cambia algo escribe su `RegistroAuditoria` en la **misma transacción**.
   Si el cambio se guarda, el registro también; si no, ninguno.
 - La aplicación usa un usuario de base **sin permiso** de `UPDATE` ni `DELETE` sobre la tabla de
-  auditoría, y un disparador en la base rechaza cualquier modificación. Ni un error de código ni
-  alguien con la contraseña de la aplicación pueden alterarla.
+  auditoría, y un disparador en la base rechaza cualquier modificación mientras esté activo. Ni un
+  error de código ni alguien con la contraseña de la aplicación pueden alterarla.
+- El dueño del esquema técnicamente podría desactivar el disparador. Por eso, en producción, su
+  contraseña **no** vive en el contenedor de la aplicación: las migraciones se corren como paso aparte.
 
 ### 7.6 Ingreso del paciente — FR-07, FR-08, S-14, S-20
 
@@ -301,7 +303,7 @@ los lee cada 15 segundos y los envía.
 | ADR-04 | Horarios libres calculados, no guardados | Tabla de horarios pregenerados | Evita regenerar y desincronizar ante cambios de agenda y bloqueos. |
 | ADR-05 | Bandeja de salida para los emails | Envío directo | Un SMTP caído no puede hacer fallar una reserva ni perder un aviso. |
 | ADR-06 | Agendas versionadas por fecha de vigencia | Editar la agenda en el lugar | Conserva la historia y permite aprobar cambios a futuro (FR-14d). |
-| ADR-07 | Auditoría protegida por permisos y disparador en la base | Sólo control en el código | La ley pide que no se pueda alterar; el código solo no alcanza. |
+| ADR-07 | Auditoría protegida por permisos y disparador en la base | Sólo control en el código | La ley pide que no se pueda alterar; el código solo no alcanza. La contraseña del dueño queda fuera de la aplicación en producción. |
 
 ## 10. Qué pasa con el código ya escrito
 
