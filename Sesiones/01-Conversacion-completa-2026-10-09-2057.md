@@ -6,7 +6,7 @@
 > Transcripción de la conversación: todos los mensajes del docente y todas las respuestas del
 > equipo, en orden. No incluye las operaciones internas (lecturas de archivos, comandos,
 > búsquedas). La versión resumida, con comentarios para la clase, es
-> [01-Inicio-2026-10-09-2030.md](01-Inicio-2026-10-09-2030.md).
+> [01-Inicio-2026-10-09-2057.md](01-Inicio-2026-10-09-2057.md).
 
 ---
 
@@ -827,7 +827,7 @@ Hoy `src/` y `tests/` sólo tienen ese código provisorio. Cuando arranquemos la
 
 ### 👤 Docente · 10/10 09:20
 
-me creas un repo en github para poner este proyecto, de nombre "BMAD-Hospital" y subi ahi por favor asi lo puedo compartir con los chicos. crea una carpeta aparte de nombre Sesiones y ahi guardaremos las conversaciones por fecha, el registro de esta conversasion con el nombre 01-Inicio-2026-10-09-2030.md
+me creas un repo en github para poner este proyecto, de nombre "BMAD-Hospital" y subi ahi por favor asi lo puedo compartir con los chicos. crea una carpeta aparte de nombre Sesiones y ahi guardaremos las conversaciones por fecha, el registro de esta conversasion con el nombre 01-Inicio-2026-10-09-2057.md
 
 ### 🤖 Equipo
 
@@ -846,7 +846,7 @@ Commiteo todo y creo el repo público en GitHub, así los alumnos lo ven sin nec
 Creé el repo y subí el proyecto: **https://github.com/fernandobono/BMAD-Hospital**
 
 - **Es público**, para que los alumnos lo vean sin pedir acceso. Si lo preferís privado, se cambia en un minuto.
-- **Sesiones/01-Inicio-2026-10-09-2030.md**: el registro de esta conversación, desde "quiero hacer una gestión de turnos" hasta las stories revisadas. Tus mensajes van textuales y las respuestas del equipo, resumidas. Sumé recuadros "Para la clase", entre ellos el error de arrancar a programar sin definir el producto.
+- **Sesiones/01-Inicio-2026-10-09-2057.md**: el registro de esta conversación, desde "quiero hacer una gestión de turnos" hasta las stories revisadas. Tus mensajes van textuales y las respuestas del equipo, resumidas. Sumé recuadros "Para la clase", entre ellos el error de arrancar a programar sin definir el producto.
 - **README**: agregué uno corto con el orden de lectura de los documentos, porque el repo no tenía portada.
 - **Antes de subir** saqué dos menciones internas de tu trabajo que se habían colado en las stories. El enlace al proyecto guía ahora apunta a su repo público.
 - Renombré la rama de `master` a `main`, igual que en el repo de testing.
