@@ -1,8 +1,13 @@
 <Solution>
   <Folder Name="/src/">
-    <Project Path="src/HospitalTurnos.Api/HospitalTurnos.Api.csproj" />
+    <Project Path="src/HospitalTurnos.Aplicacion/HospitalTurnos.Aplicacion.csproj" />
+    <Project Path="src/HospitalTurnos.Dominio/HospitalTurnos.Dominio.csproj" />
+    <Project Path="src/HospitalTurnos.Infraestructura/HospitalTurnos.Infraestructura.csproj" />
+    <Project Path="src/HospitalTurnos.Web/HospitalTurnos.Web.csproj" />
   </Folder>
   <Folder Name="/tests/">
-    <Project Path="tests/HospitalTurnos.Tests/HospitalTurnos.Tests.csproj" />
+    <Project Path="tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj" />
+    <Project Path="tests/HospitalTurnos.Dominio.Tests/HospitalTurnos.Dominio.Tests.csproj" />
+    <Project Path="tests/HospitalTurnos.Web.Tests/HospitalTurnos.Web.Tests.csproj" />
   </Folder>
 </Solution>

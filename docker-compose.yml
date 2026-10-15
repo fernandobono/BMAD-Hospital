@@ -1,0 +1,43 @@
+# Contraseñas: copiá .env.ejemplo a .env (que no se versiona). Sin .env, Compose se corta (AC 15).
+services:
+  db:
+    image: postgres:17
+    environment:
+      POSTGRES_DB: hospital_turnos
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?copiá .env.ejemplo a .env}
+      TURNOS_OWNER_PASSWORD: ${TURNOS_OWNER_PASSWORD:?copiá .env.ejemplo a .env}
+      TURNOS_APP_PASSWORD: ${TURNOS_APP_PASSWORD:?copiá .env.ejemplo a .env}
+    ports: ["127.0.0.1:5432:5432"]   # sólo desde esta máquina
+    volumes:
+      - datos-db:/var/lib/postgresql/data
+      - ./docker/postgres/initdb:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d hospital_turnos"]
+      interval: 5s
+      retries: 10
+  mailpit:
+    image: axllent/mailpit
+    # Sólo desde esta máquina: Mailpit no pide usuario y va a mostrar mails con datos de pacientes.
+    ports: ["127.0.0.1:1025:1025", "127.0.0.1:8025:8025"]
+  web:
+    build: { context: ., dockerfile: src/HospitalTurnos.Web/Dockerfile }
+    ports: ["8080:8080"]
+    environment:
+      # En desarrollo el contenedor tiene también la cadena del dueño y migra al arrancar.
+      # En producción NO: las migraciones son un paso aparte (contrato técnico, I-8).
+      ConnectionStrings__App: Host=db;Database=hospital_turnos;Username=turnos_app;Password=${TURNOS_APP_PASSWORD:?copiá .env.ejemplo a .env}
+      ConnectionStrings__Migraciones: Host=db;Database=hospital_turnos;Username=turnos_owner;Password=${TURNOS_OWNER_PASSWORD:?copiá .env.ejemplo a .env}
+      ProteccionDeDatos__Carpeta: /claves-proteccion
+    volumes:
+      - claves-proteccion:/claves-proteccion
+    depends_on:
+      db: { condition: service_healthy }
+      mailpit: { condition: service_started }
+    # La app no puede ser el proceso 1 del contenedor: Linux ignora ahí la señal con la que .NET
+    # termina tras un error, y un arranque fallido (AC 7) quedaba girando al 100% de CPU.
+    init: true
+    restart: unless-stopped
+volumes:
+  datos-db:
+  claves-proteccion:
