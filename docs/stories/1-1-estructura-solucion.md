@@ -2,7 +2,7 @@
 epic: 1
 story: "1.1"
 title: "Estructura de la solución en 4 capas, con Docker Compose (app + PostgreSQL + Mailpit). Reemplaza el código inicial."
-status: in-progress
+status: review
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -65,7 +65,7 @@ files_to_modify:
 
 # Story 1.1: Estructura de la solución en 4 capas, con Docker Compose (app + PostgreSQL + Mailpit). Reemplaza el código inicial.
 
-Status: in-progress
+Status: review
 
 ## Story
 
