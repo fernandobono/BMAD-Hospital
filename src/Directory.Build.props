@@ -1,0 +1,9 @@
+<Project>
+  <!-- MSBuild usa sólo el Directory.Build.props más cercano: hay que importar el de la raíz a mano. -->
+  <Import Project="$([MSBuild]::GetPathOfFileAbove('Directory.Build.props', '$(MSBuildThisFileDirectory)../'))" />
+
+  <!-- Sólo el código de producción: una advertencia en src/ no llega a main (contrato técnico). -->
+  <PropertyGroup>
+    <TreatWarningsAsErrors>true</TreatWarningsAsErrors>
+  </PropertyGroup>
+</Project>

@@ -2,11 +2,18 @@
 epic: 1
 story: "1.1"
 title: "Estructura de la solución en 4 capas, con Docker Compose (app + PostgreSQL + Mailpit). Reemplaza el código inicial."
-status: ready-for-dev
+status: in-progress
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
 depends_on: []
+runtime_not_verifiable:
+  - ac: 8
+    reason: "La convención snake_case sólo se nota en una tabla, y en esta story el modelo no tiene ninguna entidad: la primera tabla llega con la story 1.3. Corriendo la app no hay nada que mirar."
+    covered_by: T7
+  - ac: 18
+    reason: "Habla de la fábrica de pruebas (HospitalWebApplicationFactory), que sólo existe dentro de la suite de pruebas; la app en ejecución no la usa."
+    covered_by: T11
 files_to_create:
   - "Directory.Build.props"
   - "src/Directory.Build.props"
@@ -58,7 +65,7 @@ files_to_modify:
 
 # Story 1.1: Estructura de la solución en 4 capas, con Docker Compose (app + PostgreSQL + Mailpit). Reemplaza el código inicial.
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -133,7 +140,7 @@ para que todas las stories siguientes se escriban sobre la arquitectura aprobada
 | T10 | `Salud_DetrasDelProxy_RespetaHttpsSoloDeRedesConfiables` | 17 | integration | `[Theory]` 5 casos (entorno, IP remota, `X-Forwarded-Proto`, redes configuradas): (`Testing`, 127.0.0.1, `https`, —); (`Testing`, 127.0.0.1, sin encabezado, —); (`Testing`, 203.0.113.5, `https`, —); (`Testing`, 203.0.113.5, `https`, `203.0.113.0/24`); (`Development`, 127.0.0.1, sin encabezado, —) | 200 + `Strict-Transport-Security`; 307 a `https://turnos.lasacacias.example/salud`; 307; 200 + `Strict-Transport-Security`; 200 sin `Strict-Transport-Security` |
 | T11 | `Fabrica_EntornoDevelopment_UsaLasCadenasDeLaFixture` | 18 | integration | `HospitalWebApplicationFactory` con `UseEnvironment("Development")`; en un scope, `HospitalDbContext.Database.GetConnectionString()` | `Host` y `Port` (leídos con `NpgsqlConnectionStringBuilder`) iguales a los de `fixture.CadenaApp`; `Username == "turnos_app"` |
 | T12 | `ScriptDeRoles_SinBitEjecutable_CreaLosRolesIgual` | 20 | integration | Contenedor propio (no la colección) con `01-roles.sh` mapeado en modo `0644` | `SELECT count(*) FROM pg_roles WHERE rolname IN ('turnos_owner','turnos_app')` = 2; `has_database_privilege('turnos_app','hospital_turnos','CONNECT')` = true |
-| E1 | `Smoke_DockerCompose_LevantaYSaludResponde` | 12, 13, 19 | e2e | `scripts/smoke-compose.sh` con `.env` presente: `up -d --build`, espera `/salud` = 200 (tope 60 s), Mailpit 8025 = 200, `stop db` → 503, `start db` → 200 sondeando (tope 30 s), anota el archivo de claves de `/claves-proteccion`, `up -d --force-recreate web`, espera `/salud` = 200 y comprueba que el archivo sigue | Sale con código 0 e imprime el nombre del test; con código ≠ 0 y el paso que falló si algo no responde |
+| E1 | `Smoke_DockerCompose_LevantaYSaludResponde` | 7, 12, 13, 19 | e2e | `scripts/smoke-compose.sh` con `.env` presente: `up -d --build`, espera `/salud` = 200 (tope 60 s), `web` sin `ConnectionStrings:App` termina en ≤ 30 s nombrando la cadena (Change Log 2026-10-15), Mailpit 8025 = 200, `stop db` → 503, `start db` → 200 sondeando (tope 30 s), anota el archivo de claves de `/claves-proteccion`, `up -d --force-recreate web`, espera `/salud` = 200 y comprueba que el archivo sigue | Sale con código 0 e imprime el nombre del test; con código ≠ 0 y el paso que falló si algo no responde |
 | E2 | `Smoke_DockerComposeSinEnv_FallaConMensajeClaro` | 15 | e2e | Mismo script, primer paso: `env -u POSTGRES_PASSWORD -u TURNOS_OWNER_PASSWORD -u TURNOS_APP_PASSWORD docker compose --env-file /dev/null config` | Código ≠ 0 y la salida de error contiene `copiá .env.ejemplo a .env`; el script imprime `Smoke_DockerComposeSinEnv_FallaConMensajeClaro OK` |
 
 Cada test xUnit lleva `[Trait("Story", "1.1")]` y un `[Trait("AC", "n")]` por AC cubierto (regla del contrato técnico). E1 y E2 no son xUnit: el script imprime `<nombre> OK` por cada uno.
@@ -152,33 +159,33 @@ Cada test xUnit lleva `[Trait("Story", "1.1")]` y un `[Trait("AC", "n")]` por AC
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: 1, 14)
-  - [ ] `git -C ~/SourceCode/hospital-turnos log --oneline -1`. Si dice que no hay commits (estado al escribir esta story: rama `master` sin commits, todo sin seguimiento), **DETENERSE y pedir al docente un commit inicial** del estado actual antes de borrar nada: el código inicial nunca se guardó y Arq. §10 quiere reaprovechar `Medico.HorariosDelDia`. El agente no commitea sin autorización.
-  - [ ] Confirmar que la solución es `HospitalTurnos.slnx` (no `.sln`): `ls HospitalTurnos.sln*`. Si apareció un `.sln`, usarlo y anotar el spec anchor.
-  - [ ] `dotnet --version` → `10.0.400` o superior; `docker info` responde.
-  - [ ] Confirmar que no existen todavía `Directory.Build.props`, `Directory.Packages.props`, `docker-compose.yml` en la raíz.
-  - [ ] `git check-ignore .env` → debe responder `.env` (el `.gitignore` ya lo ignora). Si no, DETENERSE: un `.env` podría versionarse.
-- [ ] [SEQ] Task 2: Borrar el código inicial (AC: 1, 14)
-  - [ ] `dotnet sln HospitalTurnos.slnx remove src/HospitalTurnos.Api/HospitalTurnos.Api.csproj tests/HospitalTurnos.Tests/HospitalTurnos.Tests.csproj`
-  - [ ] `rm -rf src/HospitalTurnos.Api tests/HospitalTurnos.Tests`
-- [ ] [SEQ] Task 3: Props de la solución y herramientas (AC: 3)
-  - [ ] `Directory.Build.props`, `src/Directory.Build.props` (importa el de arriba con `GetPathOfFileAbove`) y `Directory.Packages.props` con las versiones del contrato (fijar la última estable de cada uno con `dotnet package search <id> --exact-match`; EF/ASP.NET/TimeProvider.Testing en 10.0.x, xunit 2.9.x).
-  - [ ] `dotnet new tool-manifest` + `dotnet tool install dotnet-ef --version 10.0.*` (el `dotnet-ef` global de la máquina es 9.0.6 y no sirve para EF 10).
-  - [ ] `.gitattributes` con `*.sh text eol=lf` (el script de roles corre en Linux).
-  - [ ] `.env.ejemplo` con `POSTGRES_PASSWORD`, `TURNOS_OWNER_PASSWORD`, `TURNOS_APP_PASSWORD` y valores de ejemplo obvios (`cambiar-esta-clave-…`), con un comentario arriba: "Copiá este archivo a .env (que no se versiona)".
-- [ ] [SEQ] Task 4: Los 4 proyectos de `src/` (AC: 1, 2, 11, 16)
-  - [ ] `dotnet new classlib` para Dominio, Aplicacion, Infraestructura (borrar `Class1.cs`); `dotnet new blazor -n HospitalTurnos.Web -o src/HospitalTurnos.Web --interactivity Server` (plantilla completa: trae `Components/Pages/Error.razor`, que usa la story 1.2).
-  - [ ] Sacar de cada `.csproj` lo que ya fija `Directory.Build.props` y los `Version` de paquetes.
-  - [ ] Referencias entre proyectos según la tabla del contrato; `dotnet sln HospitalTurnos.slnx add ...` en las carpetas de solución `/src/` y `/tests/`.
-  - [ ] Borrar `Counter.razor`, `Weather.razor` y sus enlaces en `NavMenu.razor`; `Home.razor` con el `<h1>` y subtítulo de AC 11; `<html lang="es">` en `App.razor`.
-  - [ ] `dotnet user-secrets init --project src/HospitalTurnos.Web` (para `dotnet run` fuera de Compose; los secretos quedan fuera del repo). `appsettings*.json` sin `ConnectionStrings`.
-- [ ] [SEQ] Task 5: Persistencia (AC: 6, 7, 8)
-  - [ ] `HospitalDbContext` vacío + `ConvencionSnakeCase` + `AplicadorDeMigraciones` + `FabricaDeContextoEnDiseno` + `ServiciosDeInfraestructura.AgregarInfraestructura` (ver Implementación concreta).
-  - [ ] `dotnet ef migrations add Inicial --project src/HospitalTurnos.Infraestructura --startup-project src/HospitalTurnos.Web --output-dir Persistencia/Migraciones` (sin conectarse a la base).
-- [ ] [SEQ] Task 6: `Program.cs` de Web: infraestructura, validación de cadenas y migraciones al arrancar, encabezados del proxy + HSTS + redirección HTTPS, protección de datos, `/salud` con `ChequeoBaseDeDatos`, `public partial class Program;` (AC: 6, 7, 9, 10, 17, 19)
-- [ ] [PAR] Task 7: Docker: `01-roles.sh` (con `git update-index --chmod=+x` una vez que haya commit), `docker-compose.yml`, `Dockerfile`, `.dockerignore`, `scripts/smoke-compose.sh` (AC: 4, 12, 13, 15, 19, 20)
-- [ ] [SEQ] Task 8: Los 3 proyectos de tests, `PostgresFixture`, `ColeccionPostgres`, `HospitalWebApplicationFactory`, `FiltroIpRemota`, T1–T12 (AC: 1–11, 14, 16–18, 20)
-- [ ] [SEQ] Task 9: Verificación completa (build Release 0 advertencias, `dotnet test`, smoke E1 y E2) y Dev Agent Record
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: 1, 14)
+  - [x] `git log --oneline -1`: hay commits; el código inicial está en `48f29a1` (Arq. §10 quiere reaprovechar `Medico.HorariosDelDia`).
+  - [x] Confirmar que la solución es `HospitalTurnos.slnx` (no `.sln`): `ls HospitalTurnos.sln*`. Si apareció un `.sln`, usarlo y anotar el spec anchor.
+  - [x] `dotnet --version` → `10.0.400` o superior; `docker info` responde.
+  - [x] Confirmar que no existen todavía `Directory.Build.props`, `Directory.Packages.props`, `docker-compose.yml` en la raíz.
+  - [x] `git check-ignore .env` → debe responder `.env` (el `.gitignore` ya lo ignora). Si no, DETENERSE: un `.env` podría versionarse.
+- [x] [SEQ] Task 2: Borrar el código inicial (AC: 1, 14)
+  - [x] `dotnet sln HospitalTurnos.slnx remove src/HospitalTurnos.Api/HospitalTurnos.Api.csproj tests/HospitalTurnos.Tests/HospitalTurnos.Tests.csproj`
+  - [x] `rm -rf src/HospitalTurnos.Api tests/HospitalTurnos.Tests`
+- [x] [SEQ] Task 3: Props de la solución y herramientas (AC: 3)
+  - [x] `Directory.Build.props`, `src/Directory.Build.props` (importa el de arriba con `GetPathOfFileAbove`) y `Directory.Packages.props` con las versiones del contrato (fijar la última estable de cada uno con `dotnet package search <id> --exact-match`; EF/ASP.NET/TimeProvider.Testing en 10.0.x, xunit 2.9.x).
+  - [x] `dotnet new tool-manifest` + `dotnet tool install dotnet-ef --version 10.0.*` (el `dotnet-ef` global de la máquina es 9.0.6 y no sirve para EF 10).
+  - [x] `.gitattributes` con `*.sh text eol=lf` (el script de roles corre en Linux).
+  - [x] `.env.ejemplo` con `POSTGRES_PASSWORD`, `TURNOS_OWNER_PASSWORD`, `TURNOS_APP_PASSWORD` y valores de ejemplo obvios (`cambiar-esta-clave-…`), con un comentario arriba: "Copiá este archivo a .env (que no se versiona)".
+- [x] [SEQ] Task 4: Los 4 proyectos de `src/` (AC: 1, 2, 11, 16)
+  - [x] `dotnet new classlib` para Dominio, Aplicacion, Infraestructura (borrar `Class1.cs`); `dotnet new blazor -n HospitalTurnos.Web -o src/HospitalTurnos.Web --interactivity Server` (plantilla completa: trae `Components/Pages/Error.razor`, que usa la story 1.2).
+  - [x] Sacar de cada `.csproj` lo que ya fija `Directory.Build.props` y los `Version` de paquetes.
+  - [x] Referencias entre proyectos según la tabla del contrato; `dotnet sln HospitalTurnos.slnx add ...` en las carpetas de solución `/src/` y `/tests/`.
+  - [x] Borrar `Counter.razor`, `Weather.razor` y sus enlaces en `NavMenu.razor`; `Home.razor` con el `<h1>` y subtítulo de AC 11; `<html lang="es">` en `App.razor`.
+  - [x] `dotnet user-secrets init --project src/HospitalTurnos.Web` (para `dotnet run` fuera de Compose; los secretos quedan fuera del repo). `appsettings*.json` sin `ConnectionStrings`.
+- [x] [SEQ] Task 5: Persistencia (AC: 6, 7, 8)
+  - [x] `HospitalDbContext` vacío + `ConvencionSnakeCase` + `AplicadorDeMigraciones` + `FabricaDeContextoEnDiseno` + `ServiciosDeInfraestructura.AgregarInfraestructura` (ver Implementación concreta).
+  - [x] `dotnet ef migrations add Inicial --project src/HospitalTurnos.Infraestructura --startup-project src/HospitalTurnos.Web --output-dir Persistencia/Migraciones` (sin conectarse a la base).
+- [x] [SEQ] Task 6: `Program.cs` de Web: infraestructura, validación de cadenas y migraciones al arrancar, encabezados del proxy + HSTS + redirección HTTPS, protección de datos, `/salud` con `ChequeoBaseDeDatos`, `public partial class Program;` (AC: 6, 7, 9, 10, 17, 19)
+- [x] [PAR] Task 7: Docker: `01-roles.sh` (con `git update-index --chmod=+x` una vez que haya commit), `docker-compose.yml`, `Dockerfile`, `.dockerignore`, `scripts/smoke-compose.sh` (AC: 4, 12, 13, 15, 19, 20)
+- [x] [SEQ] Task 8: Los 3 proyectos de tests, `PostgresFixture`, `ColeccionPostgres`, `HospitalWebApplicationFactory`, `FiltroIpRemota`, T1–T12 (AC: 1–11, 14, 16–18, 20)
+- [x] [SEQ] Task 9: Verificación completa (build Release 0 advertencias, `dotnet test`, smoke E1 y E2) y Dev Agent Record
 
 ### Task Dependencies
 
@@ -189,25 +196,14 @@ T7 puede hacerse en paralelo con T4–T6; T8 lo necesita (el script de roles).
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-09)
+#### En hospital-turnos (verificado 2026-10-15, al arrancar la implementación)
 
-- `HospitalTurnos.slnx` (8 líneas) — **el contrato técnico y Arq. §5 dicen `HospitalTurnos.sln`, pero el archivo real es `.slnx`** (formato XML de solución de .NET 10). Esta story trabaja sobre el `.slnx`. Contenido real:
-  ```xml
-  <Solution>
-    <Folder Name="/src/">
-      <Project Path="src/HospitalTurnos.Api/HospitalTurnos.Api.csproj" />
-    </Folder>
-    <Folder Name="/tests/">
-      <Project Path="tests/HospitalTurnos.Tests/HospitalTurnos.Tests.csproj" />
-    </Folder>
-  </Solution>
-  ```
-- `src/HospitalTurnos.Api/` — código descartable: `Program.cs` (6 líneas, sólo `MapGet("/", () => "Hello World!")`), `HospitalTurnos.Api.csproj` con `Microsoft.EntityFrameworkCore.Sqlite` 10.0.12, `Datos/HospitalDbContext.cs` (SQLite, con `DbSet` de Especialidades/Medicos/Pacientes/Turnos), `Dominio/*.cs`, `Endpoints/ManejadorDeErrores.cs`, `Servicios/AgendaService.cs`. **Se borra entero.**
-- `tests/HospitalTurnos.Tests/` — sólo el `.csproj` (xunit 2.9.3, Mvc.Testing 10.0.12), sin tests. **Se borra.**
-- `.gitignore` — ya ignora `bin/`, `obj/`, `.env` (y **no** ignora `.env.ejemplo`, que sí se versiona). No se toca.
-- Git: rama `master` **sin commits**; todo está sin seguimiento (ver Task 1).
-- SDK `10.0.400`, Docker 28.4.0. Herramienta global `dotnet-ef` 9.0.6 (no sirve para EF 10 → manifiesto local).
-- **NO existe — se crea en esta story:** todo lo de `files_to_create`. No hay `Directory.*.props`, `docker-compose.yml` ni proyectos de capas.
+- Rama `story/1-1-estructura-solucion`, creada desde `main`. El código inicial quedó guardado en el commit `48f29a1` (recuperable para la story 4.1) y **ya fue borrado** con autorización del docente: `src/HospitalTurnos.Api/` y `tests/HospitalTurnos.Tests/` no existen y `HospitalTurnos.slnx` quedó vacío (`<Solution />`).
+- La solución es `HospitalTurnos.slnx` (formato XML de .NET 10), **no** `HospitalTurnos.sln` como dicen el contrato técnico y Arq. §5. Esta story trabaja sobre el `.slnx`.
+- Ya creados en este arranque (Task 3 y parte de Task 4): `Directory.Build.props`, `src/Directory.Build.props`, `Directory.Packages.props`, `.gitattributes`, `.env.ejemplo`, `.dockerignore`, `.config/dotnet-tools.json` (dotnet-ef 10.0.13) y los 4 proyectos de `src/` generados por plantilla (todavía sin ajustar).
+- `.gitignore` ya ignora `bin/`, `obj/`, `.env` (y **no** ignora `.env.ejemplo`, que sí se versiona). No se toca.
+- SDK `10.0.400`, Docker 28.4.0. Herramienta global `dotnet-ef` 9.0.6 (no sirve para EF 10 → manifiesto local). En .NET 10 `dotnet new tool-manifest` crea el manifiesto en la raíz: se movió a `.config/`.
+- **NO existe todavía:** el resto de `files_to_create` (persistencia, `Program.cs` nuevo, Docker, pruebas).
 
 ### Patron de referencia verificado
 
@@ -381,6 +377,9 @@ services:
     depends_on:
       db: { condition: service_healthy }
       mailpit: { condition: service_started }
+    # La app no puede ser el proceso 1 del contenedor: Linux ignora ahí la señal con la que .NET
+    # termina tras un error, y el arranque fallido (AC 7) quedaba girando al 100% de CPU.
+    init: true
     restart: unless-stopped
 volumes:
   datos-db:
@@ -474,10 +473,53 @@ docker compose down -v && docker compose up -d --build
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), como Amelia (desarrolladora del equipo BMAD).
+
 ### Debug Log References
+
+- Build Release: 0 advertencias, 0 errores.
+- Pruebas: Dominio.Tests 2/2, Aplicacion.Tests 6/6, Web.Tests 15/15 (23 casos = T1–T12 contando cada caso de los `[Theory]`).
+- Smoke E1 y E2 en verde contra el Compose real; evidencia en vivo de 18 de 20 AC. Los AC 8 y 18 se declararon no verificables corriendo la app (`runtime_not_verifiable`) y el docente los aprobó.
 
 ### Completion Notes List
 
+- Pruebas escritas antes que el código (T1–T12 y las ayudas de prueba), después Docker, después `src/`.
+- Desvíos de detalle, sin cambio de comportamiento (revisados contra la spec, sin hallazgos):
+  - `Directory.Packages.props` fija también `Microsoft.EntityFrameworkCore` y `.Relational` 10.0.13 con `CentralPackageTransitivePinningEnabled`: Npgsql 10.0.3 traía EF 10.0.4 y las pruebas mezclaban versiones (MSB3277).
+  - `PostgresFixture` tiene un constructor interno (modo del script, aplicar o no migraciones) y `CadenaSuperusuario`, para T2 y T12, que necesitan su propio contenedor.
+  - Testcontainers 4.16 cambió la firma de `WithResourceMapping` (uid, gid, modo): se pasa `fileMode:` por nombre.
+  - `/salud` escribe el JSON como texto fijo: el serializador escapaba la "ó" como `\u00F3`.
+  - En .NET 10 `dotnet new tool-manifest` crea el manifiesto en la raíz: se movió a `.config/`.
+  - `.dockerignore` excluye además `Sesiones/` y `docs/`.
+- Arreglos por la revisión: Mailpit publicado sólo en 127.0.0.1; `/salud` deja la causa de la falla en el registro del servidor (sin mostrarla en la respuesta).
+- Hallazgo en la prueba en vivo del AC 7: sin `init: true` el contenedor `web` quedaba colgado al 100% de CPU al fallar el arranque (la app era el proceso 1). Ver Change Log.
+- En macOS, un script montado como carpeta en Docker aparece como ejecutable aunque tenga modo 0644: para probar el AC 20 a mano hay que copiarlo (`docker cp`), como hace T12.
+- Pase adversarial: salteado por decisión del docente.
+
 ### File List
 
+- Borrados: `src/HospitalTurnos.Api/`, `tests/HospitalTurnos.Tests/` (respaldo en el commit 48f29a1).
+- Modificados: `HospitalTurnos.slnx`, `docs/stories/1-1-estructura-solucion.md`.
+- Raíz: `Directory.Build.props`, `Directory.Packages.props`, `.config/dotnet-tools.json`, `.gitattributes`, `.dockerignore`, `.env.ejemplo`, `docker-compose.yml`, `docker/postgres/initdb/01-roles.sh`, `scripts/smoke-compose.sh`.
+- `src/Directory.Build.props`; `src/HospitalTurnos.Dominio/`, `src/HospitalTurnos.Aplicacion/` (sólo `.csproj`).
+- `src/HospitalTurnos.Infraestructura/`: `.csproj`, `ServiciosDeInfraestructura.cs`, `Persistencia/HospitalDbContext.cs`, `ConvencionSnakeCase.cs`, `AplicadorDeMigraciones.cs`, `FabricaDeContextoEnDiseno.cs`, `Migraciones/*_Inicial.cs` + snapshot.
+- `src/HospitalTurnos.Web/`: plantilla Blazor (sin Counter/Weather), `.csproj`, `Program.cs`, `Dockerfile`, `Salud/ChequeoBaseDeDatos.cs`, `Components/App.razor`, `Components/Pages/Home.razor`, `Components/Layout/NavMenu.razor`.
+- `tests/HospitalTurnos.Dominio.Tests/`: `.csproj`, `Arquitectura/RaizDelRepo.cs`, `EstructuraDeLaSolucionTests.cs`, `SecretosTests.cs`.
+- `tests/HospitalTurnos.Aplicacion.Tests/`: `.csproj`, `Persistencia/ConvencionSnakeCaseTests.cs`.
+- `tests/HospitalTurnos.Web.Tests/`: `.csproj`, `PostgresFixture.cs`, `ColeccionPostgres.cs`, `HospitalWebApplicationFactory.cs`, `Ayudas/FiltroIpRemota.cs`, `Salud/SaludTests.cs`, `Inicio/InicioTests.cs`, `Arranque/ArranqueTests.cs`, `Arranque/RolesDeBaseTests.cs`, `Arranque/HttpsDetrasDelProxyTests.cs`, `Arranque/FabricaDePruebasTests.cs`.
+
 ### Change Log
+
+
+- 2026-10-15 — `init: true` en el servicio `web` del Compose (aprobado por el docente). Al juntar evidencia en vivo del AC 7 se vio que, sin `ConnectionStrings:App`, la imagen escribía el error pero el proceso no terminaba: como proceso 1 del contenedor, la señal de cierre de .NET se ignora y queda al 100% de CPU. Con `init` sale en 2 s con código ≠ 0. Las pruebas en memoria (T4) no podían verlo.
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C1 — `docs/stories/1-1-estructura-solucion.md` — E1/E2 son el script scripts/smoke-compose.sh (no xUnit, como declara la story); corrieron en verde vía smoke-run.sh. Confirmado por tycon-ac-coverage-checker. <!-- fkey:ACCOV-C1|docs/stories/1-1-estructura-solucion.md -->
+- [x] **[WARNING]** SEC-W7 — `docker-compose.yml` — Puertos de Mailpit publicados sólo en 127.0.0.1 <!-- fkey:SEC-W7|docker-compose.yml -->
+- [x] **[WARNING]** SILENT-C2 — `src/HospitalTurnos.Web/Salud/ChequeoBaseDeDatos.cs` — LogWarning con la excepción; la respuesta sigue sin detalles; OperationCanceledException del pedido se propaga <!-- fkey:SILENT-C2|src/HospitalTurnos.Web/Salud/ChequeoBaseDeDatos.cs -->
+- [ ] **[WARNING]** TEST-W2 — `tests/HospitalTurnos.Web.Tests` — En observación, no frena: test-gate.sh no reconoce .slnx y se corrió por proyecto (23/23 en verde); la cobertura por líneas no se midió en esta story. <!-- fkey:TEST-W2|tests/HospitalTurnos.Web.Tests -->
+- [x] **[CRITICAL]** DODRT-C8 — `docker-compose.yml` — Evidencia en vivo del AC 7: sin la cadena App el contenedor quedaba colgado al 100% de CPU (la app era PID 1). init: true en web, aprobado por el docente; Change Log de la story. <!-- fkey:DODRT-C8|docker-compose.yml -->
+- [x] **[WARNING]** SILENT-W7 — `scripts/smoke-compose.sh` — El paso del AC 7 distingue tope vencido (142) de falla, y borra el contenedor con nombre fijo (trap EXIT). <!-- fkey:SILENT-W7|scripts/smoke-compose.sh -->

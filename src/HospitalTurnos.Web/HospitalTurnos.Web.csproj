@@ -1,0 +1,22 @@
+﻿<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <BlazorDisableThrowNavigationException>true</BlazorDisableThrowNavigationException>
+    <UserSecretsId>2fba8b21-8cd4-4d98-aa28-9392ef95e40e</UserSecretsId>
+  </PropertyGroup>
+
+  <!-- Web es la raíz de composición: conoce a la aplicación y a la infraestructura. -->
+  <ItemGroup>
+    <ProjectReference Include="..\HospitalTurnos.Aplicacion\HospitalTurnos.Aplicacion.csproj" />
+    <ProjectReference Include="..\HospitalTurnos.Infraestructura\HospitalTurnos.Infraestructura.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Sólo para que "dotnet ef migrations add" pueda usar este proyecto como arranque. -->
+    <PackageReference Include="Microsoft.EntityFrameworkCore.Design">
+      <PrivateAssets>all</PrivateAssets>
+      <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+    </PackageReference>
+  </ItemGroup>
+
+</Project>

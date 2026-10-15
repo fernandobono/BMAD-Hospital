@@ -1,0 +1,73 @@
+using HospitalTurnos.Infraestructura;
+using HospitalTurnos.Infraestructura.Persistencia;
+using HospitalTurnos.Web.Components;
+using HospitalTurnos.Web.Salud;
+using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.Diagnostics.HealthChecks;
+using Microsoft.AspNetCore.HttpOverrides;
+using Microsoft.Extensions.Diagnostics.HealthChecks;
+
+var builder = WebApplication.CreateBuilder(args);
+
+// Composición de dependencias: Web es el único proyecto que conoce a todas las capas.
+// Infraestructura registra el DbContext con el rol de la app (turnos_app). La cadena se lee DIFERIDA
+// (dentro del lambda de AddDbContext), así ve también la configuración que agregan las pruebas.
+builder.Services.AgregarInfraestructura(builder.Configuration);
+builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+builder.Services.AddHealthChecks()
+    .AddCheck<ChequeoBaseDeDatos>("base", timeout: TimeSpan.FromSeconds(3));
+
+// NFR-03: el HTTPS lo termina el proxy. Sólo se le cree a X-Forwarded-* si viene de una red
+// conocida: loopback (por defecto) + ProxyInverso:RedesConfiables. Nunca "confiar en todos".
+builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>((o, config) =>
+{
+    o.ForwardedHeaders = ForwardedHeaders.XForwardedFor | ForwardedHeaders.XForwardedProto;
+    foreach (var red in config.GetSection("ProxyInverso:RedesConfiables").Get<string[]>() ?? [])
+        o.KnownIPNetworks.Add(System.Net.IPNetwork.Parse(red));
+});
+
+// M-11: claves de protección de datos en una carpeta persistente (volumen en Compose), para que
+// recrear el contenedor no invalide sesiones ni formularios abiertos.
+var carpetaClaves = builder.Configuration["ProteccionDeDatos:Carpeta"];
+var proteccion = builder.Services.AddDataProtection().SetApplicationName("HospitalTurnos");
+if (!string.IsNullOrWhiteSpace(carpetaClaves))
+    proteccion.PersistKeysToFileSystem(new DirectoryInfo(carpetaClaves));
+
+var app = builder.Build();
+
+// Las dos cadenas se validan con la configuración final (AC 7). Las migraciones las corre el
+// dueño del esquema ANTES de atender a nadie.
+ServiciosDeInfraestructura.CadenaDeConexion(app.Configuration, "App");
+await AplicadorDeMigraciones.AplicarAsync(
+    ServiciosDeInfraestructura.CadenaDeConexion(app.Configuration, "Migraciones"));
+
+app.UseForwardedHeaders();          // primero: el resto del pipeline ve el esquema real (https)
+// (la story 1.2 agrega acá UseExceptionHandler, en todos los entornos)
+if (!app.Environment.IsDevelopment())
+{
+    app.UseHsts();
+    app.UseHttpsRedirection();
+}
+app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
+
+app.UseAntiforgery();
+
+app.MapStaticAssets();
+app.MapRazorComponents<App>()
+    .AddInteractiveServerRenderMode();
+app.MapHealthChecks("/salud", new HealthCheckOptions { ResponseWriter = EscribirSalud });
+
+app.Run();
+
+// Sólo el estado, nunca report.Entries[..].Exception: la respuesta no muestra detalles técnicos.
+static Task EscribirSalud(HttpContext contexto, HealthReport reporte)
+{
+    // Texto fijo y no WriteAsJsonAsync: el serializador escaparía la "ó" como ó.
+    contexto.Response.ContentType = "application/json; charset=utf-8";
+    return contexto.Response.WriteAsync(reporte.Status == HealthStatus.Healthy
+        ? """{"estado":"ok"}"""
+        : """{"estado":"sin conexión con la base"}""");
+}
+
+// Hace falta para que las pruebas de integración usen WebApplicationFactory<Program>.
+public partial class Program;
