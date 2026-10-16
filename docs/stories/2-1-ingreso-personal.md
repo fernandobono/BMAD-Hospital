@@ -2,7 +2,7 @@
 epic: 2
 story: "2.1"
 title: "Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión"
-status: review
+status: done
 sprint: 1
 priority: "P0"
 approach: "[ADAPT]"
@@ -56,7 +56,7 @@ files_to_modify:
 
 # Story 2.1: Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión
 
-Status: review
+Status: done
 
 ## Story
 
