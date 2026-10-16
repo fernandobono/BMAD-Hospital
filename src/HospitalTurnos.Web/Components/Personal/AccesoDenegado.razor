@@ -1,0 +1,25 @@
+@page "/personal/acceso-denegado"
+@layout LayoutIngreso
+@attribute [AllowAnonymous]
+@using System.Security.Claims
+
+@* Una sección de otro rol: 403 legible con un camino de vuelta, nunca un 500 ni una página en blanco (AC 13). *@
+<PageTitle>Sin permiso · Las Acacias</PageTitle>
+
+<h1 class="h3 mb-3">Sin permiso</h1>
+<p>No tenés permiso para entrar a esta sección.</p>
+<p><a href="@inicio">Volver a tu inicio</a></p>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    private string inicio = RutasPersonal.Ingreso;
+
+    protected override void OnInitialized()
+    {
+        HttpContext.Response.StatusCode = StatusCodes.Status403Forbidden;
+        if (HttpContext.User.Identity?.IsAuthenticated == true)
+            inicio = RutasPersonal.InicioDe(HttpContext.User.FindFirstValue(ClaimTypes.Role));
+    }
+}

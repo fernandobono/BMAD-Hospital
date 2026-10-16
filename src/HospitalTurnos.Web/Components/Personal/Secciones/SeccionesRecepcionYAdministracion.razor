@@ -1,0 +1,8 @@
+@page "/personal/agendas"
+@page "/personal/para-avisar"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = $"{HospitalTurnos.Dominio.Personal.Roles.Recepcionista},{HospitalTurnos.Dominio.Personal.Roles.Administrador}")]
+@inject NavigationManager Navegacion
+
+@* El administrador también consulta agendas y pacientes para avisar (UX §3). *@
+<SeccionEnConstruccion Titulo="@RutasPersonal.TituloDe(Navegacion.ToAbsoluteUri(Navegacion.Uri).AbsolutePath)" />

@@ -1,0 +1,6 @@
+@page "/personal/recepcion/turnos"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Recepcionista)]
+@inject NavigationManager Navegacion
+
+<SeccionEnConstruccion Titulo="@RutasPersonal.TituloDe(Navegacion.ToAbsoluteUri(Navegacion.Uri).AbsolutePath)" />

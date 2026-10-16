@@ -1,0 +1,11 @@
+@page "/personal/admin/medicos"
+@page "/personal/admin/propuestas"
+@page "/personal/admin/especialidades"
+@page "/personal/admin/bloqueos"
+@page "/personal/admin/usuarios"
+@page "/personal/admin/auditoria"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@inject NavigationManager Navegacion
+
+<SeccionEnConstruccion Titulo="@RutasPersonal.TituloDe(Navegacion.ToAbsoluteUri(Navegacion.Uri).AbsolutePath)" />

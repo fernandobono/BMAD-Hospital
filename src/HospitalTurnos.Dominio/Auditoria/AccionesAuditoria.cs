@@ -12,4 +12,10 @@ public static class AccionesAuditoria
     public const string PropuestaAgendaAprobada = "propuesta-agenda.aprobada";
     public const string PropuestaAgendaRechazada = "propuesta-agenda.rechazada";
     public const string AgendaCorregida = "agenda.corregida";
+
+    // Story 2.1: el ingreso del personal. Como el bloqueo no se muestra en pantalla, la auditoría (A5)
+    // es la única forma de que el administrador se entere de bloqueos e intentos.
+    public const string IngresoPersonal = "ingreso-personal";
+    public const string IngresoPersonalFallido = "ingreso-personal-fallido";
+    public const string IngresoPersonalBloqueado = "ingreso-personal-bloqueado";
 }
