@@ -2,7 +2,7 @@
 epic: 1
 story: "1.5"
 title: "Integración continua: compilar, probar y medir cobertura en cada push"
-status: in-progress
+status: review
 sprint: 1
 priority: "P1"
 approach: "[ADAPT]"
@@ -28,7 +28,7 @@ files_to_modify:
 
 # Story 1.5: Integración continua: compilar, probar y medir cobertura en cada push
 
-Status: in-progress
+Status: review
 
 ## Story
 
@@ -241,7 +241,7 @@ negocio (NFR-11) pase sin que nos enteremos, y para que los alumnos vean la pir�
   - [x] `probar-workflow.py`, `probar-umbral.sh`, `probar-imagen.sh` y los cinco datos de prueba.
   - [x] Agregar `resultados/` y `reporte-cobertura/` a `.gitignore`.
   - [x] Correr T1, T2, T3, T4 y anotar el resultado en el Dev Agent Record.
-- [ ] [SEQ] Task 8: Corrida en GitHub (AC: 14) — con el push aprobado: `gh run watch`, `gh run view --json jobs,artifacts` y captura de la corrida (T5).
+- [x] [SEQ] Task 8: Corrida en GitHub (AC: 14) — con el push aprobado: `gh run watch`, `gh run view --json jobs,artifacts` y captura de la corrida (T5).
 
 ### Task Dependencies
 
@@ -437,6 +437,16 @@ Claude Opus 5.5 (Amelia, bmad-dev-story) — sesión 06, 2026-10-16.
   NuGetAudit como error), así que la CI lo frena desde "Compilar"; el SCA queda como segunda red y
   para los avisos de severidad baja.
 - `.trx` de `dotnet test` copia la cobertura en `In/<máquina>/`: ReportGenerator la une sin duplicar.
+- T5: push aprobado por el docente; corrida
+  [38926262486](https://github.com/fernandobono/BMAD-Hospital/actions/runs/38926262486) disparada
+  por el push del commit `d76f08f`: los 6 jobs en verde en 2 min 23 s, artefactos `resultados-unit`,
+  `resultados-integracion` y `reporte-cobertura`; cobertura 97,4 % de líneas (38 de 39) y 100 % de
+  ramas. El resumen del paso sólo se ve con sesión iniciada en GitHub; el artefacto trae el mismo
+  `SummaryGithub.md`.
+- Matriz por criterio: 14 de 14 corridos de verdad.
+- Para seguir (fuera de esta story): la corrida avisa que las acciones `@v4` usan Node.js 20
+  (deprecado) y que `ubuntu-latest` pasa a Ubuntu 26 el 19/10/2026; fijar las acciones por SHA
+  (sugerencia del revisor de seguridad); la protección de ramas para exigir el flujo en verde.
 
 ### File List
 
