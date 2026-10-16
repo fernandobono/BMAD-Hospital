@@ -2,7 +2,7 @@
 epic: 1
 story: "1.5"
 title: "Integración continua: compilar, probar y medir cobertura en cada push"
-status: review
+status: done
 sprint: 1
 priority: "P1"
 approach: "[ADAPT]"
@@ -28,7 +28,7 @@ files_to_modify:
 
 # Story 1.5: Integración continua: compilar, probar y medir cobertura en cada push
 
-Status: review
+Status: done
 
 ## Story
 
