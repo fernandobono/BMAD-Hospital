@@ -2,7 +2,7 @@
 epic: 2
 story: "2.2"
 title: "Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar y desbloquear"
-status: in-progress
+status: review
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -1059,6 +1059,8 @@ pruebas primero, revisores y prueba en vivo.
   `smoke-run.sh` + la CI local, todos con 0 fallas; matriz por AC 27/27 en vivo
   (`.advisors/dod-runtime/2.2-runtime-matrix.md`). Incluye la auditoría caída (INSERT revocado y
   restaurado), dos administradores a la vez y la base detenida. Capturas en `Sesiones/img/09-*`.
+- GitHub Actions del PR #7 (commit 4286564): corridas 38981528710 (push) y 38981533395 (pull_request),
+  6 de 6 controles en verde cada una (~3 min). Captura en `Sesiones/img/09-github-actions-corrida.png`.
 - Revisores: 3 vueltas (7, 6 y 4 revisores), sin CRITICAL; los avisos quedaron resueltos o anotados en
   "Review Follow-ups".
 
