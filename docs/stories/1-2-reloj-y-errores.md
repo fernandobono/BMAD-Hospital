@@ -2,7 +2,7 @@
 epic: 1
 story: "1.2"
 title: "Reloj del hospital (zona Córdoba) y manejador global de errores sin detalles técnicos."
-status: review
+status: done
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -32,7 +32,7 @@ files_to_modify:
 
 # Story 1.2: Reloj del hospital (zona Córdoba) y manejador global de errores sin detalles técnicos.
 
-Status: review
+Status: done
 
 ## Story
 
