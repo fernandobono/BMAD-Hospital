@@ -1,8 +1,8 @@
 ---
 documento: Épicas, stories y plan de sprints
 proyecto: Gestión de turnos — Hospital Municipal Las Acacias (caso simulado)
-version: 1.0
-fecha: 2026-10-09
+version: 1.1
+fecha: 2026-10-16
 autor: John (producto) con Winston, Sally y Mary
 estado: aprobado (2026-10-09)
 entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.md (v1.0)
@@ -51,6 +51,7 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 |---|---|---|---|
 | 2.1 | Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión. | FR-09, FR-11, NFR-04 | 9 |
 | 2.2 | Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar. | FR-10, S-30 | 8 |
+| 2.3 | Contraseña olvidada: el administrador genera otra contraseña temporal desde A4. *Agregada el 2026-10-16 (revisión del S2, decisión 2).* | FR-10, S-30 | 4 |
 
 ### E3 — Catálogo
 
@@ -74,7 +75,7 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 |---|---|---|---|
 | 5.1 | Pacientes: búsqueda por DNI, alta y edición. | FR-01, FR-02, FR-03 | 10 |
 | 5.2 | Disponibilidad: horarios libres de un médico y primeros 10 de una especialidad. | FR-16, FR-16b, FR-17 | 12 |
-| 5.3 | Reserva de turno con todas las reglas y protección contra reservas simultáneas. | FR-18, FR-19, R-01, R-04, R-05, NFR-02 | 14 |
+| 5.3 | Reserva de turno con todas las reglas y protección contra reservas simultáneas. **Hereda** de la 3.1 (AC 17) que no se pueda desactivar una especialidad con turnos futuros, y de la 3.2 (AC 23) que no se pueda cambiar la especialidad de un médico con turnos futuros; la prueba T15 de la 3.1 lo recuerda. | FR-18, FR-19, R-01, R-04, R-05, NFR-02, FR-12 | 14 |
 | 5.4 | Cancelación de turno por la recepción. | FR-22, FR-23, FR-24 | 6 |
 | 5.5 | Pantalla de recepción R1 completa, manejable con teclado. | RU-03, RU-04, CE-04 | 8 |
 
@@ -119,7 +120,7 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 | 10.2 | Prueba de carga con 30 usuarios simultáneos. | NFR-01 | 2 |
 | 10.3 | Respaldo diario y procedimiento de restauración probado. | NFR-08 | 1 |
 
-**Total: 34 stories · ~249 pruebas estimadas.**
+**Total: 35 stories · ~253 pruebas estimadas.**
 
 ## 3. Plan de sprints
 
@@ -128,16 +129,24 @@ Los sprints son **incrementos de entrega**, no bloques de calendario: cada uno c
 puede mostrar. La duración real se mide al cerrar el sprint 1 y con eso se proyecta el resto. **[SUPUESTO S-35]** El orden sigue las dependencias: no se puede reservar
 sin agendas, ni avisar sin bandeja de emails.
 
-| Sprint | Objetivo | Stories | Pruebas (est.) |
-|---|---|---|---|
-| **S1** | La base andando: se levanta todo, se entra como personal. | 1.1, 1.2, 1.3, 1.4, 1.5, 2.1 | 34 → **76 reales** |
-| **S2** | El hospital se puede configurar. | 2.2, 3.1, 3.2, 4.1 | 36 |
-| **S3** | Los médicos tienen agenda aprobada. | 4.2, 4.3, 4.4, 5.1 | 34 |
-| **S4** | La recepción da y cancela turnos. *Primera versión usable.* | 5.2, 5.3, 5.4, 5.5 | 40 |
-| **S5** | El paciente saca turnos por la web. | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | 45 |
-| **S6** | Licencias, agendas del día y auditoría. | 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 9.1 | 47 |
-| **S7** | Listo para producción. | 10.1, 10.2, 10.3 | 13 |
-| | | **34 stories** | **~249** |
+| Sprint | Objetivo | Stories | Pruebas (est.) | Tiempo |
+|---|---|---|---|---|
+| **S1** | La base andando: se levanta todo, se entra como personal. | 1.1, 1.2, 1.3, 1.4, 1.5, 2.1 | 34 → **77 reales** | **11 h 45 medido** |
+| **S2** | El hospital se puede configurar. | 2.2, 3.1, 3.2, 4.1 | 36 | ~12 h 30 |
+| **S3** | Los médicos tienen agenda aprobada. | 2.3, 4.2, 4.3, 4.4, 5.1 | 38 | ~13 h 10 |
+| **S4** | La recepción da y cancela turnos. *Primera versión usable.* | 5.2, 5.3, 5.4, 5.5 | 40 | ~13 h 50 |
+| **S5** | El paciente saca turnos por la web. | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | 45 | ~15 h 30 |
+| **S6** | Licencias, agendas del día y auditoría. | 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 9.1 | 47 | ~16 h 15 |
+| **S7** | Listo para producción. | 10.1, 10.2, 10.3 | 13 | ~4 h 30 |
+| | | **35 stories** | **~253** | **~88 h** |
+
+**Velocidad medida en el S1** (retrospectiva en `docs/retrospectiva-sprint-1.md`): 11 h 45 de reloj para
+34 pruebas estimadas, unos 21 minutos por prueba estimada. Los sprints 2 a 7 se proyectan con esa
+velocidad, por tamaño (decisión del docente, 2026-10-16). Se recalcula al cerrar el S2.
+
+**Aviso para el S2** (revisión del 2026-10-16, I-6): sus stories ya escritas suman **129 pruebas** contra 36
+estimadas (3,6 veces; en el S1 fue 2,3). Se espera que el S2 tarde más que las ~12 h 30 proyectadas,
+probablemente 19 a 20 h. Si se confirma, la proyección se recalcula al cerrarlo.
 
 **Hitos:**
 
@@ -160,4 +169,4 @@ NFR-03 (HTTPS y contraseñas), repartido así (revisión I-7, contrato técnico 
 
 | Id | Supuesto |
 |---|---|
-| S-35 | Los sprints no tienen duración fija: la velocidad real se mide en el sprint 1 y se proyecta el resto. |
+| S-35 | Los sprints no tienen duración fija: la velocidad real se mide en el sprint 1 y se proyecta el resto. **Medida el 2026-10-16:** 21 min de reloj por prueba estimada. |

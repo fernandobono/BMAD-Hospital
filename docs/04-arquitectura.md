@@ -111,13 +111,13 @@ classDiagram
     class Medico {
         Nombre, Apellido
         Matricula
-        HorariosDelDia(fecha)
-        AtiendeEn(fechaHora)
     }
     class AgendaMedico {
         DuracionTurnoMinutos
         VigenteDesde
         Estado
+        HorariosDelDia(fecha)
+        AtiendeEn(fechaHora)
         Enviar()
         Aprobar()
         Rechazar(motivo)
@@ -162,6 +162,9 @@ classDiagram
     Medico "1" <-- "*" Turno
     Turno "1" <-- "0..1" AvisoPendiente
 ```
+
+> Cambio del 2026-10-16 (story 4.1, decisión 14 de la revisión del S2): `HorariosDelDia` y `AtiendeEn`
+> pasaron de `Medico` a `AgendaMedico`, porque los horarios dependen de qué agenda rige en cada fecha.
 
 **Cómo se arma la disponibilidad:** para una fecha, se toma la agenda **aprobada** del médico
 con la `VigenteDesde` más reciente que no sea posterior a esa fecha. Se generan los horarios de
