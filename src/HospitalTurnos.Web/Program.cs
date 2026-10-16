@@ -92,6 +92,8 @@ app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages:
 
 // En este orden: quién es (cookie "Personal"), si puede (roles de cada sección) y el token de los formularios.
 app.UseAuthentication();
+// Story 2.2: con la contraseña temporal, todo /personal/ lleva a la pantalla de cambio (AC 20).
+app.UseCambioDeContrasenaObligatorio();
 app.UseAuthorization();
 app.UseAntiforgery();
 

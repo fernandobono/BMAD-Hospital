@@ -1,4 +1,3 @@
-using System.Security.Claims;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Personal;
 using HospitalTurnos.Dominio.Auditoria;
@@ -16,7 +15,7 @@ namespace HospitalTurnos.Infraestructura.Identidad;
 public sealed class IngresoPersonalIdentity(
     UserManager<UsuarioPersonal> usuarios,
     IPasswordHasher<UsuarioPersonal> hasher,
-    IUserClaimsPrincipalFactory<UsuarioPersonal> fabricaDePrincipal,
+    FabricaPrincipalPersonal fabricaDePrincipal,
     IAuditoria auditoria,
     HospitalDbContext contexto,
     ILogger<IngresoPersonalIdentity> registro) : IIngresoPersonal
@@ -76,12 +75,11 @@ public sealed class IngresoPersonalIdentity(
             return await AuditarAsync(actor, encontrado, AccionesAuditoria.IngresoPersonalFallido,
                 "varios-roles", ResultadoIngreso.VariosRoles(), ct);
 
-        // 6. Éxito. La fábrica de Identity ya trae id, rol y sello de seguridad; se suma el nombre.
+        // 6. Éxito. La fábrica trae id, rol, sello, nombre y, con la contraseña temporal, la marca (2.2).
         Asegurar(await usuarios.ResetAccessFailedCountAsync(encontrado));
-        var principal = await fabricaDePrincipal.CreateAsync(encontrado);
-        ((ClaimsIdentity)principal.Identity!).AddClaim(new Claim(ClaimsPersonal.NombreCompleto, encontrado.NombreCompleto));
+        var principal = await fabricaDePrincipal.CrearAsync(encontrado);
         return await AuditarAsync(actor, encontrado, AccionesAuditoria.IngresoPersonal, motivo: null,
-            ResultadoIngreso.Exitoso(principal, roles[0]), ct);
+            ResultadoIngreso.Exitoso(principal, roles[0], encontrado.DebeCambiarContrasena), ct);
     }
 
     public async Task<bool> SesionVigenteAsync(string usuarioId, string? selloDeSeguridad, CancellationToken ct)

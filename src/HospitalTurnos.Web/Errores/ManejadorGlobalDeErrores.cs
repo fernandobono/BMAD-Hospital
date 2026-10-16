@@ -14,18 +14,48 @@ public sealed class ManejadorGlobalDeErrores(
 {
     public const string MensajeGenerico = "Algo falló. Probá de nuevo en unos minutos.";
 
-    public async ValueTask<bool> TryHandleAsync(HttpContext http, Exception error, CancellationToken ct)
+    /// <summary>
+    /// El código HTTP de cada excepción. Un solo mapeo: lo usa este manejador y las páginas SSR que
+    /// muestran el cartel de una regla en la propia pantalla (story 2.2; la 3.1 y la 3.2 lo reusan).
+    /// </summary>
+    public static int EstadoPara(Exception error) => error switch
     {
         // El orden importa: ConflictoException ES una ReglaDeNegocioException.
-        var estado = error switch
+        ConflictoException => StatusCodes.Status409Conflict,
+        ReglaDeNegocioException => StatusCodes.Status400BadRequest,
+        NoEncontradoException => StatusCodes.Status404NotFound,
+        AccesoDenegadoException => StatusCodes.Status403Forbidden,
+        _ => StatusCodes.Status500InternalServerError
+    };
+
+    /// <summary>Las del dominio: su mensaje ya está escrito para el usuario. Lo demás es un error.</summary>
+    public static bool EsEsperable(Exception error) => EstadoPara(error) != StatusCodes.Status500InternalServerError;
+
+    /// <summary>
+    /// El código de la excepción en la respuesta de una página SSR que muestra el cartel de la regla (story
+    /// 2.2; la 3.1 y la 3.2 lo reusan). El 404 se fija al empezar a enviar la respuesta: Blazor (.NET 10)
+    /// no escribe el cuerpo de una página que terminó de dibujarse en 404 (lo deja para la página "no
+    /// encontrada"), y el cartel no llegaría. Los demás se fijan en el acto.
+    /// </summary>
+    public static void FijarEstadoEnPagina(HttpContext http, Exception error)
+    {
+        var estado = EstadoPara(error);
+        if (estado != StatusCodes.Status404NotFound)
         {
-            ConflictoException => StatusCodes.Status409Conflict,
-            ReglaDeNegocioException => StatusCodes.Status400BadRequest,
-            NoEncontradoException => StatusCodes.Status404NotFound,
-            AccesoDenegadoException => StatusCodes.Status403Forbidden,
-            _ => StatusCodes.Status500InternalServerError
-        };
-        var esperable = estado != StatusCodes.Status500InternalServerError;
+            http.Response.StatusCode = estado;
+            return;
+        }
+        http.Response.OnStarting(() =>
+        {
+            http.Response.StatusCode = estado;
+            return Task.CompletedTask;
+        });
+    }
+
+    public async ValueTask<bool> TryHandleAsync(HttpContext http, Exception error, CancellationToken ct)
+    {
+        var estado = EstadoPara(error);
+        var esperable = EsEsperable(error);
 
         if (esperable)
             registro.LogInformation("Regla de negocio: {Mensaje}", error.Message);

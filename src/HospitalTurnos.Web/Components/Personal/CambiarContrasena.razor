@@ -1,0 +1,143 @@
+@page "/personal/cambiar-contrasena"
+@layout LayoutIngreso
+@attribute [Authorize]
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using HospitalTurnos.Aplicacion.Personal
+@using HospitalTurnos.Web.Errores
+@using Microsoft.AspNetCore.Authentication
+@inject ICambioContrasenaPersonal CambioContrasena
+@inject NavigationManager Navegacion
+
+@* S-30 (story 2.2), renderizado estático: la cookie nueva se escribe en la respuesta HTTP del POST. Sin
+   menú (layout de ingreso) y fuera del menú lateral: se llega por el primer ingreso o por la dirección. *@
+<PageTitle>@Titulo · Las Acacias</PageTitle>
+
+<h1 class="h3 mb-3">@Titulo</h1>
+@if (obligado)
+{
+    <p>Tu contraseña es temporal. Elegí una nueva para seguir.</p>
+}
+
+@if (errores.Count > 0)
+{
+    @* Un mensaje por renglón; los de la política de la nueva, con su título (AC 22). *@
+    var dePolitica = errores.Where(EsDePolitica).ToList();
+    <div class="alert alert-danger" role="alert">
+        @foreach (var error in errores.Where(e => !EsDePolitica(e)))
+        {
+            <p class="mb-1">@error</p>
+        }
+        @if (dePolitica.Count > 0)
+        {
+            <p class="mb-1">La contraseña nueva no sirve:</p>
+            <ul class="mb-0">
+                @foreach (var error in dePolitica)
+                {
+                    <li>@error</li>
+                }
+            </ul>
+        }
+    </div>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="CambiarAsync" OnInvalidSubmit="MostrarErrores" FormName="cambio-contrasena">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label for="actual" class="form-label">Contraseña actual</label>
+        <InputText id="actual" type="password" class="form-control" @bind-Value="Input!.Actual" autocomplete="current-password" />
+    </div>
+    <div class="mb-3">
+        <label for="nueva" class="form-label">Contraseña nueva</label>
+        <InputText id="nueva" type="password" class="form-control" @bind-Value="Input!.Nueva" autocomplete="new-password" />
+    </div>
+    <div class="mb-3">
+        <label for="repetida" class="form-label">Repetí la contraseña nueva</label>
+        <InputText id="repetida" type="password" class="form-control" @bind-Value="Input!.Repetida" autocomplete="new-password" />
+        <div class="form-text">Mínimo 10 caracteres, con mayúscula, minúscula, número y símbolo.</div>
+    </div>
+    <button type="submit" class="btn btn-primary w-100" style="background-color: #1F5FA8;">Guardar contraseña</button>
+</EditForm>
+
+@* Sin menú en este layout: el botón Salir va acá (AC 20). *@
+<form method="post" action="@RutasPersonal.Salir" class="mt-3 text-center">
+    <AntiforgeryToken />
+    <button type="submit" class="btn btn-link">Salir</button>
+</form>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private Formulario? Input { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private bool obligado;
+    private List<string> errores = [];
+
+    private string Titulo => obligado ? "Elegí tu contraseña" : "Cambiar contraseña";
+
+    // Los textos de la política salen de DescriptorErroresIdentity (AC 24) y empiezan todos igual.
+    private static bool EsDePolitica(string error) => error.StartsWith("La contraseña tiene que tener", StringComparison.Ordinal);
+
+    protected override void OnInitialized()
+    {
+        Input ??= new();
+        obligado = HttpContext.User.HasClaim(ClaimsPersonal.DebeCambiarContrasena, "si");
+    }
+
+    // Los mensajes de los campos van todos juntos al cartel (AC 22); las contraseñas nunca vuelven escritas.
+    private void MostrarErrores(EditContext contexto)
+    {
+        errores = [.. contexto.GetValidationMessages()];
+        Input = new();
+    }
+
+    private async Task CambiarAsync()
+    {
+        ResultadoCambioContrasena resultado;
+        try
+        {
+            resultado = await CambioContrasena.CambiarAsync(HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier)!,
+                Input!.Actual!, Input.Nueva!, HttpContext.RequestAborted);
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+            errores = [e.Message];
+            Input = new();
+            return;
+        }
+        if (!resultado.Exitoso)
+        {
+            errores = [.. resultado.Errores];
+            Input = new();
+            return;
+        }
+
+        // Cookie nueva: sin la marca y con el sello nuevo, así la revalidación de 2.1 no la corta (AC 21).
+        await HttpContext.SignInAsync(SesionPersonal.Esquema, resultado.Principal!,
+            new AuthenticationProperties { IsPersistent = false });
+        var destino = RutasPersonal.EsReturnUrlValido(ReturnUrl)
+            && !ReturnUrl!.StartsWith(RutasPersonal.CambiarContrasena, StringComparison.OrdinalIgnoreCase)
+            ? ReturnUrl
+            : RutasPersonal.InicioDe(resultado.Rol);
+        Navegacion.NavigateTo(destino);
+    }
+
+    private sealed class Formulario
+    {
+        [Required(ErrorMessage = "Ingresá tu contraseña actual.")]
+        public string? Actual { get; set; }
+
+        [Required(ErrorMessage = "Ingresá la contraseña nueva.")]
+        public string? Nueva { get; set; }
+
+        [Required(ErrorMessage = "Repetí la contraseña nueva.")]
+        [Compare(nameof(Nueva), ErrorMessage = "Las contraseñas nuevas no coinciden.")]
+        public string? Repetida { get; set; }
+    }
+}
