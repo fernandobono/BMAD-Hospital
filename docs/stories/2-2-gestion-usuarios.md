@@ -2,7 +2,7 @@
 epic: 2
 story: "2.2"
 title: "Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar y desbloquear"
-status: review
+status: done
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -51,7 +51,7 @@ files_to_modify:
 
 # Story 2.2: Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar y desbloquear
 
-Status: review
+Status: done
 
 ## Story
 
