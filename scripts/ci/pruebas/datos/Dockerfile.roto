@@ -1,0 +1,2 @@
+FROM mcr.microsoft.com/dotnet/sdk:10.0
+RUN dotnet publish proyecto-que-no-existe.csproj

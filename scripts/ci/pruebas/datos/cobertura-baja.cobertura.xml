@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<coverage line-rate="0.857143" branch-rate="0" version="1.9" timestamp="1" lines-covered="12" lines-valid="14" branches-covered="0" branches-valid="0">
+  <sources><source>/x/</source></sources>
+  <packages>
+    <package name="HospitalTurnos.Dominio" line-rate="0.5" branch-rate="0" complexity="1">
+      <classes><class name="HospitalTurnos.Dominio.Clase0" filename="Clase0.cs" line-rate="0.5" branch-rate="0" complexity="1"><methods/>
+        <lines><line number="1" hits="1" branch="False"/><line number="2" hits="0" branch="False"/></lines>
+      </class></classes></package>
+    <package name="HospitalTurnos.Aplicacion" line-rate="0.5" branch-rate="0" complexity="1">
+      <classes><class name="HospitalTurnos.Aplicacion.Clase1" filename="Clase1.cs" line-rate="0.5" branch-rate="0" complexity="1"><methods/>
+        <lines><line number="1" hits="1" branch="False"/><line number="2" hits="0" branch="False"/></lines>
+      </class></classes></package>
+    <package name="HospitalTurnos.Web" line-rate="1" branch-rate="0" complexity="1">
+      <classes><class name="HospitalTurnos.Web.Clase2" filename="Clase2.cs" line-rate="1" branch-rate="0" complexity="1"><methods/>
+        <lines><line number="1" hits="1" branch="False"/><line number="2" hits="1" branch="False"/><line number="3" hits="1" branch="False"/><line number="4" hits="1" branch="False"/><line number="5" hits="1" branch="False"/><line number="6" hits="1" branch="False"/><line number="7" hits="1" branch="False"/><line number="8" hits="1" branch="False"/><line number="9" hits="1" branch="False"/><line number="10" hits="1" branch="False"/></lines>
+      </class></classes></package>
+  </packages>
+</coverage>
