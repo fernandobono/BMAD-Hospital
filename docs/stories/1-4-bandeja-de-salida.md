@@ -2,7 +2,7 @@
 epic: 1
 story: "1.4"
 title: "Bandeja de salida de emails con proceso de fondo y reintentos"
-status: review
+status: done
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -53,7 +53,7 @@ files_to_modify:
 
 # Story 1.4: Bandeja de salida de emails con proceso de fondo y reintentos
 
-Status: review
+Status: done
 
 ## Story
 
