@@ -187,6 +187,10 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                         .HasColumnType("text")
                         .HasColumnName("concurrency_stamp");
 
+                    b.Property<bool>("DebeCambiarContrasena")
+                        .HasColumnType("boolean")
+                        .HasColumnName("debe_cambiar_contrasena");
+
                     b.Property<string>("Email")
                         .HasMaxLength(256)
                         .HasColumnType("character varying(256)")

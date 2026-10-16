@@ -27,10 +27,15 @@ public enum EstadoIngreso
     VariosRoles,
 }
 
-/// <summary>Principal y Rol sólo vienen en el ingreso exitoso.</summary>
-public sealed record ResultadoIngreso(EstadoIngreso Estado, ClaimsPrincipal? Principal = null, string? Rol = null)
+/// <summary>
+/// Principal y Rol sólo vienen en el ingreso exitoso. DebeCambiarContrasena: entró con la contraseña
+/// temporal y tiene que elegir la suya antes de usar el sistema (story 2.2, AC 19).
+/// </summary>
+public sealed record ResultadoIngreso(EstadoIngreso Estado, ClaimsPrincipal? Principal = null, string? Rol = null,
+    bool DebeCambiarContrasena = false)
 {
-    public static ResultadoIngreso Exitoso(ClaimsPrincipal principal, string rol) => new(EstadoIngreso.Exitoso, principal, rol);
+    public static ResultadoIngreso Exitoso(ClaimsPrincipal principal, string rol, bool debeCambiarContrasena = false) =>
+        new(EstadoIngreso.Exitoso, principal, rol, debeCambiarContrasena);
 
     public static ResultadoIngreso CredencialesInvalidas() => new(EstadoIngreso.CredencialesInvalidas);
 
@@ -47,4 +52,7 @@ public static class ClaimsPersonal
 {
     /// <summary>El nombre que muestra el menú (Identity sólo trae el nombre de usuario).</summary>
     public const string NombreCompleto = "nombre_completo";
+
+    /// <summary>Vale "si" mientras la sesión tenga que pasar por el cambio de contraseña (story 2.2, AC 20).</summary>
+    public const string DebeCambiarContrasena = "debe_cambiar_contrasena";
 }

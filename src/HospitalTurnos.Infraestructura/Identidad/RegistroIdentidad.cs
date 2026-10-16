@@ -30,9 +30,17 @@ public static class RegistroIdentidad
                 o.User.RequireUniqueEmail = false;
             })
             .AddRoles<IdentityRole<Guid>>()
-            .AddEntityFrameworkStores<HospitalDbContext>();
+            .AddEntityFrameworkStores<HospitalDbContext>()
+            // Story 2.2: los errores que ve el personal, en castellano (AC 24).
+            .AddErrorDescriber<DescriptorErroresIdentity>();
+        // RequireNonAlphanumeric no se toca: queda en true, el valor de Identity (la política exige un símbolo).
 
+        servicios.AddScoped<FabricaPrincipalPersonal>();
         servicios.AddScoped<IIngresoPersonal, IngresoPersonalIdentity>();
+        // Story 2.2: A4, el cambio de contraseña y el permiso del administrador confirmado en la base.
+        servicios.AddScoped<IActorVigente, ActorVigenteIdentity>();
+        servicios.AddScoped<IGestionUsuariosPersonal, GestionUsuariosPersonalIdentity>();
+        servicios.AddScoped<ICambioContrasenaPersonal, CambioContrasenaPersonalIdentity>();
         servicios.AddScoped<SembradorPersonal>();
         // Configure con la sección (no BindConfiguration): así funciona también sin IConfiguration en el
         // contenedor (pruebas de Aplicacion) y lee los valores recién al resolverse.

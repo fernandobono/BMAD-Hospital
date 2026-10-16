@@ -93,11 +93,41 @@ public static partial class FormularioHttp
             ? valores.Where(v => v.StartsWith(CookiePersonal + "=", StringComparison.Ordinal)).ToList()
             : [];
 
-    /// <summary>Texto del elemento role="alert" (decodificado), o null si no hay.</summary>
+    /// <summary>
+    /// Texto del elemento role="alert" (decodificado), o null si no hay. Lee el elemento entero: con varios
+    /// renglones (story 2.2, AC 22) cada uno queda separado por un espacio.
+    /// </summary>
     public static string? Alerta(string html)
     {
         var alerta = AlertaRegex().Match(html);
-        return alerta.Success ? WebUtility.HtmlDecode(Etiquetas().Replace(alerta.Groups[1].Value, "")).Trim() : null;
+        if (!alerta.Success)
+            return null;
+        var texto = WebUtility.HtmlDecode(Etiquetas().Replace(alerta.Groups[2].Value, " "));
+        return Espacios().Replace(texto, " ").Trim();
+    }
+
+    /// <summary>Texto del elemento role="status" (decodificado), o null si no hay. Story 2.2: las confirmaciones.</summary>
+    public static string? Estado(string html)
+    {
+        var estado = EstadoRegex().Match(html);
+        return estado.Success ? WebUtility.HtmlDecode(Etiquetas().Replace(estado.Groups[1].Value, "")).Trim() : null;
+    }
+
+    /// <summary>
+    /// Lo que hace el navegador con un formulario SSR con nombre (story 2.2, reusado por 3.1 y 3.2): GET de
+    /// la ruta, toma el token de esa página y hace POST a la misma ruta con _handler = el formulario.
+    /// accept: "text/html" para mirar el camino de un navegador ante un error (lección de 2.1 T15).
+    /// </summary>
+    public static async Task<HttpResponseMessage> EnviarAsync(HttpClient cliente, string ruta, string formulario,
+        IDictionary<string, string> campos, bool conToken = true, string? accept = null)
+    {
+        var todos = new Dictionary<string, string>(campos) { ["_handler"] = formulario };
+        if (conToken)
+            todos["__RequestVerificationToken"] = await TokenDeAsync(cliente, ruta);
+        using var pedido = new HttpRequestMessage(HttpMethod.Post, ruta) { Content = new FormUrlEncodedContent(todos) };
+        if (accept is not null)
+            pedido.Headers.Accept.ParseAdd(accept);
+        return await cliente.SendAsync(pedido);
     }
 
     /// <summary>Un usuario propio del test (p-xxxxxxxx), para todo flujo que cambia su estado.</summary>
@@ -147,8 +177,14 @@ public static partial class FormularioHttp
     [GeneratedRegex("value=\"([^\"]*)\"", RegexOptions.IgnoreCase)]
     private static partial Regex Valor();
 
-    [GeneratedRegex("<[^>]*role=\"alert\"[^>]*>(.*?)</", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    [GeneratedRegex("<(div|p|span)[^>]*role=\"alert\"[^>]*>(.*?)</\\1>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
     private static partial Regex AlertaRegex();
+
+    [GeneratedRegex(@"\s+")]
+    private static partial Regex Espacios();
+
+    [GeneratedRegex("<[^>]*role=\"status\"[^>]*>(.*?)</div>", RegexOptions.IgnoreCase | RegexOptions.Singleline)]
+    private static partial Regex EstadoRegex();
 
     [GeneratedRegex("<[^>]+>")]
     private static partial Regex Etiquetas();

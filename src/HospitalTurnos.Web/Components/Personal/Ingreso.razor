@@ -72,7 +72,12 @@
         await HttpContext.SignInAsync(SesionPersonal.Esquema, resultado.Principal!,
             new AuthenticationProperties { IsPersistent = false });   // cookie de sesión, sin Expires
         // Sin redirección abierta (AC 7): sólo rutas del personal.
-        Navegacion.NavigateTo(RutasPersonal.EsReturnUrlValido(ReturnUrl) ? ReturnUrl! : RutasPersonal.InicioDe(resultado.Rol));
+        var destino = RutasPersonal.EsReturnUrlValido(ReturnUrl) ? ReturnUrl! : RutasPersonal.InicioDe(resultado.Rol);
+        if (resultado.DebeCambiarContrasena)   // S-30: antes de usar el sistema, elegir la propia (story 2.2, AC 19)
+            destino = RutasPersonal.EsReturnUrlValido(ReturnUrl)
+                ? $"{RutasPersonal.CambiarContrasena}?ReturnUrl={Uri.EscapeDataString(ReturnUrl!)}"
+                : RutasPersonal.CambiarContrasena;
+        Navegacion.NavigateTo(destino);
     }
 
     private sealed class Formulario

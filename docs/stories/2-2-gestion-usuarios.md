@@ -2,7 +2,7 @@
 epic: 2
 story: "2.2"
 title: "Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar y desbloquear"
-status: ready-for-dev
+status: in-progress
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -51,7 +51,7 @@ files_to_modify:
 
 # Story 2.2: Gestión de usuarios del personal: alta con contraseña temporal, desactivar, reactivar y desbloquear
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -93,8 +93,8 @@ que nadie dependa de tocar la base de datos para administrar accesos.
    - `Estado`: `Activo` o `Desactivado`; además `Bloqueado hasta las HH:mm` (hora del hospital) si su
      `LockoutEnd` es posterior a ahora, y `Debe cambiar la contraseña` si tiene la marca del AC 3.
    - `Acciones` (botones dentro de un único formulario con token): `Desactivar` si está activo
-     (**salvo en la fila del propio administrador**), `Reactivar` si está desactivado, `Desbloquear`
-     si está bloqueado ahora.
+     (**salvo en la fila del propio administrador**, que en lugar del botón dice `(sos vos)`),
+     `Reactivar` si está desactivado, `Desbloquear` si está bloqueado ahora.
 2. **Given** un usuario con rol `Recepcionista` o `Medico` **When** pide la pantalla **Then** recibe
    el `403` legible de la 2.1 (AC 13). **When** envía a mano un POST del formulario de alta (con un
    token válido de su propia sesión) **Then** recibe `302` a `/personal/acceso-denegado` y no se crea
@@ -130,6 +130,8 @@ que nadie dependa de tocar la base de datos para administrar accesos.
      `El usuario tiene entre 3 y 100 caracteres: letras sin acento, números, punto, guion o guion bajo.`
    - rol vacío o que no está en `Roles.Todos` (por ejemplo `Superusuario` en un POST armado) →
      `Elegí un rol.`
+   Debajo del campo `Usuario` hay siempre una ayuda: `Por ejemplo: ana.ruiz. Letras sin acento,
+   números, punto, guion o guion bajo.` (marca de legibilidad de la pantalla, sesión 09).
 6. **Given** que ya existe un usuario con ese nombre, **sin importar mayúsculas** (`Recepcion1` choca con
    `recepcion1`) **When** se envía el alta **Then** la respuesta es `409`, con
    `Ya existe un usuario con el nombre <usuario>. Elegí otro.` en un elemento `role="alert"`, los
@@ -212,7 +214,8 @@ que nadie dependa de tocar la base de datos para administrar accesos.
 20. **Given** una sesión con ese claim **When** pide cualquier ruta que empieza con `/personal/`, salvo
     `/personal/cambiar-contrasena`, `/personal/salir`, `/personal/ingreso` y
     `/personal/acceso-denegado` **Then** recibe `302` a `/personal/cambiar-contrasena`. `Salir`
-    funciona igual. Las rutas fuera de `/personal/` (archivos estáticos, `/salud`, `/Error`) no se
+    funciona igual: la pantalla de cambio tiene un botón `Salir` (formulario a `/personal/salir` con
+    token), porque su layout no tiene menú. Las rutas fuera de `/personal/` (archivos estáticos, `/salud`, `/Error`) no se
     tocan.
 21. **Given** la pantalla `/personal/cambiar-contrasena` (layout de ingreso, sin menú) **When** envía
     `Contraseña actual`, `Contraseña nueva` y `Repetí la contraseña nueva` válidas **Then**, en una
@@ -223,7 +226,8 @@ que nadie dependa de tocar la base de datos para administrar accesos.
     `ReturnUrl` si es válido y no es la propia pantalla, si no al inicio de su rol. Después la
     contraseña temporal ya no sirve y la nueva sí.
 22. **Given** datos que no sirven **When** se envía el cambio **Then** la respuesta es `200`, con los
-    mensajes en un `role="alert"`, la contraseña no cambia, la marca sigue, no se audita y la sesión
+    mensajes en un `role="alert"`, uno por renglón; si alguno es de la política de la nueva (AC 24),
+    van debajo del título `La contraseña nueva no sirve:`. La contraseña no cambia, la marca sigue, no se audita y la sesión
     sigue obligada a cambiar (AC 20):
     - contraseña actual incorrecta → `La contraseña actual no es correcta.` (no suma intentos de
       bloqueo: ver "Decisiones");
@@ -280,9 +284,12 @@ que nadie dependa de tocar la base de datos para administrar accesos.
       **reusan con la misma firma**, no las vuelven a crear ni las copian:
       - `ActorDeSesion.Desde(ClaimsPrincipal)` (Web/Personal) arma el `ActorAuditoria` desde la sesión.
       - `ManejadorGlobalDeErrores.EstadoPara(Exception)` y `EsEsperable(Exception)` traducen una
-        excepción del dominio al mismo código que usa el manejador global. Toda página SSR del
-        administrador muestra el cartel de regla con
-        `catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))` + `EstadoPara(e)`.
+        excepción del dominio al mismo código que usa el manejador global.
+        `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, Exception)` fija ese código en la
+        respuesta de una página SSR (el 404, al empezar a enviarla: ver "Implementación concreta").
+        Toda página SSR del administrador muestra el cartel de regla con
+        `catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))` +
+        `FijarEstadoEnPagina(HttpContext, e)`.
       - `IActorVigente.ExigirAdministradorActivoAsync(actor, mensajeSiNoLoEs, ct)` (Aplicacion/Personal,
         implementado en Infraestructura/Identidad) confirma **en la base** que el actor es un
         administrador activo y devuelve el actor con su nombre leído de la base (decisión 16).
@@ -328,16 +335,16 @@ que nadie dependa de tocar la base de datos para administrar accesos.
 | T17 | `CambiarAsync_ContrasenaTemporal_CambiaHashSelloYBanderaYAudita` | 19,21,25 | integration | Alta por `CrearAsync` (rol Recepcionista); `ValidarAsync` con la temporal; `CambiarAsync(id, temporal, "Nueva-Clave-2026")` | El ingreso con la temporal es `Exitoso` con `DebeCambiarContrasena = true` y el claim `debe_cambiar_contrasena = si`; el cambio devuelve éxito, rol `Recepcionista` y un principal **sin** ese claim y con el sello nuevo; en la base la marca es `false` y el sello cambió; `ValidarAsync` con la temporal → `CredencialesInvalidas`, con la nueva → `Exitoso` sin marca; 1 fila `usuario-personal.contrasena-cambiada` con `usuario_id` = `entidad_id` = su id y detalle `{"motivo":"primer-ingreso"}` |
 | T18 | `CambiarAsync_DatosInvalidos_DevuelveMensajesEnCastellanoSinCambiar` | 22,24 | integration | `[Theory]` con usuario propio con marca: (a) actual `Mala-Clave-99`; (b) nueva igual a la actual; (c) nueva `abc` | No exitoso, con: (a) `La contraseña actual no es correcta.`; (b) `La nueva contraseña tiene que ser distinta de la actual.`; (c) los 4 textos de largo, mayúscula, número y símbolo del AC 24 (minúscula no, `abc` la tiene); hash, sello y marca sin cambio; `access_failed_count = 0`; 0 filas `usuario-personal.contrasena-cambiada` con su id |
 | T19 | `CambiarAsync_UsuarioSinBandera_CambiaYAuditaComoVoluntario` | 23 | integration | Usuario propio sin marca; cambio válido | Éxito; 1 fila `usuario-personal.contrasena-cambiada` con detalle `{"motivo":"voluntario"}` |
-| T20 | `GetUsuarios_Administrador_MuestraTablaConAccionesSegunEstado` | 1,27 | integration | `admin1` ingresa; usuarios propios: activo, desactivado, bloqueado (5 fallos); GET A4 | `200`; `<h1>Usuarios del personal</h1>`; no contiene el texto de construcción; `Cache-Control` con `no-store`; la fila de cada uno trae su estado y **sólo** su botón (`value="desactivar:<id>"`, `reactivar:<id>`, `desbloquear:<id>`); la fila de `admin1` **no** tiene `desactivar:<id de admin1>` |
+| T20 | `GetUsuarios_Administrador_MuestraTablaConAccionesSegunEstado` | 1,27 | integration | `admin1` ingresa; usuarios propios: activo, desactivado, bloqueado (5 fallos); GET A4 | `200`; `<h1>Usuarios del personal</h1>`; no contiene el texto de construcción; `Cache-Control` con `no-store`; la fila de cada uno trae su estado y **sólo** su botón (`value="desactivar:<id>"`, `reactivar:<id>`, `desbloquear:<id>`); la fila de `admin1` **no** tiene `desactivar:<id de admin1>` y dice `(sos vos)` |
 | T21 | `Usuarios_OtrosRoles_NoVenNiModifican` | 2 | integration | `[Theory]` `recepcion1`, `medico1`: GET A4 siguiendo redirecciones; después POST del alta (`_handler=alta-usuario`) con el token tomado de su propia página de inicio | GET: `403` y `No tenés permiso para entrar a esta sección.`; POST: `302` con destino que empieza con `/personal/acceso-denegado`; el usuario del alta no existe |
 | T22 | `PostAlta_DatosValidos_MuestraLaContrasenaTemporalUnaSolaVez` | 3,4 | integration | `admin1`; alta `Persona <m>` / `p-<m>` / `Recepcionista`; después GET A4; después ingreso de `p-<m>` con la temporal en otro cliente | POST: `200`, `no-store`, `role="status"` con el texto del AC 3, `<code id="contrasena-temporal">` con 12 caracteres, fila nueva, campos de alta vacíos; ninguna entrada de `ProveedorDeRegistroEnMemoria` ni el `detalle` de su fila de auditoría contiene la temporal; GET: no contiene la temporal ni `contrasena-temporal`; ingreso: `302` a `/personal/cambiar-contrasena` |
-| T23 | `PostAlta_DatosInvalidosOArmados_MuestraMensajesSinCrear` | 5 | integration | `[Theory]`: (a) los tres campos vacíos; (b) usuario `con espacio`; (c) rol `Superusuario` (POST armado) | `200`; (a) los 3 mensajes; (b) el mensaje de usuario; (c) `Elegí un rol.`; 0 usuarios nuevos con ese nombre |
+| T23 | `PostAlta_DatosInvalidosOArmados_MuestraMensajesSinCrear` | 5 | integration | `[Theory]`: (a) los tres campos vacíos; (b) usuario `con espacio`; (c) rol `Superusuario` (POST armado) | `200`; (a) los 3 mensajes; (b) el mensaje de usuario; (c) `Elegí un rol.`; en los tres, la ayuda `Por ejemplo: ana.ruiz.` debajo de `Usuario`; 0 usuarios nuevos con ese nombre |
 | T24 | `PostAlta_UsuarioRepetido_Devuelve409ConCartel` | 6 | integration | `admin1`; alta con usuario `Recepcion1` | `409`; `role="alert"` con `Ya existe un usuario con el nombre recepcion1. Elegí otro.`; el campo usuario conserva `Recepcion1`; `recepcion1` sigue siendo uno solo |
 | T25 | `PostAcciones_SegunEstado_CambianElEstadoYConfirman` | 8,11,13 | integration | `[Theory]` con usuario propio y `admin1`: (a) activo → `desactivar:<id>`; (b) desactivado → `reactivar:<id>`; (c) bloqueado → `desbloquear:<id>` | `200`; `role="status"` con el texto del AC; en la base el estado nuevo; la fila muestra el estado nuevo en la misma respuesta (la tabla se recarga después de la acción) |
 | T26 | `PostAcciones_Errores_MuestranCartelConSuCodigo` | 9,12,14,15,16 | integration | `[Theory]`: (a) admin propio ingresa y envía `desactivar:<su id>`; (b) `desactivar:` a uno ya desactivado; (c) `desbloquear:` a uno no bloqueado; (d) `desactivar:<Guid nuevo>`; (e) `borrar:<id>`; (f) admin propio ingresa, se lo desactiva en la base y, **sin** adelantar el reloj, envía `reactivar:` a un desactivado | (a) `400`; (b) `409`; (c) `409`; (d) `404`; (e) `400`; (f) `403`; cada uno con su texto exacto en `role="alert"`; en la base nada cambió |
 | T27 | `Desactivar_SesionAbiertaDelUsuario_SeCortaAlRevalidar` | 8,26 | integration | Usuario propio Recepcionista ingresa en el cliente B; `admin1` lo desactiva desde el cliente A; `Reloj.Advance(6 min)`; B pide `/personal/recepcion/turnos` | `302` con destino `/personal/ingreso?ReturnUrl=%2Fpersonal%2Frecepcion%2Fturnos` |
-| T28 | `PrimerIngreso_ContrasenaTemporal_ObligaACambiarlaAntesDeEntrar` | 19,20,21 | integration | `[Theory]` (a) sin `ReturnUrl`; (b) con `ReturnUrl=/personal/agendas`. `admin1` da de alta `p-<m>` Recepcionista por A4. En otro cliente: ingreso con la temporal; GET `/personal/recepcion/turnos`; GET `/salud` (todavía obligado); GET y POST del cambio (`Nueva-Clave-2026` dos veces); GET de la sección; `Salir`; ingreso con la temporal; ingreso con la nueva | Ingreso: `302` a `/personal/cambiar-contrasena` (b: `…?ReturnUrl=%2Fpersonal%2Fagendas`); GET sección: `302` a `/personal/cambiar-contrasena`; GET `/salud`: `200` (las rutas fuera de `/personal/` no se tocan, AC 20); POST: `302` a `/personal/recepcion/turnos` (b: `/personal/agendas`) con `Set-Cookie` de `.HospitalTurnos.Personal`; GET sección: `200`; `Salir` mientras tanto funciona; temporal: `200` con `Usuario o contraseña incorrectos.`; nueva: `302` directo al inicio |
-| T29 | `PostCambiarContrasena_Errores_MuestraMensajesYSigueObligado` | 22 | integration | `[Theory]` con usuario dado de alta por A4 e ingresado con la temporal: (a) repetida distinta; (b) actual mala; (c) nueva `corta`; (d) los tres campos vacíos | `200`; `role="alert"` con el texto del AC 22 / AC 24 que corresponde ((d): los 3 de campos vacíos); después GET `/personal/recepcion/turnos` sigue dando `302` a `/personal/cambiar-contrasena` |
+| T28 | `PrimerIngreso_ContrasenaTemporal_ObligaACambiarlaAntesDeEntrar` | 19,20,21 | integration | `[Theory]` (a) sin `ReturnUrl`; (b) con `ReturnUrl=/personal/agendas`. `admin1` da de alta `p-<m>` Recepcionista por A4. En otro cliente: ingreso con la temporal; GET `/personal/recepcion/turnos`; GET `/salud` (todavía obligado); GET y POST del cambio (`Nueva-Clave-2026` dos veces); GET de la sección; `Salir`; ingreso con la temporal; ingreso con la nueva | Ingreso: `302` a `/personal/cambiar-contrasena` (b: `…?ReturnUrl=%2Fpersonal%2Fagendas`); GET sección: `302` a `/personal/cambiar-contrasena`; GET `/salud`: `200` (las rutas fuera de `/personal/` no se tocan, AC 20); la pantalla de cambio trae el formulario `Salir` (`action="/personal/salir"`); POST: `302` a `/personal/recepcion/turnos` (b: `/personal/agendas`) con `Set-Cookie` de `.HospitalTurnos.Personal`; GET sección: `200`; `Salir` mientras tanto funciona; temporal: `200` con `Usuario o contraseña incorrectos.`; nueva: `302` directo al inicio |
+| T29 | `PostCambiarContrasena_Errores_MuestraMensajesYSigueObligado` | 22 | integration | `[Theory]` con usuario dado de alta por A4 e ingresado con la temporal: (a) repetida distinta; (b) actual mala; (c) nueva `corta`; (d) los tres campos vacíos | `200`; `role="alert"` con el texto del AC 22 / AC 24 que corresponde ((c) además con el título `La contraseña nueva no sirve:`; (d): los 3 de campos vacíos); después GET `/personal/recepcion/turnos` sigue dando `302` a `/personal/cambiar-contrasena` |
 | T30 | `Post_SinTokenAntiforgery_Devuelve400SinCambios` | 17 | integration | `[Theory]` POST sin `__RequestVerificationToken`: (a) alta válida `p-<m>`; (b) `desactivar:<id>` de un usuario propio activo; (c) cambio de contraseña de un usuario con marca | `400` en los tres; (a) no existe `p-<m>`; (b) sigue activo; (c) la marca sigue |
 | T31 | `PostAlta_FallaLaBase_MuestraErrorGenericoSinContrasena` | 18 | integration | Fábrica con `IGestionUsuariosPersonal` reemplazado por `GestionUsuariosConBaseCaida`; POST de alta con `Accept: text/html` | `500`; el cuerpo decodificado contiene `Algo falló. Probá de nuevo en unos minutos.` y no contiene `Npgsql`, `secreto` ni `contrasena-temporal`; el `ILogger` del manejador de 1.2 tiene la excepción |
 
@@ -413,49 +420,50 @@ verificación en el navegador queda en "Como verificar", paso 4, con su resultad
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar que existen y dicen lo que cita "Que existe hoy": `UsuarioPersonal`,
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar que existen y dicen lo que cita "Que existe hoy": `UsuarioPersonal`,
         `IngresoPersonalIdentity`, `RegistroIdentidad`, `IIngresoPersonal`, `AccionesAuditoria`,
         `ManejadorGlobalDeErrores`, `RutasPersonal`, `SeccionesAdministracion.razor` (con `@page "/personal/admin/usuarios"`),
         `PersonalWebApplicationFactory`, `FormularioHttp`, la T19 de la 2.1 con `TextoEnConstruccion`.
-  - [ ] Confirmar que `RegistroIdentidad.AddIdentidadPersonal` **no** cambia `RequireNonAlphanumeric`
+  - [x] Confirmar que `RegistroIdentidad.AddIdentidadPersonal` **no** cambia `RequireNonAlphanumeric`
         (queda `true`, valor por defecto de Identity) y anotarlo en el Debug Log.
-  - [ ] `dotnet test` en verde antes de tocar nada; anotar los totales por proyecto.
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio y Aplicacion (AC: 3, 5, 19, 21–23, 25)
-  - [ ] `ReglasUsuarioPersonal` (Dominio/Personal): `LargoMaximoNombre = 120`,
+  - [x] `dotnet test` en verde antes de tocar nada; anotar los totales por proyecto.
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio y Aplicacion (AC: 3, 5, 19, 21–23, 25)
+  - [x] `ReglasUsuarioPersonal` (Dominio/Personal): `LargoMaximoNombre = 120`,
         `PatronUsuario = "^[A-Za-z0-9._-]{3,100}$"` y los textos de error del AC 5.
-  - [ ] Cinco constantes en `AccionesAuditoria` (AC 25).
-  - [ ] `IGestionUsuariosPersonal` con sus registros; `IActorVigente` (pieza compartida, AC 26);
+  - [x] Cinco constantes en `AccionesAuditoria` (AC 25).
+  - [x] `IGestionUsuariosPersonal` con sus registros; `IActorVigente` (pieza compartida, AC 26);
         `ICambioContrasenaPersonal` con `ResultadoCambioContrasena`; en `IIngresoPersonal.cs`, `ResultadoIngreso` suma
         `bool DebeCambiarContrasena = false` y `ClaimsPersonal.DebeCambiarContrasena = "debe_cambiar_contrasena"`.
-- [ ] [SEQ] Task 3: Infraestructura — modelo y migración (AC: 3, 27)
-  - [ ] `UsuarioPersonal.DebeCambiarContrasena` (`bool`, sin valor por defecto en la base).
-  - [ ] Migración `GestionUsuariosPersonal` con `dotnet ef migrations add` (ver Como verificar).
+- [x] [SEQ] Task 3: Infraestructura — modelo y migración (AC: 3, 27)
+  - [x] `UsuarioPersonal.DebeCambiarContrasena` (`bool`, sin valor por defecto en la base).
+  - [x] Migración `GestionUsuariosPersonal` con `dotnet ef migrations add` (ver Como verificar).
         Tiene que agregar sólo `debe_cambiar_contrasena boolean NOT NULL DEFAULT false` a `asp_net_users`.
-  - [ ] Correr la Salvaguarda de BD.
-- [ ] [SEQ] Task 4: Infraestructura — casos de uso (AC: 3–16, 19, 21–24)
-  - [ ] `DescriptorErroresIdentity` y `.AddErrorDescriber<DescriptorErroresIdentity>()` en `RegistroIdentidad`;
+  - [x] Correr la Salvaguarda de BD.
+- [x] [SEQ] Task 4: Infraestructura — casos de uso (AC: 3–16, 19, 21–24)
+  - [x] `DescriptorErroresIdentity` y `.AddErrorDescriber<DescriptorErroresIdentity>()` en `RegistroIdentidad`;
         registrar `IGestionUsuariosPersonal`, `ICambioContrasenaPersonal`, `IActorVigente` →
         `ActorVigenteIdentity` y `FabricaPrincipalPersonal` (scoped).
-  - [ ] `ContrasenaTemporal.Generar()`.
-  - [ ] `FabricaPrincipalPersonal`; `IngresoPersonalIdentity` la usa en el paso 6 y devuelve la marca.
-  - [ ] `GestionUsuariosPersonalIdentity` y `CambioContrasenaPersonalIdentity` (Implementación concreta).
-  - [ ] `UsuariosDePrueba`, dobles y T1–T19 en verde.
-- [ ] [SEQ] Task 5: Web (AC: 1–3, 5, 6, 8, 9, 11–23)
-  - [ ] `ManejadorGlobalDeErrores`: extraer el `switch` a `public static int EstadoPara(Exception)` y sumar
-        `public static bool EsEsperable(Exception)`; `TryHandleAsync` los usa (mismo comportamiento).
-  - [ ] `ActorDeSesion`, `CambioDeContrasenaObligatorio` (y `app.UseCambioDeContrasenaObligatorio()` en
+  - [x] `ContrasenaTemporal.Generar()`.
+  - [x] `FabricaPrincipalPersonal`; `IngresoPersonalIdentity` la usa en el paso 6 y devuelve la marca.
+  - [x] `GestionUsuariosPersonalIdentity` y `CambioContrasenaPersonalIdentity` (Implementación concreta).
+  - [x] `UsuariosDePrueba`, dobles y T1–T19 en verde.
+- [x] [SEQ] Task 5: Web (AC: 1–3, 5, 6, 8, 9, 11–23)
+  - [x] `ManejadorGlobalDeErrores`: extraer el `switch` a `public static int EstadoPara(Exception)` y sumar
+        `public static bool EsEsperable(Exception)` y `public static void FijarEstadoEnPagina(HttpContext, Exception)`;
+        `TryHandleAsync` usa los dos primeros (mismo comportamiento).
+  - [x] `ActorDeSesion`, `CambioDeContrasenaObligatorio` (y `app.UseCambioDeContrasenaObligatorio()` en
         `Program.cs` entre `UseAuthentication()` y `UseAuthorization()`), `RutasPersonal.CambiarContrasena`.
-  - [ ] Sacar `@page "/personal/admin/usuarios"` de `SeccionesAdministracion.razor`; crear
+  - [x] Sacar `@page "/personal/admin/usuarios"` de `SeccionesAdministracion.razor`; crear
         `Administracion/UsuariosPersonal.razor` (abre la carpeta única de las páginas del
         administrador, AC 26) y `CambiarContrasena.razor`.
-  - [ ] `Ingreso.razor`: si `resultado.DebeCambiarContrasena`, el destino es la pantalla de cambio (AC 19).
-- [ ] [SEQ] Task 6: Pruebas de Web y verificación (AC: todos)
-  - [ ] `FormularioHttp.EnviarAsync` y `Estado`; `RutasYaConstruidas` en la T19 de la 2.1.
-  - [ ] `GestionUsuariosConBaseCaida` y T20–T31 en verde.
-  - [ ] Suite completa y `bash scripts/ci/local.sh` sin regresiones (AC 27).
-  - [ ] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent Record.
+  - [x] `Ingreso.razor`: si `resultado.DebeCambiarContrasena`, el destino es la pantalla de cambio (AC 19).
+- [x] [SEQ] Task 6: Pruebas de Web y verificación (AC: todos)
+  - [x] `FormularioHttp.EnviarAsync` y `Estado`; `RutasYaConstruidas` en la T19 de la 2.1.
+  - [x] `GestionUsuariosConBaseCaida` y T20–T31 en verde.
+  - [x] Suite completa y `bash scripts/ci/local.sh` sin regresiones (AC 27).
+  - [x] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent Record.
 
 ### Task Dependencies
 
@@ -503,8 +511,8 @@ Dentro de T4, `DescriptorErroresIdentity` y `ContrasenaTemporal` pueden hacerse 
   (nombres en camelCase). `ActorAuditoria(string? UsuarioId, string Quien, string Rol, CanalAuditoria Canal)`.
   `CanalAuditoria.Personal` existe.
 - `AccionesAuditoria` (Dominio/Auditoria): hoy tiene 9 constantes de turnos y agenda con punto
-  (`turno.reservado`) y las 3 de la 2.1 en kebab-case sin punto (`ingreso-personal`). Esta story sigue
-  el estilo de la 2.1 (pedido del brief del sprint 2: kebab-case).
+  (`turno.reservado`) y las 3 de la 2.1 en kebab-case sin punto (`ingreso-personal`). Esta story usa
+  `<entidad>.<acción>` con punto, como las 9 de la 1.3 (AC 25, decisión del docente sobre M-7).
 - Excepciones del dominio (Dominio/Excepciones): `ReglaDeNegocioException` (→400),
   `ConflictoException : ReglaDeNegocioException` (→409), `NoEncontradoException` (→404),
   `AccesoDenegadoException` (→403). `ManejadorGlobalDeErrores.TryHandleAsync` las traduce con un
@@ -517,8 +525,8 @@ Dentro de T4, `DescriptorErroresIdentity` y `ContrasenaTemporal` pueden hacerse 
   usuarios, auditoria) con `[Authorize(Roles = Administrador)]` y dibuja `SeccionEnConstruccion`.
   `AccesoDenegado.razor:21` fija `HttpContext.Response.StatusCode = 403` y dibuja: así se sabe que una
   página SSR puede cambiar su código sin que `UseStatusCodePagesWithReExecute` la reemplace.
-- `Ingreso.razor`: `EditForm` con `FormName="ingreso"` (línea 22), `[SupplyParameterFromForm]` (línea 45),
-  `HttpContext.SignInAsync` (línea 72) y `NavigateTo` (línea 75). Sin `try/catch`.
+- `Ingreso.razor`: `EditForm` con `FormName="ingreso"`, `[SupplyParameterFromForm] Formulario? Input`, y en
+  `IngresarAsync` `HttpContext.SignInAsync` seguido de `Navegacion.NavigateTo`. Sin `try/catch`.
 - `SesionPersonal`: esquema `"Personal"`, 30 min deslizante, revalidación cada 5 min con
   `ValidadorSesionPersonal` (2.1 AC 25). `Program.cs`: `UseAuthentication()`, `UseAuthorization()`,
   `UseAntiforgery()` en ese orden.
@@ -529,7 +537,7 @@ Dentro de T4, `DescriptorErroresIdentity` y `ContrasenaTemporal` pueden hacerse 
   Web.Tests. La `PostgresFixture` de Aplicacion.Tests vive en
   `tests/HospitalTurnos.Aplicacion.Tests/PostgresFixture.cs` (el contrato dice `Infraestructura/`, el
   archivo real está en la raíz del proyecto: se usa el real, no se mueve).
-- `SesionYPermisosHttpTests.cs:119` (2.1 T19) exige `TextoEnConstruccion` en **toda** sección
+- `SesionYPermisosHttpTests.Secciones_SegunRol_PermiteLasSuyasYDevuelve403LegibleEnLasAjenas` (2.1 T19) exige `TextoEnConstruccion` en **toda** sección
   permitida, incluida `/personal/admin/usuarios`: por eso esta story la modifica (AC 27).
 - `MenuLateralTests` (2.1 T21) compara los enlaces del menú **exactamente**: agregar un enlace la rompe.
 
@@ -555,10 +563,10 @@ Dentro de T4, `DescriptorErroresIdentity` y `ContrasenaTemporal` pueden hacerse 
 
 | Ancla `archivo:línea` | Qué se verificó y qué se toma |
 |---|---|
-| `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor:22` | `<EditForm Model="Input" method="post" OnValidSubmit="IngresarAsync" FormName="ingreso">` + `DataAnnotationsValidator`: formulario SSR validado en el servidor. Se toma para el alta y el cambio. |
+| `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor` (el `EditForm` de `FormName="ingreso"`) | `<EditForm Model="Input" method="post" OnValidSubmit="IngresarAsync" FormName="ingreso">` + `DataAnnotationsValidator`: formulario SSR validado en el servidor. Se toma para el alta y el cambio. |
 | `src/HospitalTurnos.Web/Components/Personal/AccesoDenegado.razor:21` | Una página SSR fija su propio código de estado. Se toma para el `409/400/403/404` de los carteles. |
 | `src/HospitalTurnos.Infraestructura/Identidad/SembradorPersonal.cs:63` | `Asegurar(IdentityResult)`: un resultado fallido de Identity lanza con código y descripción. Se repite en los casos de uso nuevos. |
-| `tests/HospitalTurnos.Web.Tests/Personal/FormularioHttp.cs:104` | `CrearUsuarioAsync` crea un usuario propio por prueba. Se usa tal cual. |
+| `tests/HospitalTurnos.Web.Tests/Personal/FormularioHttp.cs` (`CrearUsuarioAsync`) | `CrearUsuarioAsync` crea un usuario propio por prueba. Se usa tal cual. |
 | `tests/HospitalTurnos.Web.Tests/Personal/PersonalWebApplicationFactory.cs` | Fábrica con reloj de prueba y registro en memoria. Se usa sin cambios. |
 
 **Patrón 2 — cambio de contraseña: plantilla oficial** (no está en el proyecto guía
@@ -620,7 +628,7 @@ ejecutable por cualquier rol; se suelta sola al terminar la transacción).
   revisión, decisión 16).
 - **Errores de regla en pantallas SSR**: la página atrapa **sólo** las excepciones del dominio
   (`catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))`), fija el código que fija el
-  manejador global (`EstadoPara`) y muestra el mensaje en un cartel arriba del formulario, conservando
+  manejador global (`FijarEstadoEnPagina`, que usa `EstadoPara`) y muestra el mensaje en un cartel arriba del formulario, conservando
   lo escrito (UX §8, "Error de regla de negocio"). Lo inesperado sigue al manejador global (AC 18). El
   mapeo excepción → código vive en un solo lugar, el manejador de 1.2. El docente lo eligió para las
   tres pantallas del sprint (decisión 1): la 3.1 y la 3.2 usan este mismo mecanismo.
@@ -867,11 +875,17 @@ try
 }
 catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
 {
-    HttpContext.Response.StatusCode = ManejadorGlobalDeErrores.EstadoPara(e);
+    ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
     cartel = e.Message;           // role="alert" arriba del formulario
 }
 await CargarAsync();
 ```
+
+  **Por qué `FijarEstadoEnPagina` y no `Response.StatusCode = EstadoPara(e)`** (hallado al implementar):
+  en .NET 10, Blazor SSR no escribe el cuerpo de una página que terminó de dibujarse con código 404
+  (`RazorComponentEndpointInvoker` lo deja para la página "no encontrada" del router): el cartel del
+  AC 16 no llegaba. `FijarEstadoEnPagina` fija 400, 403 y 409 en el acto y el 404 en
+  `Response.OnStarting`, justo antes de enviar los encabezados.
 
   `Accion` se separa en `tipo:id`; un tipo que no es `desactivar`, `reactivar` o `desbloquear`, o un id
   que no es `Guid`, lanza `ReglaDeNegocioException("No reconocemos esa acción. Recargá la página.")`
@@ -941,7 +955,7 @@ Contra el PostgreSQL de Compose (mismo `01-roles.sh` que la `PostgresFixture`):
 | Modificar | `IIngresoPersonal.cs` (`ResultadoIngreso.DebeCambiarContrasena`, `ClaimsPersonal.DebeCambiarContrasena`) |
 | Modificar | `Program.cs` (`app.UseCambioDeContrasenaObligatorio()`) |
 | Modificar | `RutasPersonal.cs` (`CambiarContrasena = "/personal/cambiar-contrasena"`) |
-| Modificar | `ManejadorGlobalDeErrores.cs` (`EstadoPara` y `EsEsperable`, sin cambiar comportamiento) |
+| Modificar | `ManejadorGlobalDeErrores.cs` (`EstadoPara`, `EsEsperable` y `FijarEstadoEnPagina`, sin cambiar el comportamiento del manejador) |
 | Modificar | `Ingreso.razor` (destino del AC 19) |
 | Modificar | `SeccionesAdministracion.razor` (quitar `@page "/personal/admin/usuarios"`) |
 | Modificar | `FormularioHttp.cs` (`EnviarAsync`, `Estado`) |
@@ -1013,18 +1027,100 @@ open http://localhost:8080/personal/ingreso
 
 # 5. La auditoría quedó escrita, sin contraseñas
 docker compose exec db psql -U postgres -d hospital_turnos \
-  -c "SELECT cuando, quien, rol, accion, entidad_id, detalle FROM registros_auditoria WHERE accion LIKE 'usuario-personal-%' OR accion = 'usuario-personal.contrasena-cambiada' ORDER BY id DESC LIMIT 10;"
+  -c "SELECT cuando, quien, rol, accion, entidad_id, detalle FROM registros_auditoria WHERE accion LIKE 'usuario-personal.%' ORDER BY id DESC LIMIT 10;"
 ```
 
 ## Dev Agent Record
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), sesión 09 (2026-10-16), circuito completo: validación, plan aprobado,
+pruebas primero, revisores y prueba en vivo.
+
 ### Debug Log References
+
+- Línea de base antes de tocar nada (`main` 462f415): Dominio 20, Aplicacion 52, Web 107 → 179 en verde.
+- `RegistroIdentidad.AddIdentidadPersonal` no toca `RequireNonAlphanumeric`: queda en `true` (valor de
+  Identity). Se dejó un comentario en el archivo.
+- Salvaguarda de BD (Compose, después de `docker compose up -d --build`): `debe_cambiar_contrasena |
+  boolean | NO | false`; `0` usuarios obligados; permisos `t | t | f`. Coincide con lo esperado.
+- Migración generada `20261016212111_GestionUsuariosPersonal`: sólo `AddColumn<bool>` con
+  `defaultValue: false` y su snapshot.
+- Rojo de las pruebas: Aplicacion.Tests no compilaba por los tipos que la story manda crear (rojo
+  legítimo); Web.Tests compilaba y 25 de 28 casos fallaban por las pantallas ausentes. Los 3 que ya
+  pasaban son T30 (POST sin token → `400`): ese freno lo da el antifalsificación del framework desde la
+  1.1, y la prueba queda como protección de no-regresión del AC 17.
+- T9 sin el candado (`pg_advisory_xact_lock` comentado): falló 5 de 5 corridas; con el candado, verde.
+  La prueba protege lo que dice.
+- Suite completa (portón de pruebas, por proyecto porque el repo usa `.slnx`): Dominio 20, Aplicacion 94,
+  Web 135 → 249 en verde (antes 179). `bash scripts/ci/local.sh`: rc 0, cobertura de líneas 98,1 %
+  (umbral 80 %), ramas 100 %.
+- Prueba en vivo (paso 4 de "Como verificar"): Chrome contra el Compose, 5 grupos registrados con
+  `smoke-run.sh` + la CI local, todos con 0 fallas; matriz por AC 27/27 en vivo
+  (`.advisors/dod-runtime/2.2-runtime-matrix.md`). Incluye la auditoría caída (INSERT revocado y
+  restaurado), dos administradores a la vez y la base detenida. Capturas en `Sesiones/img/09-*`.
+- Revisores: 3 vueltas (7, 6 y 4 revisores), sin CRITICAL; los avisos quedaron resueltos o anotados en
+  "Review Follow-ups".
 
 ### Completion Notes List
 
+- **El 404 del cartel (AC 16) necesitó un ajuste a la "Implementación concreta".** En .NET 10, Blazor
+  SSR no escribe el cuerpo de una página que terminó de dibujarse con `StatusCode = 404`
+  (`RazorComponentEndpointInvoker`: lo deja para la página "no encontrada" del router). Fijar el 404
+  en el manejador, como dice la story, devolvía 404 **sin** el cartel. La página A4 fija el 404 en
+  `Response.OnStarting` (justo antes de enviar los encabezados); 400, 403 y 409 se fijan en el acto.
+  Por decisión del docente (Hallazgos, vuelta 1) quedó como pieza compartida:
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina` (AC 26 e "Implementación concreta" actualizados). La
+  3.1 y la 3.2 lo reusan; sus stories todavía dicen `Response.StatusCode = EstadoPara(e)` y se
+  corrigen al validarlas antes de implementar (pendiente anotado).
+- `FormularioAlta` saca los espacios de los extremos al recibir el valor, así la página valida lo mismo
+  que el caso de uso (`  ana.ruiz  ` es válido, AC 3).
+- La pantalla de cambio de contraseña junta en un solo `role="alert"` los mensajes de los campos y los
+  de Identity (AC 22); no repite mensajes debajo de cada campo.
+- A4 muestra el rol `Medico` como `Médico` (el valor guardado no cambia).
+
 ### File List
+
+- Creado: `docs/qa/2.2-pasos.md`
+- Creado: `src/HospitalTurnos.Aplicacion/Personal/IActorVigente.cs`
+- Creado: `src/HospitalTurnos.Aplicacion/Personal/ICambioContrasenaPersonal.cs`
+- Creado: `src/HospitalTurnos.Aplicacion/Personal/IGestionUsuariosPersonal.cs`
+- Modificado: `src/HospitalTurnos.Aplicacion/Personal/IIngresoPersonal.cs`
+- Modificado: `src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs`
+- Creado: `src/HospitalTurnos.Dominio/Personal/ReglasUsuarioPersonal.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/ActorVigenteIdentity.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/CambioContrasenaPersonalIdentity.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/ContrasenaTemporal.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/DescriptorErroresIdentity.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/FabricaPrincipalPersonal.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs`
+- Modificado: `src/HospitalTurnos.Infraestructura/Identidad/IngresoPersonalIdentity.cs`
+- Modificado: `src/HospitalTurnos.Infraestructura/Identidad/RegistroIdentidad.cs`
+- Modificado: `src/HospitalTurnos.Infraestructura/Identidad/UsuarioPersonal.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016212111_GestionUsuariosPersonal.Designer.cs`
+- Creado: `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016212111_GestionUsuariosPersonal.cs`
+- Modificado: `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs`
+- Creado: `src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor`
+- Creado: `src/HospitalTurnos.Web/Components/Personal/CambiarContrasena.razor`
+- Modificado: `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor`
+- Modificado: `src/HospitalTurnos.Web/Components/Personal/Secciones/SeccionesAdministracion.razor`
+- Modificado: `src/HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs`
+- Creado: `src/HospitalTurnos.Web/Personal/ActorDeSesion.cs`
+- Creado: `src/HospitalTurnos.Web/Personal/CambioDeContrasenaObligatorio.cs`
+- Modificado: `src/HospitalTurnos.Web/Personal/RutasPersonal.cs`
+- Modificado: `src/HospitalTurnos.Web/Program.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Ayudas/UsuariosDePrueba.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Personal/CambioContrasenaPersonalIdentityTests.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Personal/ContrasenaTemporalTests.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Personal/Dobles/AuditoriaQueFalla.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Personal/Dobles/ValidadorUsuarioQueAceptaTodo.cs`
+- Creado: `tests/HospitalTurnos.Aplicacion.Tests/Personal/GestionUsuariosPersonalIdentityTests.cs`
+- Creado: `tests/HospitalTurnos.Web.Tests/Personal/CambioContrasenaHttpTests.cs`
+- Creado: `tests/HospitalTurnos.Web.Tests/Personal/Dobles/GestionUsuariosConBaseCaida.cs`
+- Modificado: `tests/HospitalTurnos.Web.Tests/Personal/FormularioHttp.cs`
+- Modificado: `tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs`
+- Creado: `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs`
+- Modificado: `docs/stories/2-2-gestion-usuarios.md`
 
 ### Change Log
 
@@ -1036,3 +1132,28 @@ docker compose exec db psql -U postgres -d hospital_turnos \
   la carpeta `Administracion/` (I-2), `FormularioHttp.EnviarAsync`/`Estado`, `RutasYaConstruidas` y
   la ayuda nueva `UsuariosDePrueba`. Estilo de acciones de auditoría escrito (M-7). T28 suma `/salud`
   (M-11). Decisiones 1–4, 16 y 17 tomadas; ninguna abierta. Siguen 27 AC y 31 verificaciones.
+- 2026-10-16: Al validar antes de implementar (sesión 09): las citas por número de línea de archivos
+  que esta story modifica pasan a nombrar el método o el formulario; la nota de `AccionesAuditoria` y la
+  consulta del paso 5 de "Como verificar" quedan con `usuario-personal.` (con punto), como el AC 25.
+  Ningún AC ni prueba cambia.
+- 2026-10-16: Hallazgos de la vuelta 1 de revisores (sesión 09), con decisión del docente: el AC 26 suma
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, Exception)` como pieza compartida, porque
+  Blazor .NET 10 no escribe el cuerpo de una página SSR en 404 (el cartel del AC 16 no llegaba).
+  "Implementación concreta" y la tabla de archivos lo reflejan. El alta traduce a "usuario repetido"
+  sólo el 23505 del índice `user_name_index` (lo nombra el AC 6). Ningún AC cambia de resultado; las
+  pruebas no cambian.
+- 2026-10-16: Revisión de legibilidad de las pantallas (tester no técnico, sesión 09), con decisión del
+  docente: AC 1 suma `(sos vos)` en la fila propia; AC 5, la ayuda debajo de `Usuario`; AC 20, el botón
+  `Salir` en la pantalla de cambio; AC 22, un mensaje por renglón y el título `La contraseña nueva no
+  sirve:` para los de la política. T20, T23, T28 y T29 verifican esos textos. Queda fuera: al terminar
+  el cambio la persona llega a su inicio, que todavía dice "en construcción" (lo construyen sus stories).
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[WARNING]** SPEC-W2 — `docs/stories/2-2-gestion-usuarios.md` — Decisión del docente: FijarEstadoEnPagina como pieza compartida en ManejadorGlobalDeErrores; AC 26, Implementación concreta y Change Log actualizados. <!-- fkey:SPEC-W2|docs/stories/2-2-gestion-usuarios.md -->
+- [x] **[WARNING]** SILENT-W — `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs` — El catch del 23505 filtra por ConstraintName user_name_index. <!-- fkey:SILENT-W|src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/2-2-gestion-usuarios.md` — File List, Tasks y Status del cuerpo se completan al preparar el commit; el ajuste del 404 pasó a Implementación concreta. <!-- fkey:VAL-W15|docs/stories/2-2-gestion-usuarios.md -->
+- [x] **[WARNING]** VAL-W14 — `docs/stories/2-2-gestion-usuarios.md` — Ancla de FormularioHttp citada por CrearUsuarioAsync. <!-- fkey:VAL-W14|docs/stories/2-2-gestion-usuarios.md -->
+- [ ] **[WARNING]** TEST-W — `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs` — Vuelta 2: sin prueba del 23505 de otro índice. El alta no puede provocarlo hoy (el único índice único que toca es user_name_index); la rama va al manejador global, cubierto por la 1.2. <!-- fkey:TEST-W|src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs -->

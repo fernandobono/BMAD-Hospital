@@ -1,0 +1,236 @@
+@page "/personal/admin/usuarios"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@using System.ComponentModel.DataAnnotations
+@using System.Security.Claims
+@using HospitalTurnos.Aplicacion.Personal
+@using HospitalTurnos.Dominio.Excepciones
+@using HospitalTurnos.Dominio.Personal
+@using HospitalTurnos.Web.Errores
+@inject IGestionUsuariosPersonal Gestion
+@inject TimeProvider Reloj
+
+@* A4 (UX §7), renderizado estático como S0. La página atrapa SÓLO las excepciones del dominio y muestra
+   su mensaje en un cartel con el código del manejador global; lo inesperado sigue a ese manejador (AC 18). *@
+<PageTitle>Usuarios del personal · Las Acacias</PageTitle>
+
+<h1>Usuarios del personal</h1>
+
+@if (cartel is not null)
+{
+    <div class="alert alert-danger" role="alert">@cartel</div>
+}
+@if (alta is not null)
+{
+    @* La contraseña se dibuja acá una sola vez: no se guarda en ningún otro lado (AC 4). *@
+    <div class="alert alert-success" role="status">Creaste el usuario @alta.Usuario (@EtiquetaDe(alta.Rol)). Contraseña temporal: <code id="contrasena-temporal">@alta.ContrasenaTemporal</code>. Anotala y dásela a la persona: no se vuelve a mostrar. La tiene que cambiar en su primer ingreso.</div>
+}
+else if (confirmacion is not null)
+{
+    <div class="alert alert-success" role="status">@confirmacion</div>
+}
+
+<section class="mb-4" style="max-width: 32rem;">
+    <h2 class="h5">Dar de alta</h2>
+    <EditForm EditContext="contextoAlta" method="post" OnValidSubmit="CrearAsync" FormName="alta-usuario">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label for="alta-nombre" class="form-label">Nombre completo</label>
+            <InputText id="alta-nombre" class="form-control" @bind-Value="Alta!.NombreCompleto" />
+            <ValidationMessage For="() => Alta!.NombreCompleto" class="text-danger" />
+        </div>
+        <div class="mb-3">
+            <label for="alta-usuario" class="form-label">Usuario</label>
+            <InputText id="alta-usuario" class="form-control" @bind-Value="Alta!.Usuario" autocomplete="off" aria-describedby="alta-usuario-ayuda" />
+            <div id="alta-usuario-ayuda" class="form-text">Por ejemplo: ana.ruiz. Letras sin acento, números, punto, guion o guion bajo.</div>
+            <ValidationMessage For="() => Alta!.Usuario" class="text-danger" />
+        </div>
+        <div class="mb-3">
+            <label for="alta-rol" class="form-label">Rol</label>
+            <InputSelect id="alta-rol" class="form-select" @bind-Value="Alta!.Rol">
+                <option value="">Elegí un rol</option>
+                @foreach (var rol in Roles.Todos)
+                {
+                    <option value="@rol">@EtiquetaDe(rol)</option>
+                }
+            </InputSelect>
+            <ValidationMessage For="() => Alta!.Rol" class="text-danger" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Dar de alta</button>
+    </EditForm>
+</section>
+
+@* Un solo formulario para todas las acciones: el navegador envía sólo el botón pulsado (Accion = tipo:id). *@
+<form method="post" @formname="acciones-usuarios" @onsubmit="EjecutarAccionAsync">
+    <AntiforgeryToken />
+    <table class="table align-middle">
+        <thead>
+            <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var fila in filas)
+            {
+                var bloqueado = fila.BloqueadoHasta is not null;
+                <tr>
+                    <td>@fila.Usuario</td>
+                    <td>@fila.NombreCompleto</td>
+                    <td>@EtiquetaDe(fila.Rol)</td>
+                    <td>
+                        @(fila.Activo ? "Activo" : "Desactivado")
+                        @if (bloqueado)
+                        {
+                            <br /><span>Bloqueado hasta las @TimeZoneInfo.ConvertTime(fila.BloqueadoHasta!.Value, Reloj.LocalTimeZone).ToString("HH:mm")</span>
+                        }
+                        @if (fila.DebeCambiarContrasena)
+                        {
+                            <br /><span>Debe cambiar la contraseña</span>
+                        }
+                    </td>
+                    <td>
+                        @if (fila.Id == idPropio)
+                        {
+                            <span class="text-muted">(sos vos)</span>   @* nadie se desactiva a sí mismo (AC 9) *@
+                        }
+                        else if (fila.Activo)
+                        {
+                            <button type="submit" class="btn btn-sm btn-outline-danger" name="Accion" value="desactivar:@fila.Id">Desactivar</button>
+                        }
+                        @if (!fila.Activo)
+                        {
+                            <button type="submit" class="btn btn-sm btn-outline-primary" name="Accion" value="reactivar:@fila.Id">Reactivar</button>
+                        }
+                        @if (bloqueado)
+                        {
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" name="Accion" value="desbloquear:@fila.Id">Desbloquear</button>
+                        }
+                    </td>
+                </tr>
+            }
+        </tbody>
+    </table>
+</form>
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "alta-usuario")]
+    private FormularioAlta? Alta { get; set; }
+
+    [SupplyParameterFromForm(FormName = "acciones-usuarios")]
+    private string? Accion { get; set; }
+
+    private EditContext contextoAlta = default!;
+    private ValidationMessageStore mensajesAlta = default!;
+    private IReadOnlyList<UsuarioPersonalFila> filas = [];
+    private Guid? idPropio;
+    private AltaUsuarioPersonal? alta;
+    private string? confirmacion;
+    private string? cartel;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // La respuesta del alta trae la contraseña: que "Atrás" no la saque de la memoria del navegador.
+        HttpContext.Response.Headers.CacheControl = "no-store";
+        idPropio = Guid.TryParse(HttpContext.User.FindFirstValue(ClaimTypes.NameIdentifier), out var id) ? id : null;
+        PrepararAlta(Alta ?? new());
+        // OnInitializedAsync corre ANTES del manejador del formulario: cada manejador vuelve a cargar.
+        await CargarAsync();
+    }
+
+    private void PrepararAlta(FormularioAlta formulario)
+    {
+        Alta = formulario;
+        contextoAlta = new EditContext(formulario);
+        mensajesAlta = new ValidationMessageStore(contextoAlta);
+    }
+
+    private async Task CargarAsync() => filas = await Gestion.ListarAsync(HttpContext.RequestAborted);
+
+    private async Task CrearAsync()
+    {
+        // Un POST armado puede traer cualquier rol (NFR-10).
+        if (!Roles.Todos.Contains(Alta!.Rol!))
+        {
+            mensajesAlta.Add(() => Alta.Rol!, ReglasUsuarioPersonal.RolInvalido);
+            contextoAlta.NotifyValidationStateChanged();
+            return;
+        }
+        try
+        {
+            alta = await Gestion.CrearAsync(new(Alta.NombreCompleto, Alta.Usuario, Alta.Rol),
+                ActorDeSesion.Desde(HttpContext.User), HttpContext.RequestAborted);
+            PrepararAlta(new());   // el formulario vuelve vacío
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            MostrarCartel(e);   // lo tipeado queda en los campos
+        }
+        await CargarAsync();
+    }
+
+    private async Task EjecutarAccionAsync()
+    {
+        try
+        {
+            var partes = (Accion ?? "").Split(':', 2);
+            if (partes.Length != 2 || !Guid.TryParse(partes[1], out var id))
+                throw new ReglaDeNegocioException(AccionDesconocida);
+            var actor = ActorDeSesion.Desde(HttpContext.User);
+            var ct = HttpContext.RequestAborted;
+            var usuario = filas.FirstOrDefault(f => f.Id == id)?.Usuario;
+            switch (partes[0])
+            {
+                case "desactivar":
+                    await Gestion.DesactivarAsync(id, actor, ct);
+                    confirmacion = $"Desactivaste a {usuario}. Si tenía una sesión abierta, se corta en 5 minutos como máximo.";
+                    break;
+                case "reactivar":
+                    await Gestion.ReactivarAsync(id, actor, ct);
+                    confirmacion = $"Reactivaste a {usuario}. Ya puede ingresar con su contraseña.";
+                    break;
+                case "desbloquear":
+                    await Gestion.DesbloquearAsync(id, actor, ct);
+                    confirmacion = $"Desbloqueaste a {usuario}. Ya puede volver a intentar el ingreso.";
+                    break;
+                default:
+                    throw new ReglaDeNegocioException(AccionDesconocida);
+            }
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            MostrarCartel(e);
+        }
+        await CargarAsync();
+    }
+
+    // El código del manejador global y el mensaje en un cartel arriba del formulario (decisión 1 del docente).
+    private void MostrarCartel(Exception e)
+    {
+        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+        cartel = e.Message;
+    }
+
+    private const string AccionDesconocida = "No reconocemos esa acción. Recargá la página.";
+
+    // El rol se guarda sin acento (es el valor de Identity y de la auditoría); en pantalla, con acento.
+    private static string EtiquetaDe(string rol) => rol == Roles.Medico ? "Médico" : rol;
+
+    private sealed class FormularioAlta
+    {
+        private string? nombreCompleto;
+        private string? usuario;
+
+        // Sin espacios en los extremos antes de validar, igual que el caso de uso (AC 3).
+        [Required(ErrorMessage = ReglasUsuarioPersonal.NombreVacio)]
+        [StringLength(ReglasUsuarioPersonal.LargoMaximoNombre, ErrorMessage = ReglasUsuarioPersonal.NombreLargo)]
+        public string? NombreCompleto { get => nombreCompleto; set => nombreCompleto = value?.Trim(); }
+
+        [Required(ErrorMessage = ReglasUsuarioPersonal.UsuarioVacio)]
+        [RegularExpression(ReglasUsuarioPersonal.PatronUsuario, ErrorMessage = ReglasUsuarioPersonal.UsuarioInvalido)]
+        public string? Usuario { get => usuario; set => usuario = value?.Trim(); }
+
+        [Required(ErrorMessage = ReglasUsuarioPersonal.RolInvalido)]
+        public string? Rol { get; set; }
+    }
+}

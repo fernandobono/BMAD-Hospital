@@ -17,6 +17,9 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
     private const string IngresoConVueltaATurnos = "/personal/ingreso?ReturnUrl=%2Fpersonal%2Frecepcion%2Fturnos";
     private const string TextoEnConstruccion = "Esta sección se habilita en una próxima versión.";
 
+    // Las secciones que ya dejaron de estar "en construcción" (las suma la story que las construye).
+    private static readonly string[] RutasYaConstruidas = ["/personal/admin/usuarios"];
+
     // La tabla del AC 13, escrita acá a mano (no se lee de RutasPersonal: la prueba no copia al código).
     // ruta, título, roles con permiso
     private static readonly (string Ruta, string Titulo, string[] Roles)[] Secciones =
@@ -131,7 +134,11 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
         {
             Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
             Assert.Contains($"<h1>{seccion.Titulo}</h1>", html);
-            Assert.Contains(TextoEnConstruccion, html);
+            // Cada story que construye una sección suma su ruta a RutasYaConstruidas (story 2.2, AC 27).
+            if (RutasYaConstruidas.Contains(ruta))
+                Assert.DoesNotContain(TextoEnConstruccion, html);
+            else
+                Assert.Contains(TextoEnConstruccion, html);
         }
         else
         {

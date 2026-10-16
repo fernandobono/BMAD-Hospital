@@ -18,4 +18,12 @@ public static class AccionesAuditoria
     public const string IngresoPersonal = "ingreso-personal";
     public const string IngresoPersonalFallido = "ingreso-personal-fallido";
     public const string IngresoPersonalBloqueado = "ingreso-personal-bloqueado";
+
+    // Story 2.2: la administración de usuarios (A4) y el cambio de contraseña. Estilo <entidad>.<acción>,
+    // como las de turnos y agenda (contrato técnico §Auditoría).
+    public const string UsuarioPersonalCreado = "usuario-personal.creado";
+    public const string UsuarioPersonalDesactivado = "usuario-personal.desactivado";
+    public const string UsuarioPersonalReactivado = "usuario-personal.reactivado";
+    public const string UsuarioPersonalDesbloqueado = "usuario-personal.desbloqueado";
+    public const string ContrasenaPersonalCambiada = "usuario-personal.contrasena-cambiada";
 }

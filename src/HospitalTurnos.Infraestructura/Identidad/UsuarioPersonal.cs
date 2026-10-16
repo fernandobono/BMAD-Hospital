@@ -13,4 +13,10 @@ public class UsuarioPersonal : IdentityUser<Guid>
 
     /// <summary>Desactivar (story 2.2) corta el ingreso y, al revalidar, las sesiones abiertas.</summary>
     public bool Activo { get; set; } = true;
+
+    /// <summary>
+    /// Entró por A4 con una contraseña temporal y todavía no eligió la suya (story 2.2, S-30). Por defecto
+    /// false: el administrador inicial y los usuarios previos no quedan obligados (AC 27).
+    /// </summary>
+    public bool DebeCambiarContrasena { get; set; }
 }

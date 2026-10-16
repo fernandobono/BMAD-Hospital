@@ -12,6 +12,8 @@ public static class RutasPersonal
     public const string Ingreso = "/personal/ingreso";
     public const string AccesoDenegado = "/personal/acceso-denegado";
     public const string Salir = "/personal/salir";
+    // Story 2.2: fuera del menú (rompería la prueba del menú de la 2.1); se llega por la dirección.
+    public const string CambiarContrasena = "/personal/cambiar-contrasena";
 
     public const string Turnos = "/personal/recepcion/turnos";
     public const string Agendas = "/personal/agendas";
