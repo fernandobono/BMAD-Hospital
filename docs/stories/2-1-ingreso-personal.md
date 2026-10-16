@@ -2,7 +2,7 @@
 epic: 2
 story: "2.1"
 title: "Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión"
-status: in-progress
+status: review
 sprint: 1
 priority: "P0"
 approach: "[ADAPT]"
@@ -56,7 +56,7 @@ files_to_modify:
 
 # Story 2.1: Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión
 
-Status: in-progress
+Status: review
 
 ## Story
 
@@ -850,6 +850,8 @@ Claude Opus 5.5 (`claude-opus-5-5`), pipeline TYCON (sesión 07, 2026-10-16).
   la sección; e) usuario inexistente → el mismo mensaje; f) 5 contraseñas malas → mismo mensaje, y con la buena
   tampoco entra; g) recrear el contenedor web con una sesión abierta no la corta. El registro dice
   "Administrador inicial creado: admin" sin la contraseña. Capturas en `Sesiones/img/07-*.png`.
+- CI del PR #5 en GitHub Actions: corrida 38953659943 (pull_request) y la del push, 6 de 6 trabajos en
+  verde cada una, 2 min 58 s.
 - Ajustes respecto del texto original, anotados en el Change Log: salida con `IAntiforgery`, carpeta de claves leída diferida en `Program.cs`, `AddSesionPersonal()` sin parámetros.
 
 ### File List
