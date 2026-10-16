@@ -2,7 +2,7 @@
 epic: 1
 story: "1.2"
 title: "Reloj del hospital (zona Córdoba) y manejador global de errores sin detalles técnicos."
-status: ready-for-dev
+status: review
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -28,14 +28,11 @@ files_to_modify:
   - "src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs"
   - "src/HospitalTurnos.Web/Program.cs"
   - "src/HospitalTurnos.Web/Components/Pages/Error.razor"
-  - "src/HospitalTurnos.Web/Dockerfile"
-  - "tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj"
-  - "tests/HospitalTurnos.Web.Tests/HospitalTurnos.Web.Tests.csproj"
 ---
 
 # Story 1.2: Reloj del hospital (zona Córdoba) y manejador global de errores sin detalles técnicos.
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -104,17 +101,17 @@ Cada test nuevo lleva `[Trait("Story", "1.2")]` y un `[Trait("AC", "n")]` por AC
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] La story 1.1 está `done`: existen `src/HospitalTurnos.Web/Program.cs`, `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs` (con `AgregarInfraestructura`), `src/HospitalTurnos.Web/Components/Pages/Error.razor`, `tests/HospitalTurnos.Web.Tests/HospitalWebApplicationFactory.cs`, `tests/HospitalTurnos.Dominio.Tests/Arquitectura/RaizDelRepo.cs`. Si falta alguno → DETENERSE.
-  - [ ] `dotnet test HospitalTurnos.slnx --filter "Story=1.1"` en verde antes de tocar nada (incluye T11 de 1.1: la fábrica usa las cadenas de la fixture también en `Development`).
-  - [ ] `grep -rn -e "DateTime.Now" -e "DateTime.UtcNow" -e "DateTimeOffset.Now" -e "DateTimeOffset.UtcNow" -e "DateTime.Today" src` → anotar si ya hay apariciones (no debería: 1.1 no usa la hora).
-  - [ ] `ls /usr/share/zoneinfo/America/Argentina/Cordoba` en la máquina y `docker compose run --rm --entrypoint ls web /usr/share/zoneinfo/America/Argentina/Cordoba` en la imagen de Web. Si la imagen no la tiene, agregar `tzdata` en el `Dockerfile` y anotarlo.
-- [ ] [PAR] Task 2: Excepciones del dominio (AC: 7)
-- [ ] [PAR] Task 3: `RelojHospital` + `TimeProviderExtensions.AhoraLocal` + registro singleton en `AgregarInfraestructura` (AC: 1–5)
-- [ ] [SEQ] Task 4: `ManejadorGlobalDeErrores` + registro en `Program.cs` (con `SuppressDiagnosticsCallback`) + `Error.razor` genérica (AC: 8–12, 14) — necesita Task 2
-- [ ] [SEQ] Task 5: Referencias de pruebas: `Microsoft.Extensions.TimeProvider.Testing` en Aplicacion.Tests y Web.Tests (versión ya fijada en `Directory.Packages.props` por 1.1) (AC: 2, 3)
-- [ ] [SEQ] Task 6: Tests T1–T9, `ProveedorDeRegistroEnMemoria`, `FiltroRutaQueFalla` (AC: 1–12, 14)
-- [ ] [SEQ] Task 7: Verificación: build Release 0 advertencias, `--filter "Story=1.2"`, regresión `--filter "Story=1.1"`, prueba manual en compose; Dev Agent Record (AC: 13)
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] La story 1.1 está `done`: existen `src/HospitalTurnos.Web/Program.cs`, `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs` (con `AgregarInfraestructura`), `src/HospitalTurnos.Web/Components/Pages/Error.razor`, `tests/HospitalTurnos.Web.Tests/HospitalWebApplicationFactory.cs`, `tests/HospitalTurnos.Dominio.Tests/Arquitectura/RaizDelRepo.cs`. Si falta alguno → DETENERSE.
+  - [x] `dotnet test HospitalTurnos.slnx --filter "Story=1.1"` en verde antes de tocar nada (incluye T11 de 1.1: la fábrica usa las cadenas de la fixture también en `Development`).
+  - [x] `grep -rn -e "DateTime.Now" -e "DateTime.UtcNow" -e "DateTimeOffset.Now" -e "DateTimeOffset.UtcNow" -e "DateTime.Today" src` → anotar si ya hay apariciones (no debería: 1.1 no usa la hora).
+  - [x] `ls /usr/share/zoneinfo/America/Argentina/Cordoba` en la máquina y `docker compose run --rm --entrypoint ls web /usr/share/zoneinfo/America/Argentina/Cordoba` en la imagen de Web. Si la imagen no la tiene, agregar `tzdata` en el `Dockerfile` y anotarlo.
+- [x] [PAR] Task 2: Excepciones del dominio (AC: 7)
+- [x] [PAR] Task 3: `RelojHospital` + `TimeProviderExtensions.AhoraLocal` + registro singleton en `AgregarInfraestructura` (AC: 1–5)
+- [x] [SEQ] Task 4: `ManejadorGlobalDeErrores` + registro en `Program.cs` (con `SuppressDiagnosticsCallback`) + `Error.razor` genérica (AC: 8–12, 14) — necesita Task 2
+- [x] [SEQ] Task 5: Referencias de pruebas: `Microsoft.Extensions.TimeProvider.Testing` en Aplicacion.Tests y Web.Tests (AC: 2, 3) — **ya resuelta por la story 1.1**: los dos `.csproj` lo referencian y la versión está fijada en `Directory.Packages.props`. No hay cambios.
+- [x] [SEQ] Task 6: Tests T1–T9, `ProveedorDeRegistroEnMemoria`, `FiltroRutaQueFalla` (AC: 1–12, 14)
+- [x] [SEQ] Task 7: Verificación: build Release 0 advertencias, `--filter "Story=1.2"`, regresión `--filter "Story=1.1"`, prueba manual en compose; Dev Agent Record (AC: 13)
 
 ### Task Dependencies
 
@@ -304,9 +301,8 @@ if (!app.Environment.IsDevelopment())   // (story 1.1, sin cambios)
 | Crear | `src/HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs` |
 | Modificar | `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs` (registrar `RelojHospital` como `TimeProvider` singleton) |
 | Modificar | `src/HospitalTurnos.Web/Program.cs` (`AddExceptionHandler`, `AddProblemDetails`, `UseExceptionHandler` con opciones en todos los entornos) |
-| Modificar (si hace falta) | `src/HospitalTurnos.Web/Dockerfile` (instalar `tzdata` en la etapa final **sólo** si la imagen no trae `/usr/share/zoneinfo/America/Argentina/Cordoba`, ver Task 1) |
+| ~~Modificar (si hace falta)~~ No se modificó | `src/HospitalTurnos.Web/Dockerfile` — la imagen ya trae `/usr/share/zoneinfo/America/Argentina/Cordoba` (verificado en la Task 1), así que no hizo falta instalar `tzdata` |
 | Modificar | `src/HospitalTurnos.Web/Components/Pages/Error.razor` (mensaje genérico, sin Request ID ni Development Mode) |
-| Modificar | `tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj`, `tests/HospitalTurnos.Web.Tests/HospitalTurnos.Web.Tests.csproj` (`PackageReference` a `Microsoft.Extensions.TimeProvider.Testing`, sin `Version`) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Tiempo/RelojHospitalTests.cs` (T1, T3), `Comun/TimeProviderExtensionsTests.cs` (T2) |
 | Crear | `tests/HospitalTurnos.Dominio.Tests/Arquitectura/HoraDelSistemaTests.cs` (T5) |
 | Crear | `tests/HospitalTurnos.Web.Tests/Ayudas/RegistroEnMemoria.cs`, `Ayudas/ProveedorDeRegistroEnMemoria.cs`, `Ayudas/FiltroRutaQueFalla.cs`, `Errores/ManejadorGlobalDeErroresTests.cs` (T6, T7), `Errores/ErroresDeExtremoAExtremoTests.cs` (T8, T9), `Tiempo/RegistroDelRelojTests.cs` (T4) |
@@ -363,10 +359,45 @@ docker compose start db
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), como Amelia (desarrolladora del equipo BMAD).
+
 ### Debug Log References
+
+- Salvaguarda (Task 1): archivos de 1.1 presentes; `Story=1.1` 15/15 en verde antes de tocar nada; 0 lecturas de la hora del sistema en `src/`; la zona `America/Argentina/Cordoba` está en la máquina y en la imagen de Web, así que el `Dockerfile` **no se tocó**; `SuppressDiagnosticsCallback` existe en ASP.NET Core 10.0.11.
+- Build Release: 0 advertencias, 0 errores.
+- Pruebas (suite completa por proyecto, `test-gate.sh` no reconoce `.slnx`): Dominio.Tests 3/3, Aplicacion.Tests 10/10, Web.Tests 28/28 (incluye las 15 de la 1.1: R1 y el resto siguen en verde). La 1.2 suma 18 casos (T1–T9 contando cada caso de los `[Theory]`).
+- Cobertura de los archivos nuevos de `src/` (coverlet, medida a mano): 100% de líneas.
+- Prueba en vivo contra el Compose reconstruido: 14/14 AC observados corriendo la app (zona, reloj, cambio de día, los cuatro errores del dominio, el 500 genérico en JSON y en HTML, Development, registro único, `/salud` con la base caída). Capturas en `Sesiones/img/03-*.png`.
 
 ### Completion Notes List
 
+- Pruebas escritas antes que el código. Fase roja: no compilaban por las piezas que la story manda crear; con el código de A y B, T8/T9 seguían en rojo por aserción (la excepción se escapaba sin manejar y en `Development` aparecía la página técnica) hasta conectar el manejador en `Program.cs`.
+- T5 es una prueba guardiana: pasa desde el principio porque nadie lee la hora del sistema. Se comprobó que sí atrapa una lectura plantando un `DateTime.Today` temporal en `Dominio` (falló nombrando archivo y línea) y sacándolo.
+- `FiltroRutaQueFalla` con `IStartupFilter` después de `next(app)` alcanzó: la excepción llega al manejador (no hizo falta otra forma de inyectar la ruta).
+- `SuppressDiagnosticsCallback` alcanzó para el registro único (T9 en verde en los 4 casos); no hizo falta filtrar la categoría del middleware.
+- La prueba unitaria del manejador usa el `IProblemDetailsService` real tal como lo describe la story; no necesitó más servicios.
+- Task 5 ya estaba resuelta por la 1.1 (se corrigió la story antes de implementar, a pedido del validador).
+- Pase adversarial: salteado por decisión del docente.
+
 ### File List
 
+- Creados en `src/`: `HospitalTurnos.Infraestructura/Tiempo/RelojHospital.cs`, `HospitalTurnos.Aplicacion/Comun/TimeProviderExtensions.cs`, `HospitalTurnos.Dominio/Excepciones/{ReglaDeNegocio,Conflicto,NoEncontrado,AccesoDenegado}Exception.cs`, `HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs`.
+- Modificados en `src/`: `HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs`, `HospitalTurnos.Web/Program.cs`, `HospitalTurnos.Web/Components/Pages/Error.razor`.
+- Creados en `tests/`: `HospitalTurnos.Aplicacion.Tests/Tiempo/RelojHospitalTests.cs`, `Comun/TimeProviderExtensionsTests.cs`; `HospitalTurnos.Dominio.Tests/Arquitectura/HoraDelSistemaTests.cs`; `HospitalTurnos.Web.Tests/Ayudas/{RegistroEnMemoria,ProveedorDeRegistroEnMemoria,FiltroRutaQueFalla}.cs`, `Errores/{ManejadorGlobalDeErrores,ErroresDeExtremoAExtremo}Tests.cs`, `Tiempo/RegistroDelRelojTests.cs`.
+- Sin cambios (previstos "si hace falta"): `src/HospitalTurnos.Web/Dockerfile`, los `.csproj` de pruebas.
+- Documentación: esta story.
+
 ### Change Log
+
+- 2026-10-15 — Antes de implementar (a pedido del validador, aprobado por el docente): Task 5 marcada como ya resuelta por la 1.1 y sus dos `.csproj` fuera de `files_to_modify`; estado del cuerpo alineado.
+- 2026-10-15 — Tras la revisión: el `Dockerfile` sale de `files_to_modify` (la imagen ya trae la zona). Sin cambios de código por la revisión.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C1 — `docs/stories/1-2-reloj-y-errores.md` — Falso positivo: R1 es la prueba de la 1.1 en tests/HospitalTurnos.Web.Tests/Salud/SaludTests.cs:41, existe y pasa (confirmado por tycon-ac-coverage-checker). Aceptado como falso positivo por el docente. <!-- fkey:ACCOV-C1|docs/stories/1-2-reloj-y-errores.md -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/1-2-reloj-y-errores.md` — Dockerfile sacado de files_to_modify y anotado como no modificado (la imagen ya trae la zona). <!-- fkey:VAL-W15|docs/stories/1-2-reloj-y-errores.md -->
+- [ ] **[WARNING]** SILENT-W2 — `src/HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs` — Intencional y declarado en la story: el mensaje de la regla en pantalla es trabajo de cada story de pantalla. <!-- fkey:SILENT-W2|src/HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs -->
+- [ ] **[WARNING]** TEST-W2 — `tests/HospitalTurnos.Web.Tests` — test-gate no cruza cobertura con .slnx; medida a mano con coverlet: 100% de líneas en los archivos nuevos (step-04-coverage.md). <!-- fkey:TEST-W2|tests/HospitalTurnos.Web.Tests -->
