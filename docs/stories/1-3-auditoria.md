@@ -2,7 +2,7 @@
 epic: 1
 story: "1.3"
 title: "Registro de auditoría: tabla, escritura en la misma transacción, protección con permisos y disparador"
-status: review
+status: done
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -35,7 +35,7 @@ files_to_modify:
 
 # Story 1.3: Registro de auditoría: tabla, escritura en la misma transacción, protección con permisos y disparador
 
-Status: review
+Status: done
 
 ## Story
 
