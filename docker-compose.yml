@@ -29,6 +29,11 @@ services:
       ConnectionStrings__App: Host=db;Database=hospital_turnos;Username=turnos_app;Password=${TURNOS_APP_PASSWORD:?copiá .env.ejemplo a .env}
       ConnectionStrings__Migraciones: Host=db;Database=hospital_turnos;Username=turnos_owner;Password=${TURNOS_OWNER_PASSWORD:?copiá .env.ejemplo a .env}
       ProteccionDeDatos__Carpeta: /claves-proteccion
+      # Story 2.1: el primer administrador, sólo con la base sin usuarios. Los tres desde .env, sin ":-"
+      # (control de secretos de 1.1). Sin .env completo, la app arranca sin administrador y lo avisa.
+      Personal__AdministradorInicial__Usuario: ${ADMIN_INICIAL_USUARIO}
+      Personal__AdministradorInicial__Contrasena: ${ADMIN_INICIAL_CONTRASENA}
+      Personal__AdministradorInicial__NombreCompleto: ${ADMIN_INICIAL_NOMBRE}
       # Story 1.4: el correo sale por Mailpit. Usuario y clave sólo desde .env (vacíos con Mailpit).
       # Sin ":-": ningún valor por defecto en este archivo (control de secretos de la story 1.1).
       Email__Smtp__Host: mailpit

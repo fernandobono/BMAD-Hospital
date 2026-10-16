@@ -2,7 +2,7 @@
 epic: 2
 story: "2.1"
 title: "Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión"
-status: ready-for-dev
+status: in-progress
 sprint: 1
 priority: "P0"
 approach: "[ADAPT]"
@@ -16,6 +16,7 @@ files_to_create:
   - "src/HospitalTurnos.Infraestructura/Identidad/OpcionesAdministradorInicial.cs"
   - "src/HospitalTurnos.Infraestructura/Identidad/RegistroIdentidad.cs"
   - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/<marca>_IdentidadPersonal.cs"
+  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/<marca>_IdentidadPersonal.Designer.cs"
   - "src/HospitalTurnos.Web/Personal/RutasPersonal.cs"
   - "src/HospitalTurnos.Web/Personal/SesionPersonal.cs"
   - "src/HospitalTurnos.Web/Personal/ValidadorSesionPersonal.cs"
@@ -43,10 +44,10 @@ files_to_create:
   - "tests/HospitalTurnos.Web.Tests/Personal/ConfiguracionVersionadaTests.cs"
 files_to_modify:
   - "src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs"
+  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs"
   - "src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs"
-  - "src/HospitalTurnos.Dominio/Auditoria/CanalAuditoria.cs"
+  - "src/HospitalTurnos.Infraestructura/HospitalTurnos.Infraestructura.csproj"
   - "src/HospitalTurnos.Web/Program.cs"
-  - "src/HospitalTurnos.Web/Dockerfile"
   - "src/HospitalTurnos.Web/Components/Routes.razor"
   - "src/HospitalTurnos.Web/Components/_Imports.razor"
   - "docker-compose.yml"
@@ -55,7 +56,7 @@ files_to_modify:
 
 # Story 2.1: Ingreso del personal con usuario y contraseña, roles y vencimiento de sesión
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -225,7 +226,11 @@ cierre sola a los 30 minutos sin uso.
     cortar con un mensaje claro que arrancar sin el administrador que alguien quiso crear.
 20. Ningún archivo versionado trae una contraseña, ni de desarrollo (contrato §Secretos):
     `appsettings*.json` no tiene la clave `Contrasena`; `docker-compose.yml` toma la del administrador
-    de `${ADMIN_INICIAL_CONTRASENA:-}` (sin valor por defecto); `.env.ejemplo` (lo crea la story 1.1)
+    de `${ADMIN_INICIAL_CONTRASENA}` y el usuario y el nombre de `${ADMIN_INICIAL_USUARIO}` y
+    `${ADMIN_INICIAL_NOMBRE}`, **sin** la forma `${X:-…}` (la prueba de secretos de la story 1.1 la
+    prohíbe en todo el archivo; es el mismo criterio que `${SMTP_CLAVE}` de la 1.4: sin `.env`, Compose
+    avisa y pasa el valor vacío). Si `NombreCompleto` llega vacío, el sembrador usa `Administración`
+    (valor del código, no de un archivo de configuración). `.env.ejemplo` (lo crea la story 1.1)
     suma `ADMIN_INICIAL_USUARIO`, `ADMIN_INICIAL_CONTRASENA` y `ADMIN_INICIAL_NOMBRE`, con la contraseña
     vacía. `.env` ya está en `.gitignore`.
 
@@ -244,7 +249,10 @@ cierre sola a los 30 minutos sin uso.
     se reinicia o se reconstruye la imagen **Then** las sesiones abiertas y los tokens
     antifalsificación siguen siendo válidos: las claves de protección de datos se guardan en esa
     carpeta (`PersistKeysToFileSystem`) con `SetApplicationName("HospitalTurnos")`. Sin valor, se usa
-    el comportamiento por defecto del framework (pruebas, `dotnet run`).
+    el comportamiento por defecto del framework (pruebas, `dotnet run`). **Ya lo implementó la story
+    1.1 (M-11)**: `Program.cs`, la variable `ProteccionDeDatos__Carpeta: /claves-proteccion` y el volumen
+    `claves-proteccion` del compose, y la carpeta con dueño `$APP_UID` en el `Dockerfile`. Esta story
+    **no** lo vuelve a registrar ni cambia la ruta; sólo lo prueba con la cookie `Personal` (T28).
 
 ### Contrato con otras stories
 
@@ -264,7 +272,7 @@ cierre sola a los 30 minutos sin uso.
     protección de `registros_auditoria` (1.3: sólo `INSERT` y `SELECT` para `turnos_app`, disparador
     contra `UPDATE`/`DELETE`) no se tocan.
 
-### Tests (28 verificaciones)
+### Tests (30 verificaciones)
 
 | # | Test | AC | Nivel | Escenario | Resultado esperado |
 |---|------|----|-------|-----------|--------------------|
@@ -289,19 +297,21 @@ cierre sola a los 30 minutos sin uso.
 | T19 | `Secciones_SegunRol_PermiteLasSuyasYDevuelve403LegibleEnLasAjenas` | 13 | integration | `[Theory]` con las 33 combinaciones rol × ruta de la tabla del AC 13, siguiendo redirecciones | ✔ → `200` + título + texto de construcción; vacío → `403` + `No tenés permiso para entrar a esta sección.` + enlace al inicio del rol |
 | T20 | `PostSalir_ConSesion_BorraCookieYVuelveAlIngreso` | 15 | integration | Ingreso; POST `/personal/salir` con token; GET `/personal/agendas` | `302` a `/personal/ingreso`; `Set-Cookie` que vence la cookie; el GET posterior da `302` al ingreso |
 | T21 | `MenuLateral_SegunRol_MuestraSoloSusSeccionesEnElOrdenDeUx` | 14 | unit | bUnit, `[Theory]` por rol con autorización de prueba (usuario `Carla Gómez`) | Enlaces = exactamente las rutas del AC 14 para ese rol, **en ese orden** (Administrador: medicos, propuestas, especialidades, bloqueos, usuarios, auditoria, para-avisar, agendas); texto `Carla Gómez`; botón `Salir` dentro de un `form` con `action="/personal/salir"` |
-| T22 | `ConfiguracionVersionada_AppSettingsYCompose_NoTraenContrasenaDelAdministrador` | 20,27 | unit | Lee `src/HospitalTurnos.Web/appsettings*.json`, `docker-compose.yml` y `.env.ejemplo` desde la raíz del repo | Ningún `appsettings*.json` tiene la clave `Contrasena`; compose usa exactamente `${ADMIN_INICIAL_CONTRASENA:-}` y monta el volumen `claves-proteccion` con `ProteccionDeDatos__Carpeta`; `.env.ejemplo` tiene las 3 variables `ADMIN_INICIAL_*` y la línea `ADMIN_INICIAL_CONTRASENA=` vacía |
+| T22 | `ConfiguracionVersionada_AppSettingsYCompose_NoTraenContrasenaDelAdministrador` | 20,27 | unit | Lee `src/HospitalTurnos.Web/appsettings*.json`, `docker-compose.yml` y `.env.ejemplo` desde la raíz del repo | Ningún `appsettings*.json` tiene la clave `Contrasena`; compose usa exactamente `${ADMIN_INICIAL_CONTRASENA}`, no tiene ningún `${…:-` y monta el volumen `claves-proteccion` con `ProteccionDeDatos__Carpeta`; `.env.ejemplo` tiene las 3 variables `ADMIN_INICIAL_*` y la línea `ADMIN_INICIAL_CONTRASENA=` vacía |
 | T23 | `ValidarAsync_UsuarioInexistente_NoAuditaYVerificaHashFicticio` | 2,21 | integration | Usuario `noexiste-<guid>`, contraseña `Clave-Tipeada-<guid>`; `IPasswordHasher` envuelto en `HasherQueCuenta`; `ILogger` de prueba | `CredencialesInvalidas`; 0 filas en `registros_auditoria` cuyo `quien`, `entidad_id` o `detalle` contenga el marcador; 1 `Warning` con el texto del AC 2a y ningún mensaje del `ILogger` contiene el usuario ni la contraseña tipeados; `VerifyHashedPassword` llamado 1 vez |
 | T24 | `PostIngreso_UsuarioInexistenteSeisVeces_MismaRespuestaQueUnUsuarioBloqueado` | 2,3 | integration | 6 POST con `noexiste-<guid>`; por otro lado, un usuario propio bloqueado (5 fallos) que envía la contraseña correcta | Las 7 respuestas: `200` y el mismo texto del `role="alert"` (`Usuario o contraseña incorrectos.`), comparado con `WebUtility.HtmlDecode`; ninguna con `Set-Cookie` `Personal` |
 | T25 | `Arranque_AdministradorInicialVacio_ArrancaSinSembrarYAvisa` | 18 | integration | `PostgresFixture` propia (base vacía); fábrica con `Personal:AdministradorInicial:Usuario = ""` y `:Contrasena = ""` (como Compose sin `.env`) | `CreateClient()` no lanza; `GET /salud` → `200`; 0 usuarios; el `ILogger` del sembrador tiene la advertencia del AC 18 |
 | T26 | `SesionPersonal_UsuarioDesactivadoOSelloCambiado_SeCortaAlRevalidar` | 25 | integration | `[Theory]` con usuario propio Recepcionista: (a) `Activo = false` en la base; (b) `UpdateSecurityStampAsync`. Ingreso; cambio en la base; `Advance(4 min)` + GET `/personal/recepcion/turnos`; `Advance(2 min)` + GET | Primer GET `200` (todavía no revalida); segundo GET `302` con `Location.PathAndQuery` = `/personal/ingreso?ReturnUrl=%2Fpersonal%2Frecepcion%2Fturnos` y `Set-Cookie` que vence `.HospitalTurnos.Personal` |
 | T27 | `CookiePersonal_SegunEntorno_SecureSoloFueraDeDevelopment` | 26 | integration | `[Theory]` con cliente `http://localhost`: (a) entorno `Testing`; (b) entorno `Development`; ingreso correcto | (a) `Set-Cookie` de `.HospitalTurnos.Personal` contiene `secure`; (b) no lo contiene |
 | T28 | `ProteccionDeDatos_CarpetaCompartida_LaSesionSobreviveAOtraInstancia` | 27 | integration | `[Theory]`: fábrica A ingresa y se toma su cookie; fábrica B (otra instancia de la app, misma base) recibe la cookie en GET `/personal/recepcion/turnos`. (a) A y B con la misma `ProteccionDeDatos:Carpeta` temporal; (b) con carpetas distintas | (a) `200` y la carpeta tiene al menos un `key-*.xml`; (b) `302` al ingreso (prueba que la sesión depende de las claves guardadas) |
+| T29 | `ValidarAsync_NoSePuedeGuardarElIntentoFallido_LanzaSinIngresar` | 3,9 | integration | Usuario propio; `UserManager` de prueba cuyo `AccessFailedAsync` devuelve `IdentityResult.Failed` (como un conflicto de concurrencia); contraseña mala | `InvalidOperationException` (llega al manejador global, AC 9); 0 filas de auditoría con su id: un intento que no se pudo sumar no sigue como si nada (sin él, el bloqueo del AC 3 no llegaría) |
+| T30 | `SembrarAsync_NoSePuedeCrearUnRol_FallaSinCrearUsuario` | 16,19 | integration | Contenedor propio (base sin usuarios); `RoleManager` de prueba cuyo `CreateAsync` devuelve `IdentityResult.Failed`; config de administrador válida | `InvalidOperationException` (el arranque se corta con un error explícito, como el AC 19); 0 usuarios |
 
 Todas llevan `[Trait("Story", "2.1")]` y un `[Trait("AC", "n")]` por AC de su columna.
-T1–T9 y T23 van en `HospitalTurnos.Aplicacion.Tests`; T10–T22 y T24–T28 en `HospitalTurnos.Web.Tests`
+T1–T9, T23, T29 y T30 van en `HospitalTurnos.Aplicacion.Tests`; T10–T22 y T24–T28 en `HospitalTurnos.Web.Tests`
 (T21 con bUnit, T22 leyendo archivos).
 
-> El estimado del plan era ~9 pruebas; quedan 28 porque la story cubre ingreso, bloqueo sin
+> El estimado del plan era ~9 pruebas; quedan 30 porque la story cubre ingreso, bloqueo sin
 > revelar usuarios, sesión y su revalidación, 11 rutas por rol, salida, siembra, cookie segura y
 > claves persistentes, y cada camino feliz lleva su modo de falla.
 
@@ -378,8 +388,8 @@ en la story 10.1.
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado y de BD (AC: todos)
-  - [ ] Confirmar que existen (los crean las stories 1.1, 1.2, 1.3 y 1.5): `HospitalDbContext`, la carpeta
+- [x] [SEQ] Task 1: Salvaguarda de estado y de BD (AC: todos)
+  - [x] Confirmar que existen (los crean las stories 1.1, 1.2, 1.3 y 1.5): `HospitalDbContext`, la carpeta
         `Persistencia/Migraciones/` con migraciones aplicables, `RelojHospital` registrado como
         `TimeProvider`, `ManejadorGlobalDeErrores`, `IAuditoria`, `RegistroAuditoria`,
         `CanalAuditoria`, `AccionesAuditoria`, las dos `PostgresFixture` (Web.Tests y Aplicacion.Tests,
@@ -387,76 +397,74 @@ en la story 10.1.
         `HospitalWebApplicationFactory`, `RegistroEnMemoria`, `.env.ejemplo` y la CI de 1.5 en verde
         (`bash scripts/ci/local.sh`). Anotar en el Debug Log la firma exacta de `IAuditoria.Registrar(...)`
         y cómo convierte 1.1 los nombres a `snake_case` en `OnModelCreating`.
-  - [ ] Confirmar que `CanalAuditoria` tiene el valor `Personal` (contrato §Auditoría). Si 1.3 no lo
+  - [x] Confirmar que `CanalAuditoria` tiene el valor `Personal` (contrato §Auditoría). Si 1.3 no lo
         agregó, agregarlo al final del enum (no cambia los valores existentes) y anotarlo.
-  - [ ] Confirmar que existen `src/HospitalTurnos.Web/Components/Routes.razor`, `_Imports.razor`,
+  - [x] Confirmar que existen `src/HospitalTurnos.Web/Components/Routes.razor`, `_Imports.razor`,
         `src/HospitalTurnos.Web/Dockerfile` y `docker-compose.yml` (los crea la story 1.1); si
         `Roles.cs` o `UsuarioPersonal.cs` ya existieran, reutilizarlos y anotarlo.
-  - [ ] Confirmar que `Infraestructura` referencia `Microsoft.AspNetCore.Identity.EntityFrameworkCore`
-        y `Web.Tests` referencia `Microsoft.AspNetCore.Mvc.Testing`, `bunit`, `Testcontainers.PostgreSql`
+  - [x] Confirmar que `Directory.Packages.props` fija `Microsoft.AspNetCore.Identity.EntityFrameworkCore`
+        (la referencia en el `.csproj` de Infraestructura la agrega la Task 3) y que `Web.Tests` referencia `Microsoft.AspNetCore.Mvc.Testing`, `bunit`, `Testcontainers.PostgreSql`
         y `Microsoft.Extensions.TimeProvider.Testing` (contrato §Paquetes). Si falta alguno, agregarlo
         al `.csproj` sin versión (la fija `Directory.Packages.props`).
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio y Aplicacion (AC: 1–5, 22, 24, 25)
-  - [ ] `Roles.cs` con `Recepcionista`, `Medico`, `Administrador` y `Todos`.
-  - [ ] `IIngresoPersonal` con `ValidarAsync(usuario, contrasena, ct)` y
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio y Aplicacion (AC: 1–5, 22, 24, 25)
+  - [x] `Roles.cs` con `Recepcionista`, `Medico`, `Administrador` y `Todos`.
+  - [x] `IIngresoPersonal` con `ValidarAsync(usuario, contrasena, ct)` y
         `SesionVigenteAsync(usuarioId, selloDeSeguridad, ct)`; `ResultadoIngreso` (`Exitoso`,
         `CredencialesInvalidas`, `Bloqueado`, `Desactivado`, `SinRol`, `VariosRoles`; con
         `ClaimsPrincipal?` y `Rol?`) + `ClaimsPersonal.NombreCompleto = "nombre_completo"`.
-  - [ ] Tres constantes nuevas en `AccionesAuditoria` (AC 22).
-- [ ] [SEQ] Task 3: Infraestructura — Identity y migración (AC: 21, Salvaguarda de BD)
-  - [ ] `UsuarioPersonal : IdentityUser<Guid>` con `NombreCompleto` (requerido, 120) y `Activo` (default `true`).
-  - [ ] `HospitalDbContext : IdentityDbContext<UsuarioPersonal, IdentityRole<Guid>, Guid>`;
+  - [x] Tres constantes nuevas en `AccionesAuditoria` (AC 22).
+- [x] [SEQ] Task 3: Infraestructura — Identity y migración (AC: 21, Salvaguarda de BD)
+  - [x] Agregar `<PackageReference Include="Microsoft.AspNetCore.Identity.EntityFrameworkCore" />` (sin
+        versión) al `.csproj` de Infraestructura.
+  - [x] `UsuarioPersonal : IdentityUser<Guid>` con `NombreCompleto` (requerido, 120) y `Activo` (default `true`).
+  - [x] `HospitalDbContext : IdentityDbContext<UsuarioPersonal, IdentityRole<Guid>, Guid>`;
         `base.OnModelCreating(builder)` **antes** de la conversión a `snake_case`.
-  - [ ] `RegistroIdentidad.AddIdentidadPersonal(services, configuration)`: `AddIdentityCore<UsuarioPersonal>`
+  - [x] `RegistroIdentidad.AddIdentidadPersonal(services, configuration)`: `AddIdentityCore<UsuarioPersonal>`
         con las opciones del AC 21 y `User.RequireUniqueEmail = false`, `.AddRoles<IdentityRole<Guid>>()`,
         `.AddEntityFrameworkStores<HospitalDbContext>()`; registra `IIngresoPersonal`, `SembradorPersonal`
         y `OpcionesAdministradorInicial` (sección `Personal:AdministradorInicial`).
-  - [ ] Migración `IdentidadPersonal` con `dotnet ef migrations add` (ver Como verificar).
-  - [ ] Correr la Salvaguarda de BD (abajo).
-- [ ] [SEQ] Task 4: Infraestructura — ingreso y siembra (AC: 1–5, 16–19, 21, 22, 24)
-  - [ ] `IngresoPersonalIdentity` con la secuencia de "Implementación concreta" (incluido el hash
+  - [x] Migración `IdentidadPersonal` con `dotnet ef migrations add` (ver Como verificar).
+  - [x] Correr la Salvaguarda de BD (abajo).
+- [x] [SEQ] Task 4: Infraestructura — ingreso y siembra (AC: 1–5, 16–19, 21, 22, 24)
+  - [x] `IngresoPersonalIdentity` con la secuencia de "Implementación concreta" (incluido el hash
         ficticio y el `ILogger` del usuario inexistente).
-  - [ ] `SembradorPersonal.SembrarAsync()` con la regla "sin configuración" del AC 18.
-  - [ ] `HasherQueCuenta` y T1–T9, T23 en verde.
-- [ ] [SEQ] Task 5: Web — sesión, rutas y endpoints (AC: 7, 8, 10–12, 15, 25–27)
-  - [ ] `SesionPersonal.AddSesionPersonal(services, configuration, environment)`: esquema `"Personal"`
+  - [x] `SembradorPersonal.SembrarAsync()` con la regla "sin configuración" del AC 18.
+  - [x] `HasherQueCuenta` y T1–T9, T23, T29 y T30 en verde.
+- [x] [SEQ] Task 5: Web — sesión, rutas y endpoints (AC: 7, 8, 10–12, 15, 25–27)
+  - [x] `SesionPersonal.AddSesionPersonal(services)` (el entorno y el reloj se leen diferidos del contenedor; ver Change Log): esquema `"Personal"`
         como `DefaultScheme`, cookie del AC 1, `ExpireTimeSpan = 30 min`, `SlidingExpiration = true`,
         `LoginPath`, `AccessDeniedPath`, `LogoutPath`, `options.TimeProvider` desde el contenedor,
-        `Cookie.SecurePolicy` del AC 26, `EventsType = typeof(ValidadorSesionPersonal)` y protección de
-        datos del AC 27.
-  - [ ] `ValidadorSesionPersonal : CookieAuthenticationEvents` (AC 25, ver Implementación concreta).
-  - [ ] `RutasPersonal`: constantes de las 11 rutas, título de cada una, `InicioDe(rol)`,
+        `Cookie.SecurePolicy` del AC 26 y `EventsType = typeof(ValidadorSesionPersonal)`. La protección de
+        datos del AC 27 ya está en `Program.cs` (1.1): no se repite.
+  - [x] `ValidadorSesionPersonal : CookieAuthenticationEvents` (AC 25, ver Implementación concreta).
+  - [x] `RutasPersonal`: constantes de las 11 rutas, título de cada una, `InicioDe(rol)`,
         `SeccionesDe(rol)` en el orden del AC 14 y `EsReturnUrlValido(url)`.
-  - [ ] `EndpointsPersonal.MapEndpointsPersonal(app)`: `POST /personal/salir` con `[FromForm]`.
-  - [ ] `Program.cs`: `AddIdentidadPersonal`, `AddSesionPersonal`, `AddCascadingAuthenticationState`,
+  - [x] `EndpointsPersonal.MapEndpointsPersonal(app)`: `POST /personal/salir` que valida el token con `IAntiforgery` (ver Change Log).
+  - [x] `Program.cs`: `AddIdentidadPersonal`, `AddSesionPersonal`, `AddCascadingAuthenticationState`,
         `AddAuthorization`; en el pipeline `UseAuthentication`, `UseAuthorization`, `UseAntiforgery`
         (en ese orden, después de `UseForwardedHeaders` de 1.1 y antes de `MapRazorComponents`);
         `MapEndpointsPersonal`; al arrancar, después de las migraciones que corre la story 1.1,
         `await SembradorPersonal.SembrarAsync()`.
-- [ ] [SEQ] Task 6: Web — pantallas (AC: 1–7, 9, 13, 14, 24)
-  - [ ] `Ingreso.razor` (`@page "/personal/ingreso"`, `@layout LayoutIngreso`, `[AllowAnonymous]`, SSR
+- [x] [SEQ] Task 6: Web — pantallas (AC: 1–7, 9, 13, 14, 24)
+  - [x] `Ingreso.razor` (`@page "/personal/ingreso"`, `@layout LayoutIngreso`, `[AllowAnonymous]`, SSR
         estático). `Bloqueado` y `CredencialesInvalidas` se muestran con **el mismo** texto.
-  - [ ] `AccesoDenegado.razor` (`[AllowAnonymous]`, pone `HttpContext.Response.StatusCode = 403`).
-  - [ ] `LayoutPersonal` + `MenuLateral` + `SeccionEnConstruccion` + las 4 páginas de `Secciones/` con
+  - [x] `AccesoDenegado.razor` (`[AllowAnonymous]`, pone `HttpContext.Response.StatusCode = 403`).
+  - [x] `LayoutPersonal` + `MenuLateral` + `SeccionEnConstruccion` + las 4 páginas de `Secciones/` con
         su `[Authorize(Roles = ...)]` y varios `@page` cada una.
-  - [ ] `Routes.razor`: `AuthorizeRouteView` con `DefaultLayout="typeof(LayoutPersonal)"` para las
+  - [x] `Routes.razor`: `AuthorizeRouteView` con `DefaultLayout="typeof(LayoutPersonal)"` para las
         rutas del personal (o `@layout` en cada página de `Secciones/`).
-- [ ] [PAR] Task 7: Configuración sin secretos y claves persistentes (AC: 20, 27)
-  - [ ] `docker-compose.yml`, servicio `web`: `Personal__AdministradorInicial__Usuario: ${ADMIN_INICIAL_USUARIO:-}`,
-        `Personal__AdministradorInicial__Contrasena: ${ADMIN_INICIAL_CONTRASENA:-}`,
-        `Personal__AdministradorInicial__NombreCompleto: ${ADMIN_INICIAL_NOMBRE:-Administración}`,
-        `ProteccionDeDatos__Carpeta: /home/app/claves-proteccion`, volumen
-        `claves-proteccion:/home/app/claves-proteccion` y `claves-proteccion:` en `volumes:`.
-  - [ ] `Dockerfile` (etapa final, **antes** de `USER $APP_UID` si lo hay):
-        `RUN mkdir -p /home/app/claves-proteccion && chown $APP_UID /home/app/claves-proteccion`
-        (sin esto, Docker crea la carpeta del volumen como `root` y la app no puede escribir).
-  - [ ] `.env.ejemplo`: sumar las tres variables `ADMIN_INICIAL_*` con la contraseña vacía y un
+- [x] [PAR] Task 7: Configuración sin secretos (AC: 20)
+  - [x] `docker-compose.yml`, servicio `web`: `Personal__AdministradorInicial__Usuario: ${ADMIN_INICIAL_USUARIO}`,
+        `Personal__AdministradorInicial__Contrasena: ${ADMIN_INICIAL_CONTRASENA}`,
+        `Personal__AdministradorInicial__NombreCompleto: ${ADMIN_INICIAL_NOMBRE}` (sin `:-`, ver AC 20).
+        La carpeta y el volumen de claves (AC 27) ya están desde la 1.1: no se tocan.
+  - [x] `.env.ejemplo`: sumar las tres variables `ADMIN_INICIAL_*` con la contraseña vacía y un
         comentario de cómo usarlas, sin quitar lo que puso 1.1.
-- [ ] [SEQ] Task 8: Pruebas de Web y verificación manual (AC: todos)
-  - [ ] `SinParalelismo.cs`, `PersonalWebApplicationFactory`, `FormularioHttp`, T10–T22 y T24–T28 en verde.
-  - [ ] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` sin regresiones (AC 23).
-  - [ ] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent Record.
+- [x] [SEQ] Task 8: Pruebas de Web y verificación manual (AC: todos)
+  - [x] `SinParalelismo.cs`, `PersonalWebApplicationFactory`, `FormularioHttp`, T10–T22 y T24–T28 en verde.
+  - [x] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` sin regresiones (AC 23).
+  - [x] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent Record.
 
 ### Task Dependencies
 
@@ -467,12 +475,12 @@ T7 puede hacerse en paralelo con T4–T6.
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-09)
+#### En hospital-turnos (verificado 2026-10-16, con 1.1 a 1.5 en main)
 
-- Sólo el código descartable `src/HospitalTurnos.Api/` y `tests/HospitalTurnos.Tests/`, listado en
-  `HospitalTurnos.slnx`. **Lo borra la story 1.1.** Nada de eso se usa.
-- `.gitignore:7` ignora `.env` (por eso las contraseñas viven ahí).
-- **No existe** nada de lo que lista `files_to_create`. Lo que esta story **usa** y crean otras:
+- Ya existen los proyectos `Dominio`, `Aplicacion`, `Infraestructura` y `Web` con sus proyectos de
+  pruebas; el código descartable `src/HospitalTurnos.Api/` lo borró la story 1.1.
+- `.gitignore` ignora `.env` (por eso las contraseñas viven ahí).
+- **No existe** nada de lo que lista `files_to_create`. Lo que esta story **usa** y ya crearon otras:
   - `HospitalDbContext`, `Persistencia/Migraciones/`, `docker-compose.yml`, `Dockerfile`, `.env.ejemplo`,
     `Program.cs` de Web (con `UseForwardedHeaders` y HSTS), `Routes.razor`, `_Imports.razor`, la
     convención `snake_case`, la `PostgresFixture` de Web.Tests y `HospitalWebApplicationFactory` —
@@ -647,14 +655,10 @@ services.AddAuthentication(o => o.DefaultScheme = "Personal")
 // reloj que el resto del sistema, sin depender del orden en que se registraron los servicios.
 services.AddOptions<CookieAuthenticationOptions>("Personal")
     .Configure<TimeProvider>((o, reloj) => o.TimeProvider = reloj);
-
-// AC 27: sin esto, cada reconstrucción del contenedor genera claves nuevas y corta todas las
-// sesiones y los formularios abiertos.
-var proteccion = services.AddDataProtection().SetApplicationName("HospitalTurnos");
-var carpeta = configuration["ProteccionDeDatos:Carpeta"];
-if (!string.IsNullOrWhiteSpace(carpeta))
-    proteccion.PersistKeysToFileSystem(new DirectoryInfo(carpeta));
 ```
+
+La protección de datos (AC 27) ya la registra `Program.cs` desde la story 1.1 (M-11); `SesionPersonal`
+no la repite.
 
 Las claves quedan sin cifrar dentro del volumen (el framework lo avisa con una advertencia al
 arrancar). Se acepta: el volumen sólo es accesible desde el servidor de Docker.
@@ -731,12 +735,11 @@ pruebas, así que el resultado vale para las dos):
 | Crear | Los de `files_to_create` del frontmatter |
 | Modificar | `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs` (hereda de `IdentityDbContext<...>`; `base.OnModelCreating` primero) |
 | Modificar | `src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs` (3 constantes, AC 22) |
-| Modificar | `src/HospitalTurnos.Dominio/Auditoria/CanalAuditoria.cs` (sólo si 1.3 no trae `Personal`; Task 1) |
+| Modificar | `src/HospitalTurnos.Infraestructura/HospitalTurnos.Infraestructura.csproj` (referencia a `Microsoft.AspNetCore.Identity.EntityFrameworkCore`, Task 3) |
 | Modificar | `src/HospitalTurnos.Web/Program.cs` (registro, pipeline, siembra) |
-| Modificar | `src/HospitalTurnos.Web/Dockerfile` (carpeta de claves con dueño `$APP_UID`, AC 27) |
 | Modificar | `src/HospitalTurnos.Web/Components/Routes.razor` (`AuthorizeRouteView`) |
 | Modificar | `src/HospitalTurnos.Web/Components/_Imports.razor` (`Microsoft.AspNetCore.Authorization`, `Microsoft.AspNetCore.Components.Authorization`) |
-| Modificar | `docker-compose.yml` (variables del administrador inicial, carpeta y volumen de claves; AC 20, 27) |
+| Modificar | `docker-compose.yml` (variables del administrador inicial, AC 20; la carpeta y el volumen de claves ya están desde 1.1) |
 | Modificar | `.env.ejemplo` (las 3 variables `ADMIN_INICIAL_*`, AC 20) |
 
 ### Lo que NO hay que hacer
@@ -790,7 +793,7 @@ dotnet ef migrations add IdentidadPersonal \
 
 # 2. Pruebas de esta story (necesita Docker para Testcontainers)
 dotnet test --filter "Story=2.1"
-# Esperado: 28 pruebas declaradas (más los casos de cada [Theory]), 0 fallas
+# Esperado: 30 pruebas declaradas (más los casos de cada [Theory]), 0 fallas
 dotnet test --filter "Story=2.1&AC=10"      # sólo el vencimiento de sesión
 
 # 3. Suite completa y CI local (AC 23)
@@ -826,11 +829,33 @@ docker compose exec db psql -U postgres -d hospital_turnos \
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), pipeline TYCON (sesión 07, 2026-10-16).
+
 ### Debug Log References
+
+- Firma de auditoría: `IAuditoria.Registrar(ActorAuditoria actor, string accion, string entidadTipo, string entidadId, object? detalle = null)`; el detalle se serializa con `JsonSerializerOptions.Web`.
+- `snake_case`: `ConvencionSnakeCase.Aplicar` al final de `OnModelCreating` → tablas `asp_net_roles`, `asp_net_users`, `asp_net_role_claims`, `asp_net_user_claims`, `asp_net_user_logins`, `asp_net_user_roles`, `asp_net_user_tokens`.
+- Rojo inicial: no compilaba (faltaban los tipos de la story). Después, 4 rojos de comportamiento en Web: salida sin token daba `500` y las claves no iban a la carpeta configurada (ver Change Log).
+- `UsuarioPersonal.Activo` sin `HasDefaultValue(true)` en la base: con un default de base, EF toma `false` como "sin valor".
 
 ### Completion Notes List
 
+- 30 verificaciones de la tabla implementadas (más los casos de cada `[Theory]`): 18 casos en Aplicacion.Tests y 75 en Web.Tests con `Story=2.1`, todos en verde.
+- Suite completa: Dominio 20, Aplicacion 52, Web 107 (179 en verde). `bash scripts/ci/local.sh` en verde: cobertura de líneas 97,8 % (umbral 80 %), SCA sin vulnerabilidades, imagen Docker construida.
+- Revisores: vuelta 1, 7 de 7, 0 críticos (arreglado: resultados de Identity que no se revisaban); vuelta 2, 6 de 6, 0 críticos (sumada T29 para esa rama de error); vuelta 3, 4 de 4, 0 críticos (sumada T30, que encontró un mensaje de error vacío en el sembrador: ahora lleva el código de Identity).
+- Verificación manual (Como verificar, paso 4) con Docker Compose y Chrome, 2026-10-16: a) sin sesión,
+  `/personal/admin/medicos` lleva a `/personal/ingreso?ReturnUrl=%2Fpersonal%2Fadmin%2Fmedicos`; b) contraseña
+  mala → "Usuario o contraseña incorrectos." con el usuario escrito; c) admin entra a "Médicos" con el menú de 8
+  secciones en el orden del AC 14 (recepción: 3; médico: 2); d) "Salir" vuelve al ingreso y "Atrás" no muestra
+  la sección; e) usuario inexistente → el mismo mensaje; f) 5 contraseñas malas → mismo mensaje, y con la buena
+  tampoco entra; g) recrear el contenedor web con una sesión abierta no la corta. El registro dice
+  "Administrador inicial creado: admin" sin la contraseña. Capturas en `Sesiones/img/07-*.png`.
+- Ajustes respecto del texto original, anotados en el Change Log: salida con `IAntiforgery`, carpeta de claves leída diferida en `Program.cs`, `AddSesionPersonal()` sin parámetros.
+
 ### File List
+
+- Nuevos: `src/HospitalTurnos.Dominio/Personal/Roles.cs`; `src/HospitalTurnos.Aplicacion/Personal/IIngresoPersonal.cs`; `src/HospitalTurnos.Infraestructura/Identidad/{UsuarioPersonal,IngresoPersonalIdentity,SembradorPersonal,OpcionesAdministradorInicial,RegistroIdentidad}.cs`; `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016180914_IdentidadPersonal{,.Designer}.cs`; `src/HospitalTurnos.Web/Personal/{RutasPersonal,SesionPersonal,ValidadorSesionPersonal,EndpointsPersonal}.cs`; `src/HospitalTurnos.Web/Components/Personal/{Ingreso,AccesoDenegado,LayoutPersonal,LayoutIngreso,MenuLateral,SeccionEnConstruccion}.razor`; `src/HospitalTurnos.Web/Components/Personal/Secciones/{SeccionesRecepcion,SeccionesRecepcionYAdministracion,SeccionesMedico,SeccionesAdministracion}.razor`; `tests/HospitalTurnos.Aplicacion.Tests/Personal/{IngresoPersonalIdentityTests,SembradorPersonalTests}.cs`, `Personal/Dobles/HasherQueCuenta.cs`; `tests/HospitalTurnos.Web.Tests/SinParalelismo.cs`; `tests/HospitalTurnos.Web.Tests/Personal/{PersonalWebApplicationFactory,FormularioHttp,IngresoPersonalHttpTests,SesionYPermisosHttpTests,ArranquePersonalTests,MenuLateralTests,ConfiguracionVersionadaTests}.cs`.
+- Modificados: `HospitalDbContext.cs`, `HospitalDbContextModelSnapshot.cs`, `AccionesAuditoria.cs`, `HospitalTurnos.Infraestructura.csproj`, `Program.cs`, `Routes.razor`, `_Imports.razor`, `docker-compose.yml`, `.env.ejemplo`.
 
 ### Change Log
 
@@ -844,3 +869,32 @@ docker compose exec db psql -U postgres -d hospital_turnos \
   I-16 (sin contraseñas versionadas), I-17 (Web.Tests sin paralelismo y usuarios propios por test),
   M-4, M-6, M-7, M-11 (claves persistentes, AC 27, T28), M-13, M-15 (un rol por usuario, AC 24),
   M-16. 27 AC, 28 verificaciones.
+- 2026-10-16: Validación previa a implementar (sesión 07, decisión del docente: corregir y seguir).
+  AC 20, Task 7 y T22 sin `${…:-}` (la prueba de secretos de 1.1 lo prohíbe; mismo criterio que
+  `${SMTP_CLAVE}` de 1.4) y nombre por defecto `Administración` en el código; AC 27 ya implementado por
+  1.1 (M-11): sin segundo registro ni cambio de ruta, se quita el `Dockerfile` de los archivos a
+  modificar; la referencia a Identity en Infraestructura pasa a la Task 3; `CanalAuditoria` ya trae
+  `Personal`. Mismos 27 AC y 28 verificaciones.
+- 2026-10-16: Implementación (sesión 07). Dos ajustes descubiertos en rojo, sin cambiar ningún AC:
+  (1) `POST /personal/salir` valida el token con `IAntiforgery.IsRequestValidAsync` en vez de un
+  parámetro `[FromForm]`: con `[FromForm]` y un token inválido, leer el formulario lanza y el pedido
+  terminaba en `500` (T14 lo atrapó); el `400` lleva cuerpo para que la página de estado de 1.2 no lo
+  re-ejecute. (2) `Program.cs` (1.1, M-11) lee `ProteccionDeDatos:Carpeta` **diferido**
+  (`KeyManagementOptions.XmlRepository` en un `Configure<IConfiguration, ILoggerFactory>`): leído al
+  registrar no veía la configuración de las pruebas y las claves iban a la carpeta por defecto del
+  usuario (T28 lo atrapó); misma carpeta y mismo nombre de aplicación. `AddSesionPersonal()` no recibe
+  configuración ni entorno: el entorno y el reloj se leen diferidos del contenedor.
+- 2026-10-16: Revisores, vuelta 2 (decisión del docente): se suma **T29** para la rama de error de
+  los resultados de Identity (contador de intentos que no se pudo guardar → error, no sigue). 27 AC,
+  29 verificaciones.
+- 2026-10-16: Revisores, vuelta 3 (decisión del docente): se suma **T30**, la misma rama de error en el
+  sembrador (un rol que no se pudo crear corta el arranque). 27 AC, 30 verificaciones.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[WARNING]** SILENT-W6 — `src/HospitalTurnos.Infraestructura/Identidad/SembradorPersonal.cs` — roles.CreateAsync pasa por Asegurar <!-- fkey:SILENT-W6|src/HospitalTurnos.Infraestructura/Identidad/SembradorPersonal.cs -->
+- [x] **[WARNING]** SILENT-W6 — `src/HospitalTurnos.Infraestructura/Identidad/IngresoPersonalIdentity.cs` — AccessFailedAsync revisado: lanza si falla <!-- fkey:SILENT-W6|src/HospitalTurnos.Infraestructura/Identidad/IngresoPersonalIdentity.cs -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/2-1-ingreso-personal.md` — Dev Agent Record completo <!-- fkey:VAL-W15|docs/stories/2-1-ingreso-personal.md -->

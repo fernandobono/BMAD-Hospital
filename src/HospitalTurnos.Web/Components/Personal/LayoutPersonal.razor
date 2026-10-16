@@ -1,0 +1,11 @@
+@inherits LayoutComponentBase
+
+@* El sistema del personal: menú lateral con las secciones del rol (UX §3 y §5) y la sección a la derecha. *@
+<div class="d-flex min-vh-100" style="font-size: 16px;">
+    <aside class="border-end bg-light p-3" style="width: 16rem;">
+        <MenuLateral />
+    </aside>
+    <main class="flex-grow-1 p-4">
+        @Body
+    </main>
+</div>

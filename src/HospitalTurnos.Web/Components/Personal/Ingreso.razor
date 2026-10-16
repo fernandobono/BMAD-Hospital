@@ -1,0 +1,88 @@
+@page "/personal/ingreso"
+@layout LayoutIngreso
+@attribute [AllowAnonymous]
+@using System.ComponentModel.DataAnnotations
+@using HospitalTurnos.Aplicacion.Personal
+@using Microsoft.AspNetCore.Authentication
+@inject IIngresoPersonal IngresoPersonal
+@inject NavigationManager Navegacion
+
+@* S0 (UX §3), renderizado estático: la cookie se escribe en la respuesta HTTP del POST, y en un circuito
+   interactivo no hay respuesta HTTP que escribir. Sin try/catch: un error de la base tiene que llegar al
+   ManejadorGlobalDeErrores de 1.2 (AC 9). *@
+<PageTitle>Ingreso del personal · Las Acacias</PageTitle>
+
+<h1 class="h3 mb-4">Ingreso del personal</h1>
+
+@if (mensaje is not null)
+{
+    <div class="alert alert-danger" role="alert">@mensaje</div>
+}
+
+<EditForm Model="Input" method="post" OnValidSubmit="IngresarAsync" FormName="ingreso">
+    <DataAnnotationsValidator />
+    <div class="mb-3">
+        <label for="usuario" class="form-label">Usuario</label>
+        <InputText id="usuario" class="form-control" @bind-Value="Input!.Usuario" autocomplete="username" autofocus />
+        <ValidationMessage For="() => Input!.Usuario" class="text-danger" />
+    </div>
+    <div class="mb-3">
+        <label for="contrasena" class="form-label">Contraseña</label>
+        <InputText id="contrasena" type="password" class="form-control" @bind-Value="Input!.Contrasena" autocomplete="current-password" />
+        <ValidationMessage For="() => Input!.Contrasena" class="text-danger" />
+    </div>
+    <button type="submit" class="btn btn-primary w-100" style="background-color: #1F5FA8;">Ingresar</button>
+</EditForm>
+
+@code {
+    // El mismo texto para usuario inexistente, contraseña mala y bloqueo: si se distinguieran, la pantalla
+    // revelaría qué usuarios existen (AC 2 y 3).
+    private const string Generico = "Usuario o contraseña incorrectos.";
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm]
+    private Formulario? Input { get; set; }
+
+    [SupplyParameterFromQuery]
+    private string? ReturnUrl { get; set; }
+
+    private string? mensaje;
+
+    // En el GET no llega formulario: el framework deja Input en null.
+    protected override void OnInitialized() => Input ??= new();
+
+    private async Task IngresarAsync()
+    {
+        var resultado = await IngresoPersonal.ValidarAsync(Input!.Usuario!, Input.Contrasena!, HttpContext.RequestAborted);
+        if (resultado.Estado != EstadoIngreso.Exitoso)
+        {
+            mensaje = resultado.Estado switch
+            {
+                EstadoIngreso.Desactivado => "Tu usuario está desactivado. Pedile al administrador que lo reactive.",
+                EstadoIngreso.SinRol => "Tu usuario no tiene un rol asignado. Pedile al administrador que lo revise.",
+                EstadoIngreso.VariosRoles => "Tu usuario tiene más de un rol asignado. Pedile al administrador que lo revise.",
+                _ => Generico,
+            };
+            Input.Contrasena = "";   // el usuario queda escrito en la página devuelta; la contraseña, nunca
+            return;
+        }
+
+        await HttpContext.SignInAsync(SesionPersonal.Esquema, resultado.Principal!,
+            new AuthenticationProperties { IsPersistent = false });   // cookie de sesión, sin Expires
+        // Sin redirección abierta (AC 7): sólo rutas del personal.
+        Navegacion.NavigateTo(RutasPersonal.EsReturnUrlValido(ReturnUrl) ? ReturnUrl! : RutasPersonal.InicioDe(resultado.Rol));
+    }
+
+    private sealed class Formulario
+    {
+        // NFR-10: la validación corre también en el servidor (es SSR): un POST armado a mano da lo mismo.
+        [Required(ErrorMessage = "Ingresá tu usuario.")]
+        [StringLength(100, ErrorMessage = "El usuario tiene como máximo 100 caracteres.")]
+        public string? Usuario { get; set; }
+
+        [Required(ErrorMessage = "Ingresá tu contraseña.")]
+        public string? Contrasena { get; set; }
+    }
+}

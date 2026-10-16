@@ -1,11 +1,15 @@
 using HospitalTurnos.Aplicacion.Email;
 using HospitalTurnos.Infraestructura;
 using HospitalTurnos.Infraestructura.Email;
+using HospitalTurnos.Infraestructura.Identidad;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Web.Components;
 using HospitalTurnos.Web.Errores;
+using HospitalTurnos.Web.Personal;
 using HospitalTurnos.Web.Salud;
 using Microsoft.AspNetCore.DataProtection;
+using Microsoft.AspNetCore.DataProtection.KeyManagement;
+using Microsoft.AspNetCore.DataProtection.Repositories;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
 using Microsoft.AspNetCore.HttpOverrides;
 using Microsoft.Extensions.Diagnostics.HealthChecks;
@@ -22,6 +26,11 @@ builder.Services.AddOptions<OpcionesSmtp>().BindConfiguration("Email:Smtp").Vali
 builder.Services.AddScoped<IBandejaDeSalida, BandejaDeSalidaEnBase>();
 builder.Services.AddTransient<IEnviadorEmail, EnviadorEmailSmtp>();
 builder.Services.AddHostedService<ProcesadorBandejaDeSalida>();
+// Story 2.1: usuarios y roles del personal (Identity sobre el mismo contexto) y su sesión con cookie.
+builder.Services.AddIdentidadPersonal(builder.Configuration);
+builder.Services.AddSesionPersonal();
+builder.Services.AddAuthorization();
+builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 // NFR-09: un solo lugar decide qué ve el usuario ante un error y qué queda en el registro técnico.
 builder.Services.AddExceptionHandler<ManejadorGlobalDeErrores>();
@@ -40,10 +49,16 @@ builder.Services.AddOptions<ForwardedHeadersOptions>().Configure<IConfiguration>
 
 // M-11: claves de protección de datos en una carpeta persistente (volumen en Compose), para que
 // recrear el contenedor no invalide sesiones ni formularios abiertos.
-var carpetaClaves = builder.Configuration["ProteccionDeDatos:Carpeta"];
-var proteccion = builder.Services.AddDataProtection().SetApplicationName("HospitalTurnos");
-if (!string.IsNullOrWhiteSpace(carpetaClaves))
-    proteccion.PersistKeysToFileSystem(new DirectoryInfo(carpetaClaves));
+// La carpeta se lee DIFERIDA, como las cadenas: leída acá no veía la configuración que agregan las
+// pruebas y las claves iban a la carpeta por defecto del usuario (lo detectó la story 2.1, T28).
+// Es lo mismo que hace PersistKeysToFileSystem, con la carpeta resuelta al crear las opciones.
+builder.Services.AddDataProtection().SetApplicationName("HospitalTurnos");
+builder.Services.AddOptions<KeyManagementOptions>().Configure<IConfiguration, ILoggerFactory>((o, config, registros) =>
+{
+    var carpetaClaves = config["ProteccionDeDatos:Carpeta"];
+    if (!string.IsNullOrWhiteSpace(carpetaClaves))
+        o.XmlRepository = new FileSystemXmlRepository(new DirectoryInfo(carpetaClaves), registros);
+});
 
 var app = builder.Build();
 
@@ -52,6 +67,9 @@ var app = builder.Build();
 ServiciosDeInfraestructura.CadenaDeConexion(app.Configuration, "App");
 await AplicadorDeMigraciones.AplicarAsync(
     ServiciosDeInfraestructura.CadenaDeConexion(app.Configuration, "Migraciones"));
+// Con el esquema al día: los roles y, sólo con la base sin usuarios, el administrador inicial (AC 16-19).
+using (var alcance = app.Services.CreateScope())
+    await alcance.ServiceProvider.GetRequiredService<SembradorPersonal>().SembrarAsync();
 
 app.UseForwardedHeaders();          // primero: el resto del pipeline ve el esquema real (https)
 // En TODOS los entornos (AC 12): la página de excepciones para desarrolladores queda por fuera y
@@ -72,11 +90,15 @@ if (!app.Environment.IsDevelopment())
 }
 app.UseStatusCodePagesWithReExecute("/not-found", createScopeForStatusCodePages: true);
 
+// En este orden: quién es (cookie "Personal"), si puede (roles de cada sección) y el token de los formularios.
+app.UseAuthentication();
+app.UseAuthorization();
 app.UseAntiforgery();
 
 app.MapStaticAssets();
 app.MapRazorComponents<App>()
     .AddInteractiveServerRenderMode();
+app.MapEndpointsPersonal();
 app.MapHealthChecks("/salud", new HealthCheckOptions { ResponseWriter = EscribirSalud });
 
 app.Run();

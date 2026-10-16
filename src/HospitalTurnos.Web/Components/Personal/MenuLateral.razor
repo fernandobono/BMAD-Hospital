@@ -1,0 +1,40 @@
+@using System.Security.Claims
+@using HospitalTurnos.Aplicacion.Personal
+
+@* Sólo las secciones del rol, en el orden de UX §3 (AC 14). Arriba, quién está y el botón Salir. *@
+<div class="mb-4">
+    <p class="fw-bold mb-3" style="color: #1F5FA8;">Las Acacias</p>
+    <div class="d-flex align-items-center justify-content-between gap-2">
+        <span>@nombre</span>
+        <form method="post" action="@RutasPersonal.Salir">
+            <AntiforgeryToken />
+            <button type="submit" class="btn btn-sm btn-outline-secondary">Salir</button>
+        </form>
+    </div>
+</div>
+<nav aria-label="Secciones">
+    <ul class="list-unstyled">
+        @foreach (var seccion in secciones)
+        {
+            <li class="mb-2"><a href="@seccion.Ruta" style="color: #1F5FA8;">@seccion.Titulo</a></li>
+        }
+    </ul>
+</nav>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
+
+    private string nombre = "";
+    private IReadOnlyList<RutasPersonal.Seccion> secciones = [];
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EstadoDeAutenticacion is null)
+            return;
+        var usuario = (await EstadoDeAutenticacion).User;
+        nombre = usuario.FindFirstValue(ClaimsPersonal.NombreCompleto) ?? usuario.Identity?.Name ?? "";
+        // Un rol por usuario (FR-09): el ingreso ya rechaza a quien tiene varios (AC 24).
+        secciones = RutasPersonal.SeccionesDe(usuario.FindFirstValue(ClaimTypes.Role));
+    }
+}
