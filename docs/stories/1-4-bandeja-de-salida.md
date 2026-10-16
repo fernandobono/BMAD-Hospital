@@ -2,11 +2,18 @@
 epic: 1
 story: "1.4"
 title: "Bandeja de salida de emails con proceso de fondo y reintentos"
-status: ready-for-dev
+status: review
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
 depends_on: ["1.1", "1.2", "1.3"]
+runtime_not_verifiable:
+  - ac: 7
+    reason: "La app todavía no registra ningún IManejadorFalloDefinitivo: el primero (Pacientes para avisar) llega con la story 7.2. El caso sin manejador (AC 10) sí se probó en vivo."
+    covered_by: T5
+  - ac: 9
+    reason: "Mismo motivo que AC 7: no hay manejador real que pueda fallar en la app corriendo hasta la story 7.2."
+    covered_by: T7
 driver: |
   ADR-05: un SMTP caído no puede hacer fallar una reserva ni perder un aviso (FR-20, FR-28, FR-29).
   Patrón bandeja de salida con reintentos a 1, 5 y 15 min (S-33). Ver docs/04-arquitectura.md §7.4.
@@ -21,7 +28,8 @@ files_to_create:
   - src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs
   - src/HospitalTurnos.Infraestructura/Email/OpcionesSmtp.cs
   - src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/MensajeSalienteConfiguracion.cs
-  - src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/AAAAMMDDHHMMSS_AgregarBandejaDeSalida.cs
+  - src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida.cs
+  - src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida.Designer.cs
   - tests/HospitalTurnos.Aplicacion.Tests/Email/BandejaDeSalidaTests.cs
   - tests/HospitalTurnos.Aplicacion.Tests/Email/ProcesadorBandejaDeSalidaTests.cs
   - tests/HospitalTurnos.Aplicacion.Tests/Email/EnviadorEmailSmtpTests.cs
@@ -39,11 +47,13 @@ files_to_modify:
   - docker-compose.yml
   - .env.ejemplo
   - tests/HospitalTurnos.Web.Tests/HospitalWebApplicationFactory.cs
+  - src/HospitalTurnos.Infraestructura/Persistencia/ConvencionSnakeCase.cs
+  - Directory.Packages.props
 ---
 
 # Story 1.4: Bandeja de salida de emails con proceso de fondo y reintentos
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -140,6 +150,8 @@ FR-20, FR-28, FR-29 (`docs/02-prd.md:192`, `:206-207`).
 16. **Given** `Email:Smtp:Host` o `Email:Smtp:RemitenteDireccion` ausente, vacío o sólo espacios (p. ej. producción
     sin la variable de entorno) **When** arranca `HospitalTurnos.Web` **Then** el arranque se corta con
     `OptionsValidationException` cuyo mensaje contiene `Falta Email:Smtp:Host` / `Falta Email:Smtp:RemitenteDireccion`.
+    Lo mismo con `Email:Smtp:Seguridad` ausente (`Falta Email:Smtp:Seguridad`) y `Email:Smtp:Puerto` fuera de 1-65535
+    (`Falta Email:Smtp:Puerto`) — agregado por la revisión de seguridad, ver Change Log 2026-10-16.
     *(modo de falla de AC 14: con valores de desarrollo en `appsettings.json`, producción arrancaría "bien" y cada
     email fallaría en silencio hasta el fallo definitivo, 21 minutos después — hallazgo I-10)*
 
@@ -156,16 +168,16 @@ FR-20, FR-28, FR-29 (`docs/02-prd.md:192`, `:206-207`).
 | T1 | `Encolar_ConSaveChanges_QuedaPendienteParaEnvioInmediato` | 1 | integration | `Encolar` + `SaveChangesAsync` con contexto `turnos_app` y reloj fijo | 1 fila pendiente; `intentos = 0`; `creado_el = proximo_intento_el = ahora` |
 | T2 | `Encolar_SinGuardar_NoPersisteNada` | 2 | integration | `Encolar` y se descarta el contexto | 0 filas |
 | T3 | `ProcesarPendientes_EnvioExitoso_MarcaEnviadoYNoLoReenvia` | 3 | integration | Enviador falso que responde bien; dos ciclos | 1 llamada con los mismos datos; `enviado_el = ahora`; `intentos = 1` |
-| T4 | `ProcesarPendientes_SmtpCaido_ReprogramaA1_5Y15Minutos` | 4,5 | integration | Enviador que siempre lanza; ciclos con `Advance(59s)`, `Advance(1s)`, `Advance(5min)` | Llamadas: 1, 1, 2, 3; `proximo_intento_el` = +1, +5, +15 min del último fallo; `ultimo_error` con el tipo de excepción |
-| T5 | `ProcesarPendientes_FallaElTercerReintento_MarcaFalloDefinitivoEInvocaManejadorDelTipo` | 6,7 | integration | Igual que T4 + `Advance(15min)` (4.º intento falla) + `Advance(1h)`; manejadores para `aviso-bloqueo` y `codigo-ingreso` | 4 llamadas en total; `fallo_definitivo_el` y `manejado_el` con hora; sólo el manejador de `aviso-bloqueo` invocado 1 vez con `ReferenciaId = "T-77"` |
-| T6 | `ProcesarPendientes_DestinatarioInvalido_FalloDefinitivoSinIntentarEnviar` | 8,10 | integration | `[Theory]` `""`, `"paciente-sin-arroba"`, `"ana@"`; `Tipo` sin manejadores | `Encolar` no lanza; 0 llamadas al enviador; `ultimo_error = "Destinatario inválido"`; `manejado_el` con hora; 1 log `Warning` |
+| T4 | `ProcesarPendientes_SmtpCaido_ReprogramaA1_5Y15Minutos` | 4,5 | integration | Enviador que siempre lanza; ciclos con `Advance(59s)`, `Advance(1s)`, `Advance(5min)` | Llamadas: 1, 1, 2, 3; `proximo_intento_el` = +1, +5, +15 min del último fallo; `ultimo_error` con el tipo y el texto de la excepción; el `Warning` de cada fallo lleva el tipo de error y **no** la dirección (el doble rechaza repitiéndola) |
+| T5 | `ProcesarPendientes_FallaElTercerReintento_MarcaFalloDefinitivoEInvocaManejadorDelTipo` | 6,7 | integration | Igual que T4 + `Advance(15min)` (4.º intento falla) + `Advance(1h)`; manejadores para `aviso-bloqueo` y `codigo-ingreso` | 4 llamadas en total; `fallo_definitivo_el` y `manejado_el` con hora; sólo el manejador de `aviso-bloqueo` invocado 1 vez con `ReferenciaId = "T-77"`; 1 log `Error` "se dio por perdido tras 4 intentos: SmtpCommandException (SMTP 550)" sin la dirección (el doble responde 550) |
+| T6 | `ProcesarPendientes_DestinatarioInvalido_FalloDefinitivoSinIntentarEnviar` | 8,10 | integration | `[Theory]` `""`, `"paciente-sin-arroba"`, `"ana@"`; `Tipo` sin manejadores | `Encolar` no lanza; 0 llamadas al enviador; `ultimo_error = "Destinatario inválido"`; `manejado_el` con hora; 1 log `Warning` (sin manejador) y 1 log `Error` ("se dio por perdido: destinatario inválido") |
 | T7 | `ProcesarPendientes_ManejadorFalla_ReintentaManejadorSinReenviarEmail` | 9 | integration | Mensaje llevado a fallo definitivo; manejador que lanza la 1.ª vez y anda la 2.ª | Tras ciclo 1: `manejado_el` NULL + 1 log `Error`; tras ciclo 2: `manejado_el` con hora; llamadas al enviador sin cambio |
 | T8 | `ProcesarPendientes_DosInstanciasALaVez_EnviaUnaSolaVez` | 11 | integration | A se bloquea dentro de `EnviarAsync` (compuerta); B corre un ciclo completo; se libera A | B devuelve 0; A devuelve 1; total de llamadas = 1; `enviado_el` con hora |
 | T9 | `StopAsync_EnvioEnCurso_TerminaOrdenadoYElMensajeQuedaPendiente` | 12 | integration | `StartAsync`; enviador que espera hasta que lo cancelen; `StopAsync` | Termina < 5 s; 0 logs `Error`; `intentos = 0`; `proximo_intento_el` sin cambio; `enviado_el` NULL |
 | T10 | `ExecuteAsync_FallaUnCiclo_RegistraErrorYSigueSondeando` | 13 | integration | Fábrica de scopes que lanza la 1.ª vez; mensaje pendiente; `Advance(15s)` | 1 log `Error`; `ExecuteTask.IsCompleted == false`; el mensaje se envía en el ciclo siguiente |
 | T11 | `EnviarAsync_ContraMailpit_ElMensajeLlegaConAsuntoYDestinatario` | 14 | integration | Contenedor `axllent/mailpit` con Testcontainers; `EnviadorEmailSmtp` contra su puerto 1025 | `GET /api/v1/messages`: `total = 1`, asunto, `To[0].Address` y `From.Address` esperados |
 | T12 | `EnviarAsync_ServidorInaccesible_LanzaExcepcion` | 15 | integration | `Host = "127.0.0.1"`, `Puerto = 1` (nadie escucha) | `await Assert.ThrowsAnyAsync<Exception>(...)` |
-| T13 | `Arranque_SinConfiguracionSmtp_FallaConMensajeQueNombraLaClave` | 16 | integration | `[Theory]` 2 casos: `Email:Smtp:Host = ""`; `Email:Smtp:RemitenteDireccion = ""`. `HospitalWebApplicationFactory` (de 1.1) sobre la `PostgresFixture` de Web.Tests | `CreateClient()` lanza; la excepción (o su `InnerException`) es `OptionsValidationException` y su mensaje contiene `Falta Email:Smtp:Host` / `Falta Email:Smtp:RemitenteDireccion` |
+| T13 | `Arranque_SinConfiguracionSmtp_FallaConMensajeQueNombraLaClave` | 16 | integration | `[Theory]` 4 casos: `Email:Smtp:Host = ""`; `Email:Smtp:RemitenteDireccion = ""`; `Email:Smtp:Seguridad = ""`; `Email:Smtp:Puerto = "0"` (los dos últimos, por la revisión de seguridad). `HospitalWebApplicationFactory` (de 1.1) sobre la `PostgresFixture` de Web.Tests | `CreateClient()` lanza; la excepción (o su `InnerException`) es `OptionsValidationException` y su mensaje contiene `Falta Email:Smtp:Host` / `Falta Email:Smtp:RemitenteDireccion` / `Falta Email:Smtp:Seguridad` / `Falta Email:Smtp:Puerto` |
 | R1 | Todas las pruebas de 1.1, 1.2 y 1.3 (`--filter "Story=1.1\|Story=1.2\|Story=1.3"`) + smoke E1 de 1.1 (`scripts/smoke-compose.sh`) | 17 | regresión | Se vuelven a correr sin cambios, con el proceso de fondo registrado y la configuración SMTP nueva | Siguen en verde; E1 sale con 0 |
 | R2 | `CodigoFuente_ArchivosDeSrc_NoLeenLaHoraDelSistema` (story 1.2, T5) | 18 | unit | Se vuelve a correr sin cambios con los archivos nuevos de `Email/` | Sigue pasando (0 apariciones) |
 
@@ -215,28 +227,28 @@ sus Traits de 1.1/1.2/1.3.
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar que 1.1 está implementada: proyectos de las 4 capas, `HospitalDbContext`, carpeta de migraciones, `docker-compose.yml` con `db` y `mailpit`, roles `turnos_owner`/`turnos_app`.
-  - [ ] Confirmar que 1.2 está implementada: `RelojHospital` registrado como `TimeProvider` singleton.
-  - [ ] Confirmar que 1.3 está implementada (`depends_on`): existen `tests/HospitalTurnos.Aplicacion.Tests/PostgresFixture.cs` (copia idéntica de la de Web.Tests salvo el `namespace`), `ColeccionPostgres.cs` y la migración `AgregarRegistroAuditoria`. Si falta algo → DETENERSE (las dos stories agregan migración y tocan el snapshot: en paralelo chocan).
-  - [ ] Confirmar que existe `.env.ejemplo` (lo crea 1.1) y cómo inyecta la configuración `HospitalWebApplicationFactory` (anotar el mecanismo).
-  - [ ] Confirmar si `MailKit` ya está referenciado en `HospitalTurnos.Infraestructura.csproj` y versionado en `Directory.Packages.props`.
-  - [ ] Si CUALQUIER asunción no coincide → DETENERSE → corregir la story primero.
-- [ ] [SEQ] Task 2: Puertos en Aplicación (AC: 1, 2, 7)
-  - [ ] `MensajeEmail`, `IBandejaDeSalida`, `IEnviadorEmail`, `IManejadorFalloDefinitivo` + `FalloDefinitivoEmail`.
-- [ ] [SEQ] Task 3: Entidad, configuración y migración (AC: 1, 5, 6)
-  - [ ] `MensajeSaliente` con la política de reintentos dentro (`RegistrarFallo`).
-  - [ ] `MensajeSalienteConfiguracion`, `DbSet<MensajeSaliente> MensajesSalientes`, índice parcial de pendientes.
-  - [ ] `dotnet ef migrations add AgregarBandejaDeSalida …` + SQL de permisos al final de `Up`.
-- [ ] [SEQ] Task 4: `BandejaDeSalidaEnBase` (AC: 1, 2, 8) + T1, T2.
-- [ ] [SEQ] Task 5: `ProcesadorBandejaDeSalida` (AC: 3-13) + dobles de prueba (`EnviadorEmailFalso`, `ManejadorFalloDefinitivoFalso`, `RegistroEnMemoria`) + `LimpiezaDeBandeja` + T3-T10.
-- [ ] [PAR] Task 6: `EnviadorEmailSmtp` + `OpcionesSmtp` + configuración (AC: 14, 15, 16) + T11, T12.
-  - [ ] `Email:Smtp` **sólo** en `appsettings.Development.json` (sin usuario ni clave). `appsettings.json` **no** lleva la sección.
-  - [ ] `docker-compose.yml`, servicio `web`: las claves `Email__Smtp__*` de Dev Notes (punto 8); usuario y clave sólo desde `.env`.
-  - [ ] `.env.ejemplo`: agregar `SMTP_USUARIO=` y `SMTP_CLAVE=` vacías, con un comentario de para qué son.
-- [ ] [SEQ] Task 7: Registro en DI (`Program.cs`), fábrica de Web.Tests y verificación (AC: 16, 17, 18)
-  - [ ] `HospitalWebApplicationFactory`: inyectar la configuración SMTP válida (Given/Fixture) y T13 en `Arranque/ConfiguracionSmtpTests.cs`.
-  - [ ] Correr "Como verificar que funciona"; contar 13 métodos con `Story=1.4` y R1, R2 en verde.
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar que 1.1 está implementada: proyectos de las 4 capas, `HospitalDbContext`, carpeta de migraciones, `docker-compose.yml` con `db` y `mailpit`, roles `turnos_owner`/`turnos_app`.
+  - [x] Confirmar que 1.2 está implementada: `RelojHospital` registrado como `TimeProvider` singleton.
+  - [x] Confirmar que 1.3 está implementada (`depends_on`): existen `tests/HospitalTurnos.Aplicacion.Tests/PostgresFixture.cs` (copia idéntica de la de Web.Tests salvo el `namespace`), `ColeccionPostgres.cs` y la migración `AgregarRegistroAuditoria`. Si falta algo → DETENERSE (las dos stories agregan migración y tocan el snapshot: en paralelo chocan).
+  - [x] Confirmar que existe `.env.ejemplo` (lo crea 1.1) y cómo inyecta la configuración `HospitalWebApplicationFactory` (anotar el mecanismo).
+  - [x] Confirmar si `MailKit` ya está referenciado en `HospitalTurnos.Infraestructura.csproj` y versionado en `Directory.Packages.props`.
+  - [x] Si CUALQUIER asunción no coincide → DETENERSE → corregir la story primero.
+- [x] [SEQ] Task 2: Puertos en Aplicación (AC: 1, 2, 7)
+  - [x] `MensajeEmail`, `IBandejaDeSalida`, `IEnviadorEmail`, `IManejadorFalloDefinitivo` + `FalloDefinitivoEmail`.
+- [x] [SEQ] Task 3: Entidad, configuración y migración (AC: 1, 5, 6)
+  - [x] `MensajeSaliente` con la política de reintentos dentro (`RegistrarFallo`).
+  - [x] `MensajeSalienteConfiguracion`, `DbSet<MensajeSaliente> MensajesSalientes`, índice parcial de pendientes.
+  - [x] `dotnet ef migrations add AgregarBandejaDeSalida …` + SQL de permisos al final de `Up`.
+- [x] [SEQ] Task 4: `BandejaDeSalidaEnBase` (AC: 1, 2, 8) + T1, T2.
+- [x] [SEQ] Task 5: `ProcesadorBandejaDeSalida` (AC: 3-13) + dobles de prueba (`EnviadorEmailFalso`, `ManejadorFalloDefinitivoFalso`, `RegistroEnMemoria`) + `LimpiezaDeBandeja` + T3-T10.
+- [x] [PAR] Task 6: `EnviadorEmailSmtp` + `OpcionesSmtp` + configuración (AC: 14, 15, 16) + T11, T12.
+  - [x] `Email:Smtp` **sólo** en `appsettings.Development.json` (sin usuario ni clave). `appsettings.json` **no** lleva la sección.
+  - [x] `docker-compose.yml`, servicio `web`: las claves `Email__Smtp__*` de Dev Notes (punto 8); usuario y clave sólo desde `.env`.
+  - [x] `.env.ejemplo`: agregar `SMTP_USUARIO=` y `SMTP_CLAVE=` vacías, con un comentario de para qué son.
+- [x] [SEQ] Task 7: Registro en DI (`Program.cs`), fábrica de Web.Tests y verificación (AC: 16, 17, 18)
+  - [x] `HospitalWebApplicationFactory`: inyectar la configuración SMTP válida (Given/Fixture) y T13 en `Arranque/ConfiguracionSmtpTests.cs`.
+  - [x] Correr "Como verificar que funciona"; contar 13 métodos con `Story=1.4` y R1, R2 en verde.
 
 ### Task Dependencies
 
@@ -247,13 +259,12 @@ T6 puede hacerse en paralelo con T4-T5 (sólo depende de T2: usa `MensajeEmail` 
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-09)
+#### En hospital-turnos (verificado 2026-10-15, con 1.1, 1.2 y 1.3 en `main`)
 
-- Sólo existen el código descartable `src/HospitalTurnos.Api/` y `tests/HospitalTurnos.Tests/` (lo borra la story 1.1) y la documentación. No hay `docker-compose.yml` ni `Directory.Packages.props` en la raíz todavía.
-- **No existe todavía (lo crea la story 1.1):** las 4 capas, `HospitalDbContext`, migraciones, `docker-compose.yml` con `db` (5432) y `mailpit` (1025 SMTP / 8025 web), roles `turnos_owner`/`turnos_app`, gestión central de paquetes con `MailKit` y `Testcontainers.PostgreSql` en la lista.
-- **No existe todavía (lo crea la story 1.2):** `RelojHospital : TimeProvider` (singleton, zona Córdoba).
-- **Lo crea la story 1.3 (dependencia):** la copia de `PostgresFixture` en Aplicacion.Tests (idéntica a la de Web.Tests de 1.1) y `[CollectionDefinition("Postgres")]` en `ColeccionPostgres.cs`.
-- **Lo crea la story 1.1:** `.env.ejemplo` (variables sin valor real; `.env` está en `.gitignore`) y `HospitalWebApplicationFactory`.
+- **Ya existe (story 1.1):** las 4 capas, `HospitalDbContext` (registra cada configuración a mano, antes de `ConvencionSnakeCase.Aplicar`), la carpeta `Migraciones/` (`Inicial`), `docker-compose.yml` con `db` (5432), `mailpit` (1025 SMTP / 8025 web) y `web` (sin claves `Email__Smtp__*` todavía), roles `turnos_owner`/`turnos_app`, `.env.ejemplo` (hoy sólo con las tres contraseñas de la base) y `HospitalWebApplicationFactory`, que inyecta configuración con `AddInMemoryCollection` (la última fuente, gana a `appsettings*.json`) y usa el entorno `Testing`.
+- **Gestión central de paquetes:** `MailKit` 4.18.1 ya está versionado en `Directory.Packages.props`, pero `HospitalTurnos.Infraestructura.csproj` **todavía no lo referencia** (esta story lo agrega). `Testcontainers.PostgreSql` ya está referenciado en Aplicacion.Tests (trae `Testcontainers`, que da `ContainerBuilder`).
+- **Ya existe (story 1.2):** `RelojHospital : TimeProvider`, registrado como singleton en `ServiciosDeInfraestructura.AgregarInfraestructura`. El doble `RegistroEnMemoria<T>` existe **sólo** en `tests/HospitalTurnos.Web.Tests/Ayudas/`: esta story lo copia a Aplicacion.Tests.
+- **Ya existe (story 1.3):** la copia de `PostgresFixture` en Aplicacion.Tests, `ColeccionPostgres.cs` y la migración `AgregarRegistroAuditoria` (con su disparador de sólo inserción).
 - **No existe (lo crea esta story):** todo `Email/` en Aplicación e Infraestructura y la tabla `mensajes_salientes`.
 
 #### Contrato que esta story implementa (`docs/stories/00-contrato-tecnico.md` §Bandeja de salida y §Pruebas)
@@ -295,7 +306,7 @@ Primero se cambia el contrato, después la story: estos nombres están en el con
   confirmar antes de enviar: no deja la transacción abierta durante el envío, pero agrega vencimientos de
   reserva y otra columna para un volumen de ~400 turnos por día. Con `SKIP LOCKED` la base hace el trabajo y
   si el proceso muere a mitad de un envío, la transacción se revierte sola y el mensaje vuelve a quedar pendiente.
-  Costo aceptado: la transacción queda abierta mientras dura el envío; se acota con un timeout SMTP de 30 s.
+  Costo aceptado: la transacción queda abierta mientras dura el envío; se acota con un tope total de 60 s por email (y 30 s por operación de MailKit; Change Log 2026-10-16).
 - **Garantía "al menos una vez", no "exactamente una vez".** Si el servidor SMTP acepta el email y el proceso
   muere antes del `COMMIT`, el email se reenvía. Es inevitable sin cooperación del receptor y es preferible a
   perder un aviso. Para dos instancias **sanas** (AC 11) sí se envía una sola vez.
@@ -378,10 +389,12 @@ Primero se cambia el contrato, después la story: estos nombres están en el con
 6. **`ProcesadorBandejaDeSalida(IServiceScopeFactory, TimeProvider, ILogger<ProcesadorBandejaDeSalida>) : BackgroundService`**
    con `public Task<int> ProcesarPendientesAsync(CancellationToken ct)` (un ciclo; público para las pruebas) — ver Implementación concreta.
 7. **`EnviadorEmailSmtp(IOptions<OpcionesSmtp>)`** y **`OpcionesSmtp`**: `Host`, `Puerto`, `Usuario?`, `Clave?`,
-   `Seguridad` (`MailKit.Security.SecureSocketOptions`, `None` en desarrollo, `StartTls` en producción),
+   `Seguridad` (`MailKit.Security.SecureSocketOptions?`, obligatoria: `None` en desarrollo, `StartTls` en producción),
    `RemitenteNombre`, `RemitenteDireccion`. `ValidateDataAnnotations().ValidateOnStart()` con
    `[Required(ErrorMessage = "Falta Email:Smtp:Host")]` en `Host` y `[Required(ErrorMessage = "Falta Email:Smtp:RemitenteDireccion")]`
    en `RemitenteDireccion` (falla al arrancar, no al primer email; `[Required]` ya rechaza vacío y sólo espacios — AC 16).
+   Desde la revisión: `[Required(ErrorMessage = "Falta Email:Smtp:Seguridad")]` en `Seguridad` y
+   `[Range(1, 65535, ErrorMessage = "Falta Email:Smtp:Puerto (entre 1 y 65535)")]` en `Puerto`.
 8. **DI en `Program.cs`**:
    ```csharp
    builder.Services.AddOptions<OpcionesSmtp>().BindConfiguration("Email:Smtp").ValidateDataAnnotations().ValidateOnStart();
@@ -395,7 +408,7 @@ Primero se cambia el contrato, después la story: estos nombres están en el con
    |---|---|
    | `appsettings.json` | **nada** de `Email:Smtp`. Si falta la configuración, el arranque se corta (AC 16), igual que con las cadenas de conexión (1.1 AC 7) |
    | `appsettings.Development.json` | `"Email": { "Smtp": { "Host": "localhost", "Puerto": 1025, "Seguridad": "None", "RemitenteNombre": "Hospital Las Acacias", "RemitenteDireccion": "turnos@lasacacias.example" } }` — Mailpit no pide usuario ni clave |
-   | `docker-compose.yml`, servicio `web` | `Email__Smtp__Host: mailpit`, `Email__Smtp__Puerto: "1025"`, `Email__Smtp__Seguridad: None`, `Email__Smtp__RemitenteNombre: Hospital Las Acacias`, `Email__Smtp__RemitenteDireccion: turnos@lasacacias.example`, `Email__Smtp__Usuario: ${SMTP_USUARIO:-}`, `Email__Smtp__Clave: ${SMTP_CLAVE:-}` |
+   | `docker-compose.yml`, servicio `web` | `Email__Smtp__Host: mailpit`, `Email__Smtp__Puerto: "1025"`, `Email__Smtp__Seguridad: None`, `Email__Smtp__RemitenteNombre: Hospital Las Acacias`, `Email__Smtp__RemitenteDireccion: turnos@lasacacias.example`, `Email__Smtp__Usuario: ${SMTP_USUARIO}`, `Email__Smtp__Clave: ${SMTP_CLAVE}` (sin `:-`: el control de secretos de 1.1 prohíbe valores por defecto) |
    | `.env` (no versionado) / `.env.ejemplo` (versionado, sin valores) | `SMTP_USUARIO=` y `SMTP_CLAVE=` |
    | Producción | todas las claves `Email__Smtp__*` por variables de entorno, con `Seguridad = StartTls` |
 
@@ -458,8 +471,9 @@ public sealed class ProcesadorBandejaDeSalida(
                 catch (Exception ex) when (!ct.IsCancellationRequested)
                 {
                     mensaje.RegistrarFallo(reloj.GetUtcNow(), $"{ex.GetType().Name}: {ex.Message}");
-                    logger.LogWarning("Falló el envío del mensaje {MensajeId} ({Tipo}), intento {Intentos}",
-                        mensaje.Id, mensaje.Tipo, mensaje.Intentos);   // sin Para ni cuerpo: son datos personales
+                    // Revisión: el log sale DESPUÉS del commit y sin la excepción (su texto puede traer Para):
+                    // Warning "Falló el envío del mensaje {MensajeId} ({Tipo}), intento {Intentos}: {Error}" o, al 4.º,
+                    // Error "se dio por perdido tras {Intentos} intentos: {Error}", con Error = tipo + código SMTP.
                 }
             }
             await db.SaveChangesAsync(ct);
@@ -474,9 +488,10 @@ public sealed class ProcesadorBandejaDeSalida(
         // ... mismo esquema: SELECT … WHERE fallo_definitivo_el IS NOT NULL AND manejado_el IS NULL
         //     AND NOT (id = ANY({fallidosEsteCiclo.ToArray()})) ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED
         //     → manejadores = scope.ServiceProvider.GetServices<IManejadorFalloDefinitivo>().Where(m => m.Tipo == mensaje.Tipo)
-        //     → ninguno: LogWarning("sin manejador para el tipo {Tipo}") ; si hay: await cada ManejarAsync(...)
-        //     → mensaje.MarcarManejado(ahora); SaveChanges; Commit
-        //     → si un manejador lanza: Rollback, ChangeTracker.Clear(), LogError(ex, … {MensajeId}), fallidosEsteCiclo.Add(id)
+        //     → await cada ManejarAsync(...) ; mensaje.MarcarManejado(ahora); SaveChanges; Commit
+        //     → ninguno: LogWarning("sin manejador para el tipo {Tipo}") DESPUÉS del commit (revisión)
+        //     → si un manejador lanza: LogError(… {MensajeId} … {Error}) ANTES del Rollback, ChangeTracker.Clear(), con
+        //       Error = tipo de excepción, SIN la excepción (el manejador recibe Para; revisión), fallidosEsteCiclo.Add(id)
         return procesados;
     }
 
@@ -497,11 +512,13 @@ mime.From.Add(new MailboxAddress(op.RemitenteNombre, op.RemitenteDireccion));
 mime.To.Add(MailboxAddress.Parse(mensaje.Para));
 mime.Subject = mensaje.Asunto;
 mime.Body = new BodyBuilder { TextBody = mensaje.CuerpoTexto, HtmlBody = mensaje.CuerpoHtml }.ToMessageBody();
-using var smtp = new SmtpClient { Timeout = 30_000 };   // acota cuánto queda abierta la transacción del procesador
-await smtp.ConnectAsync(op.Host, op.Puerto, op.Seguridad, ct);
-if (!string.IsNullOrEmpty(op.Usuario)) await smtp.AuthenticateAsync(op.Usuario, op.Clave, ct);
-await smtp.SendAsync(mime, ct);
-await smtp.DisconnectAsync(true, ct);
+using var tope = CancellationTokenSource.CreateLinkedTokenSource(ct);
+tope.CancelAfter(TiempoMaximoPorEmail);                 // 60 s para todo el envío (revisión)
+using var smtp = new SmtpClient { Timeout = 30_000 };   // por operación
+await smtp.ConnectAsync(op.Host, op.Puerto, op.Seguridad ?? throw new InvalidOperationException("Falta Email:Smtp:Seguridad"), tope.Token);
+if (!string.IsNullOrEmpty(op.Usuario)) await smtp.AuthenticateAsync(op.Usuario, op.Clave ?? "", tope.Token);
+await smtp.SendAsync(mime, tope.Token);
+// Sin DisconnectAsync (revisión): un error al despedirse tras un envío aceptado reenviaba el email.
 ```
 
 **Comando de la migración:**
@@ -540,11 +557,11 @@ public static async Task LimpiarBandejaAsync(this PostgresFixture fixture)
 | Crear | `src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs` |
 | Crear | `src/HospitalTurnos.Infraestructura/Email/OpcionesSmtp.cs` |
 | Crear | `src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/MensajeSalienteConfiguracion.cs` |
-| Crear | `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/AAAAMMDDHHMMSS_AgregarBandejaDeSalida.cs` (prefijo lo pone `dotnet ef`) |
+| Crear | `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida.cs` y su `.Designer.cs` (prefijo puesto por `dotnet ef`) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/BandejaDeSalidaTests.cs` (T1, T2) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/ProcesadorBandejaDeSalidaTests.cs` (T3-T10) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/EnviadorEmailSmtpTests.cs` (T11, T12) |
-| Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/Dobles/EnviadorEmailFalso.cs` (modos: responde bien / siempre lanza / compuerta / espera cancelación; cuenta `Llamadas` y guarda lo recibido) |
+| Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/Dobles/EnviadorEmailFalso.cs` (modos: responde bien / siempre lanza / rechaza destinatario (550) / compuerta / espera cancelación; cuenta `Llamadas` y guarda lo recibido) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/Dobles/ManejadorFalloDefinitivoFalso.cs` (`Tipo` configurable, guarda los `FalloDefinitivoEmail`, opción "falla la primera vez") |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Ayudas/RegistroEnMemoria.cs` (el mismo doble de la story 1.2: `ILogger<T>` que guarda nivel, excepción y mensaje; evita sumar un paquete fuera del contrato) |
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Email/LimpiezaDeBandeja.cs` (extensión `LimpiarBandejaAsync`) |
@@ -557,6 +574,8 @@ public static async Task LimpiarBandejaAsync(this PostgresFixture fixture)
 | Modificar | `docker-compose.yml` (servicio `web`: claves `Email__Smtp__*`, ver Dev Notes punto 8) |
 | Modificar | `.env.ejemplo` (`SMTP_USUARIO=`, `SMTP_CLAVE=` vacías) |
 | Modificar | `tests/HospitalTurnos.Web.Tests/HospitalWebApplicationFactory.cs` (configuración SMTP válida para las pruebas de Web) |
+| Modificar | `src/HospitalTurnos.Infraestructura/Persistencia/ConvencionSnakeCase.cs` (nombre de columna por defecto, para `FromSql`; decisión del docente) |
+| Modificar | `Directory.Packages.props` (fija `System.Security.Cryptography.Pkcs` 10.0.13; seguridad) |
 
 ### Lo que NO hay que hacer
 
@@ -631,13 +650,60 @@ docker compose exec -T db psql -U turnos_app -d "$DB" -c "SELECT id, intentos, e
 
 ### Agent Model Used
 
+Claude Opus 5.5 (Amelia, dev BMAD), sesión 05 (2026-10-15/16).
+
 ### Debug Log References
+
+- Rojo inicial: las pruebas no compilaban (faltaba `Infraestructura/Email`).
+- 10 de 14 en rojo con `The required column 'CreadoEl' was not present in the results of a 'FromSql' operation`: la convención snake_case de 1.1 sólo renombraba la columna para la tabla. Corregido en `ConvencionSnakeCase` (decisión del docente).
+- `SecretosTests` (1.1) rechazó `${SMTP_USUARIO:-}`: se usa `${SMTP_USUARIO}` (decisión del docente).
+- `NU1902`/`NU1903` (advertencias como error): `System.Security.Cryptography.Pkcs` 10.0.0, que trae MailKit → fijada 10.0.13.
 
 ### Completion Notes List
 
+- 13 métodos con `Story=1.4` (18 casos con los `[Theory]`), todos en verde. Suite completa: 86/86 (Dominio 20, Web 32, Aplicación 34).
+- Diferido (documentado, no lo pide la story): prueba del tope de 60 s (necesita un servidor SMTP que no responda) y del `AuthenticateAsync` con usuario.
+- Cobertura de líneas de los archivos nuevos (coverlet): `ProcesadorBandejaDeSalida` 99 %, `MensajeSaliente`, `BandejaDeSalidaEnBase`, `EnviadorEmailSmtp` 100 %, `OpcionesSmtp` 86 %.
+- AC 18 a mano: `grep` de `DateTime.Now/UtcNow/Today` en `src/` sin resultados. Sin `Email` en `appsettings.json` y sin claves en `appsettings*.json`.
+
 ### File List
+
+- Creados: `src/HospitalTurnos.Aplicacion/Email/{MensajeEmail,IBandejaDeSalida,IEnviadorEmail,IManejadorFalloDefinitivo}.cs`; `src/HospitalTurnos.Infraestructura/Email/{MensajeSaliente,BandejaDeSalidaEnBase,ProcesadorBandejaDeSalida,EnviadorEmailSmtp,OpcionesSmtp}.cs`; `src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/MensajeSalienteConfiguracion.cs`; `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida{,.Designer}.cs`; `tests/HospitalTurnos.Aplicacion.Tests/Email/{BandejaDeSalidaTests,ProcesadorBandejaDeSalidaTests,EnviadorEmailSmtpTests,LimpiezaDeBandeja}.cs`; `tests/HospitalTurnos.Aplicacion.Tests/Email/Dobles/{EnviadorEmailFalso,ManejadorFalloDefinitivoFalso}.cs`; `tests/HospitalTurnos.Aplicacion.Tests/Ayudas/RegistroEnMemoria.cs`; `tests/HospitalTurnos.Web.Tests/Arranque/ConfiguracionSmtpTests.cs`.
+- Modificados: `HospitalDbContext.cs`, `HospitalDbContextModelSnapshot.cs`, `HospitalTurnos.Infraestructura.csproj`, `ConvencionSnakeCase.cs`, `Directory.Packages.props`, `Program.cs`, `appsettings.Development.json`, `docker-compose.yml`, `.env.ejemplo`, `HospitalWebApplicationFactory.cs`.
 
 ### Change Log
 
 - 2026-10-09: Story escrita (Mary, analista BMAD).
 - 2026-10-09: Correcciones de la revisión adversarial (`revision-sprint-1.md`): C-1 (usa la `PostgresFixture` única, sin modificarla; `CadenaDuenio`), I-9 (regla de reintentos y nombres tomados del contrato), I-10 (SMTP fuera de `appsettings.json`, secretos por `.env`, AC 16 + T13), M-3 (sin `ToTable`), M-4 (`RegistroEnMemoria`), M-5 (R1, R2 para AC 17 y 18), M-8 (`depends_on` incluye 1.3).
+- 2026-10-15: Antes de implementar: "Que existe hoy" actualizada al estado real (1.1-1.3 en `main`).
+- 2026-10-15: Decisión del docente: `HospitalTurnos.Infraestructura.csproj` suma `<FrameworkReference Include="Microsoft.AspNetCore.App" />` para `BackgroundService` (sin paquete nuevo; el contrato no cambia).
+- 2026-10-15: Seguridad: MailKit trae `System.Security.Cryptography.Pkcs` 10.0.0 con vulnerabilidades conocidas (GHSA-846f-f764-76mx, GHSA-2fmv-rv2c-59x7); se fija 10.0.13 en `Directory.Packages.props` (archivo no previsto en la story).
+- 2026-10-15: Decisión del docente: `ConvencionSnakeCase` (story 1.1) fija el nombre de columna por defecto y no sólo el de la tabla; si no, `FromSql` buscaba `CreadoEl` en vez de `creado_el`. El modelo de la base no cambia (`has-pending-model-changes`: sin cambios).
+- 2026-10-16: Decisión del docente: en `docker-compose.yml` usuario y clave SMTP van como `${SMTP_USUARIO}` / `${SMTP_CLAVE}`, sin `:-` (Dev Notes punto 8 decía `${…:-}`): el control de secretos de la 1.1 (`SecretosTests`) prohíbe todo valor por defecto en ese archivo. Sin las variables en `.env`, Compose avisa y usa vacío.
+- 2026-10-16: Revisión (decisión del docente, 4 arreglos): (1) `OpcionesSmtp.Seguridad` obligatoria (`SecureSocketOptions?` + `[Required]`) y `Puerto` con `[Range(1, 65535)]`: sin la variable, el correo salía sin cifrar; T13 suma 2 casos. (2) `EnviadorEmailSmtp` ya no llama `DisconnectAsync`: un error al despedirse tras un envío aceptado reenviaba el email. (3) Tope total de 60 s por email (`CancellationTokenSource` enlazado); el `Timeout` de MailKit es por operación. (4) El procesador registra `Error` (sin datos personales) cuando un email se da por perdido y pasa la excepción al `Warning` de cada fallo; T5, T6 y T7 lo verifican. Quedan para después (no los pide la story): indicador de salud del proceso, jitter en sondeo y reintentos, logs de inicio/fin, prueba del recorte a 500 y del tope de lote.
+- 2026-10-16: Revisión, 2.ª vuelta (decisión del docente): el log de un envío fallido o perdido ya no lleva la excepción ni su mensaje (un rechazo SMTP suele repetir la dirección del paciente): sólo el tipo de error y el código SMTP. El texto completo sigue en `ultimo_error` (AC 5, misma fila que ya tiene `Para`). Esos logs se escriben después del `CommitAsync`. T4 y T5 lo verifican (el doble de SMTP rechaza repitiendo la dirección).
+- 2026-10-16: Revisión, 3.ª vuelta (misma regla, toda la clase): en la fase 2, el `Warning` "sin manejador" se escribe después del commit y el `Error` de un manejador que falla lleva el tipo de error, no la excepción (el manejador recibe `Para`). T7 lo verifica.
+- 2026-10-16: Revisión, 4.ª vuelta (decisión del docente): en la fase 2 el `Error` de un manejador que falla se escribe antes del `RollbackAsync`, para que el id y el tipo queden aunque el rollback lance.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C1 — `docs/stories/1-4-bandeja-de-salida.md` — R1/R2 son regresión de 1.1-1.3 con sus Traits originales; confirmado falso por tycon-ac-coverage-checker <!-- fkey:ACCOV-C1|docs/stories/1-4-bandeja-de-salida.md -->
+- [x] **[CRITICAL]** ACCOV-C5 — `docs/stories/1-4-bandeja-de-salida.md` — AC 17 sí tiene R1; los \| de la celda descuadran el parser (tycon-ac-coverage-checker) <!-- fkey:ACCOV-C5|docs/stories/1-4-bandeja-de-salida.md -->
+- [x] **[WARNING]** SEC-C9 — `src/HospitalTurnos.Infraestructura/Email/OpcionesSmtp.cs` — Seguridad obligatoria y Puerto en rango; T13 suma 2 casos <!-- fkey:SEC-C9|src/HospitalTurnos.Infraestructura/Email/OpcionesSmtp.cs -->
+- [x] **[WARNING]** HTTP-W5 — `src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs` — sin DisconnectAsync: un error al despedirse ya no reenvía el email <!-- fkey:HTTP-W5|src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs -->
+- [x] **[WARNING]** HTTP-C2 — `src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs` — tope total de 60 s por email <!-- fkey:HTTP-C2|src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs -->
+- [x] **[WARNING]** SILENT-W2 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — log Error al dar por perdido; log del manejador antes del rollback (iter 1, 4) <!-- fkey:SILENT-W2|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [x] **[CRITICAL]** SEC-C5 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — iter 2: logs sin la excepción (sólo tipo + código SMTP), en fase 1 y fase 2; T4/T5/T7 lo verifican <!-- fkey:SEC-C5|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [ ] **[WARNING]** SEC-C5 — `src/HospitalTurnos.Infraestructura/Email/MensajeSaliente.cs` — ultimo_error guarda el texto completo: lo pide AC 5 y es la misma fila que ya tiene Para (decisión del docente) <!-- fkey:SEC-C5|src/HospitalTurnos.Infraestructura/Email/MensajeSaliente.cs -->
+- [x] **[WARNING]** WORKER-W3 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — logs de fallo definitivo y sin manejador después del commit <!-- fkey:WORKER-W3|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [x] **[WARNING]** TEST-W4 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — rama SmtpCommandException cubierta en T5 (550) <!-- fkey:TEST-W4|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [ ] **[WARNING]** TEST-W4 — `src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs` — tope de 60 s y AuthenticateAsync sin prueba: necesita un SMTP que no responda; documentado en la story <!-- fkey:TEST-W4|src/HospitalTurnos.Infraestructura/Email/EnviadorEmailSmtp.cs -->
+- [ ] **[WARNING]** TEST-W4 — `src/HospitalTurnos.Infraestructura/Email/MensajeSaliente.cs` — recorte a 500 y tope de lote 50 sin prueba propia; no lo pide la tabla de la story <!-- fkey:TEST-W4|src/HospitalTurnos.Infraestructura/Email/MensajeSaliente.cs -->
+- [ ] **[WARNING]** TEST-W2 — `.advisors/tests-result.json` — el portón no cruza cobertura con .slnx; medida a mano con coverlet: 99-100 % (OpcionesSmtp 86 %) <!-- fkey:TEST-W2|.advisors/tests-result.json -->
+- [ ] **[WARNING]** WORKER-W2 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — indicador de salud del proceso de fondo: fuera del alcance de la story <!-- fkey:WORKER-W2|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [ ] **[WARNING]** WORKER-W4 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — logs de inicio y fin del proceso de fondo <!-- fkey:WORKER-W4|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [ ] **[WARNING]** WORKER-W1 — `src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs` — jitter en sondeo y reintentos: la story fija 15 s y 1/5/15 min <!-- fkey:WORKER-W1|src/HospitalTurnos.Infraestructura/Email/ProcesadorBandejaDeSalida.cs -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/1-4-bandeja-de-salida.md` — textos de la story alineados con lo implementado (iter 1-4) <!-- fkey:VAL-W15|docs/stories/1-4-bandeja-de-salida.md -->

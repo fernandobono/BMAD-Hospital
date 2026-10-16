@@ -29,6 +29,15 @@ services:
       ConnectionStrings__App: Host=db;Database=hospital_turnos;Username=turnos_app;Password=${TURNOS_APP_PASSWORD:?copiá .env.ejemplo a .env}
       ConnectionStrings__Migraciones: Host=db;Database=hospital_turnos;Username=turnos_owner;Password=${TURNOS_OWNER_PASSWORD:?copiá .env.ejemplo a .env}
       ProteccionDeDatos__Carpeta: /claves-proteccion
+      # Story 1.4: el correo sale por Mailpit. Usuario y clave sólo desde .env (vacíos con Mailpit).
+      # Sin ":-": ningún valor por defecto en este archivo (control de secretos de la story 1.1).
+      Email__Smtp__Host: mailpit
+      Email__Smtp__Puerto: "1025"
+      Email__Smtp__Seguridad: None
+      Email__Smtp__RemitenteNombre: Hospital Las Acacias
+      Email__Smtp__RemitenteDireccion: turnos@lasacacias.example
+      Email__Smtp__Usuario: ${SMTP_USUARIO}
+      Email__Smtp__Clave: ${SMTP_CLAVE}
     volumes:
       - claves-proteccion:/claves-proteccion
     depends_on:

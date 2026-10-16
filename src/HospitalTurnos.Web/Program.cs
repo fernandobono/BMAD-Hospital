@@ -1,4 +1,6 @@
+using HospitalTurnos.Aplicacion.Email;
 using HospitalTurnos.Infraestructura;
+using HospitalTurnos.Infraestructura.Email;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Web.Components;
 using HospitalTurnos.Web.Errores;
@@ -14,6 +16,12 @@ var builder = WebApplication.CreateBuilder(args);
 // Infraestructura registra el DbContext con el rol de la app (turnos_app). La cadena se lee DIFERIDA
 // (dentro del lambda de AddDbContext), así ve también la configuración que agregan las pruebas.
 builder.Services.AgregarInfraestructura(builder.Configuration);
+// Bandeja de salida (ADR-05): los casos de uso encolan; el proceso de fondo envía y reintenta.
+// ValidateOnStart: sin Email:Smtp:Host o sin remitente, el arranque se corta (AC 16), no el primer email.
+builder.Services.AddOptions<OpcionesSmtp>().BindConfiguration("Email:Smtp").ValidateDataAnnotations().ValidateOnStart();
+builder.Services.AddScoped<IBandejaDeSalida, BandejaDeSalidaEnBase>();
+builder.Services.AddTransient<IEnviadorEmail, EnviadorEmailSmtp>();
+builder.Services.AddHostedService<ProcesadorBandejaDeSalida>();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
 // NFR-09: un solo lugar decide qué ve el usuario ante un error y qué queda en el registro técnico.
 builder.Services.AddExceptionHandler<ManejadorGlobalDeErrores>();

@@ -35,6 +35,13 @@ public class HospitalWebApplicationFactory : WebApplicationFactory<Program>
         {
             ["ConnectionStrings:App"] = _cadenaApp,
             ["ConnectionStrings:Migraciones"] = _cadenaMigraciones,
+            // Story 1.4: sin configuración SMTP la app no arranca (AC 16). Puerto 1: nadie escucha, así que
+            // un email encolado en una prueba de Web sólo suma reintentos y nunca sale.
+            ["Email:Smtp:Host"] = "127.0.0.1",
+            ["Email:Smtp:Puerto"] = "1",
+            ["Email:Smtp:Seguridad"] = "None",
+            ["Email:Smtp:RemitenteNombre"] = "Hospital Las Acacias",
+            ["Email:Smtp:RemitenteDireccion"] = "turnos@lasacacias.example",
         }));
     }
 }

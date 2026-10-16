@@ -106,6 +106,116 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                                 .HasColumnName("usuario_id");
                         });
                 });
+
+            modelBuilder.Entity("HospitalTurnos.Infraestructura.Email.MensajeSaliente", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Asunto")
+                        .IsRequired()
+                        .HasMaxLength(200)
+                        .HasColumnType("character varying(200)");
+
+                    b.Property<DateTimeOffset>("CreadoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("CuerpoHtml")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("CuerpoTexto")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTimeOffset?>("EnviadoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<DateTimeOffset?>("FalloDefinitivoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<int>("Intentos")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTimeOffset?>("ManejadoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("Para")
+                        .IsRequired()
+                        .HasMaxLength(320)
+                        .HasColumnType("character varying(320)");
+
+                    b.Property<DateTimeOffset>("ProximoIntentoEl")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("ReferenciaId")
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)");
+
+                    b.Property<string>("Tipo")
+                        .IsRequired()
+                        .HasMaxLength(50)
+                        .HasColumnType("character varying(50)");
+
+                    b.Property<string>("UltimoError")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)");
+
+                    b.HasKey("Id")
+                        .HasName("pk_mensajes_salientes");
+
+                    b.HasIndex("ProximoIntentoEl")
+                        .HasDatabaseName("ix_mensajes_salientes_proximo_intento_el")
+                        .HasFilter("enviado_el IS NULL AND fallo_definitivo_el IS NULL");
+
+                    b.ToTable("mensajes_salientes", t =>
+                        {
+                            t.Property("Id")
+                                .HasColumnName("id");
+
+                            t.Property("Asunto")
+                                .HasColumnName("asunto");
+
+                            t.Property("CreadoEl")
+                                .HasColumnName("creado_el");
+
+                            t.Property("CuerpoHtml")
+                                .HasColumnName("cuerpo_html");
+
+                            t.Property("CuerpoTexto")
+                                .HasColumnName("cuerpo_texto");
+
+                            t.Property("EnviadoEl")
+                                .HasColumnName("enviado_el");
+
+                            t.Property("FalloDefinitivoEl")
+                                .HasColumnName("fallo_definitivo_el");
+
+                            t.Property("Intentos")
+                                .HasColumnName("intentos");
+
+                            t.Property("ManejadoEl")
+                                .HasColumnName("manejado_el");
+
+                            t.Property("Para")
+                                .HasColumnName("para");
+
+                            t.Property("ProximoIntentoEl")
+                                .HasColumnName("proximo_intento_el");
+
+                            t.Property("ReferenciaId")
+                                .HasColumnName("referencia_id");
+
+                            t.Property("Tipo")
+                                .HasColumnName("tipo");
+
+                            t.Property("UltimoError")
+                                .HasColumnName("ultimo_error");
+                        });
+                });
 #pragma warning restore 612, 618
         }
     }
