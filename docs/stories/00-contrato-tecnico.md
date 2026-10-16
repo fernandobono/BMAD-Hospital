@@ -145,6 +145,11 @@ formularios abiertos (M-11).
   **agrega** el registro al `HospitalDbContext` sin guardar; se persiste con el `SaveChangesAsync` del
   caso de uso. `ActorAuditoria` (record, mismo lugar): `UsuarioId?`, `Quien`, `Rol`, `Canal`.
   Implementación: `AuditoriaEnBase` en `src/HospitalTurnos.Infraestructura/Auditoria/` (story 1.3).
+- **Nombre de las acciones** (decisión del docente, 2026-10-16, M-7 de la revisión del S2):
+  `<entidad>.<acción>` en kebab-case, con la entidad antes del punto (`turno.reservado`,
+  `usuario-personal.creado`, `especialidad.desactivada`, `medico.creado`). La 9.1 filtra por la entidad.
+  Excepción anotada: las tres de la 2.1 (`ingreso-personal`, `ingreso-personal-fallido`,
+  `ingreso-personal-bloqueado`) quedan como están.
 - Tabla `registros_auditoria`: `turnos_app` tiene sólo `INSERT` y `SELECT`; un disparador rechaza
   `UPDATE`, `DELETE` y `TRUNCATE`.
 
