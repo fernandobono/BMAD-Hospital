@@ -1,6 +1,7 @@
 using HospitalTurnos.Infraestructura;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Web.Components;
+using HospitalTurnos.Web.Errores;
 using HospitalTurnos.Web.Salud;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Diagnostics.HealthChecks;
@@ -14,6 +15,9 @@ var builder = WebApplication.CreateBuilder(args);
 // (dentro del lambda de AddDbContext), así ve también la configuración que agregan las pruebas.
 builder.Services.AgregarInfraestructura(builder.Configuration);
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+// NFR-09: un solo lugar decide qué ve el usuario ante un error y qué queda en el registro técnico.
+builder.Services.AddExceptionHandler<ManejadorGlobalDeErrores>();
+builder.Services.AddProblemDetails();
 builder.Services.AddHealthChecks()
     .AddCheck<ChequeoBaseDeDatos>("base", timeout: TimeSpan.FromSeconds(3));
 
@@ -42,7 +46,17 @@ await AplicadorDeMigraciones.AplicarAsync(
     ServiciosDeInfraestructura.CadenaDeConexion(app.Configuration, "Migraciones"));
 
 app.UseForwardedHeaders();          // primero: el resto del pipeline ve el esquema real (https)
-// (la story 1.2 agrega acá UseExceptionHandler, en todos los entornos)
+// En TODOS los entornos (AC 12): la página de excepciones para desarrolladores queda por fuera y
+// nunca ve la excepción, porque este middleware ya la manejó. El detalle va a la consola.
+app.UseExceptionHandler(new ExceptionHandlerOptions
+{
+    ExceptionHandlingPath = "/Error",
+    CreateScopeForErrors = true,
+    // Por qué suprimir siempre: ManejadorGlobalDeErrores ya registró cada excepción una vez y con el
+    // nivel correcto. Sin esto, en el camino HTML (el manejador devuelve false) el middleware la
+    // vuelve a registrar como Error al re-ejecutar /Error (AC 14).
+    SuppressDiagnosticsCallback = _ => true
+});
 if (!app.Environment.IsDevelopment())
 {
     app.UseHsts();

@@ -1,4 +1,5 @@
 using HospitalTurnos.Infraestructura.Persistencia;
+using HospitalTurnos.Infraestructura.Tiempo;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
@@ -16,6 +17,8 @@ public static class ServiciosDeInfraestructura
     {
         servicios.AddDbContext<HospitalDbContext>((_, opciones) =>
             opciones.UseNpgsql(CadenaDeConexion(configuracion, "App")));
+        // Un solo reloj para toda la app (NFR-06): singleton, no tiene estado.
+        servicios.AddSingleton<TimeProvider>(new RelojHospital());
         return servicios;
     }
 
