@@ -1,3 +1,5 @@
+using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Infraestructura.Auditoria;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Infraestructura.Tiempo;
 using Microsoft.EntityFrameworkCore;
@@ -19,6 +21,8 @@ public static class ServiciosDeInfraestructura
             opciones.UseNpgsql(CadenaDeConexion(configuracion, "App")));
         // Un solo reloj para toda la app (NFR-06): singleton, no tiene estado.
         servicios.AddSingleton<TimeProvider>(new RelojHospital());
+        // Scoped como el contexto: el registro viaja en el mismo SaveChangesAsync que el cambio.
+        servicios.AddScoped<IAuditoria, AuditoriaEnBase>();
         return servicios;
     }
 

@@ -2,7 +2,7 @@
 epic: 1
 story: "1.3"
 title: "Registro de auditoría: tabla, escritura en la misma transacción, protección con permisos y disparador"
-status: ready-for-dev
+status: review
 sprint: 1
 priority: "P0"
 approach: "[CREATE]"
@@ -28,13 +28,14 @@ files_to_create:
 files_to_modify:
   - src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs
   - src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs
-  - src/HospitalTurnos.Web/Program.cs
+  - src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs
   - tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj
+  - tests/HospitalTurnos.Web.Tests/Arranque/RolesDeBaseTests.cs
 ---
 
 # Story 1.3: Registro de auditoría: tabla, escritura en la misma transacción, protección con permisos y disparador
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -152,33 +153,33 @@ Traits: cada test nuevo lleva `[Trait("Story", "1.3")]` y un `[Trait("AC", "n")]
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar que la story 1.1 está implementada: existen `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs`, la carpeta `Persistencia/Migraciones/`, los proyectos `HospitalTurnos.Dominio.Tests` y `HospitalTurnos.Aplicacion.Tests`, y `src/HospitalTurnos.Api/` ya **no** existe.
-  - [ ] Anotar la firma real del constructor de `HospitalDbContext` y si `OnModelCreating` usa `ApplyConfigurationsFromAssembly` (decide si hay que registrar la configuración a mano).
-  - [ ] Confirmar que 1.1 crea los roles `turnos_owner` y `turnos_app` en el arranque de Docker Compose (sin esos roles el `GRANT` de la migración falla).
-  - [ ] Confirmar si `TimeProvider` ya está registrado (`RelojHospital`, story 1.2). Si **no** está: las pruebas igual corren (usan `FakeTimeProvider`), pero el registro en `Program.cs` no resuelve. **DETENERSE** y avisar; no registrar `TimeProvider.System` como parche (viola NFR-06).
-  - [ ] Confirmar que existe `tests/HospitalTurnos.Web.Tests/PostgresFixture.cs` (story 1.1) con `CadenaDuenio`, `CadenaApp`, `01-roles.sh` vía `WithResourceMapping` y migraciones como dueño (contrato §Pruebas). Si no coincide → DETENERSE.
-  - [ ] Si `tests/HospitalTurnos.Aplicacion.Tests/PostgresFixture.cs` ya existe, comparar con la de Web.Tests (`diff` ignorando la línea `namespace`): tiene que ser idéntica. **No** extenderla ni agregarle métodos: lo propio de cada story va en `Ayudas/` o en la clase de prueba.
-  - [ ] Archivo de solución: el contrato dice `HospitalTurnos.sln`; el 2026-10-09 el repo tenía `HospitalTurnos.slnx`. Usar el que haya dejado 1.1.
-  - [ ] Si CUALQUIER asunción no coincide → DETENERSE → corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio (AC: 1, 2, 3)
-  - [ ] `CanalAuditoria { Web, Recepcion, Personal, Sistema }` con el significado de cada valor en comentarios (ver Dev Notes).
-  - [ ] `RegistroAuditoria` con constructor validado, setters privados y constructor sin parámetros `private` para EF.
-  - [ ] `AccionesAuditoria` con las constantes de FR-33 (ver Dev Notes).
-  - [ ] T1, T2 en `Dominio.Tests`.
-- [ ] [SEQ] Task 3: Puerto y adaptador (AC: 4, 5)
-  - [ ] `ActorAuditoria` (record) e `IAuditoria` en Aplicacion.
-  - [ ] `AuditoriaEnBase : IAuditoria` en Infraestructura: toma `Cuando` de `TimeProvider.GetUtcNow()`, serializa `detalle` con `JsonSerializerOptions.Web` y hace `Add` sin guardar.
-  - [ ] Registrar `services.AddScoped<IAuditoria, AuditoriaEnBase>()` en `Program.cs` (o en el método de extensión de Infraestructura si 1.1 creó uno — anotar cuál).
-- [ ] [SEQ] Task 4: Persistencia y migración (AC: 4, 6, 7, 8, 9)
-  - [ ] `RegistroAuditoriaConfiguracion` (largos, `jsonb`, enum como texto; **sin** `ToTable`: el nombre `registros_auditoria` sale de la convención de 1.1) y `DbSet<RegistroAuditoria> RegistrosAuditoria` en `HospitalDbContext`.
-  - [ ] `dotnet ef migrations add AgregarRegistroAuditoria …` (comando en Dev Notes) y agregar al final de `Up` el SQL de permisos y disparadores; al principio de `Down`, el SQL inverso.
-- [ ] [SEQ] Task 5: Fixture e integración (AC: 4-9)
-  - [ ] Copiar `PostgresFixture` de Web.Tests (idéntica salvo el `namespace`), crear `ColeccionPostgres` (`[CollectionDefinition("Postgres")] … : ICollectionFixture<PostgresFixture>`) y `Ayudas/ContextoDePrueba.cs`.
-  - [ ] En `HospitalTurnos.Aplicacion.Tests.csproj`: `<None Include="..\..\docker\postgres\initdb\01-roles.sh" Link="initdb/01-roles.sh" CopyToOutputDirectory="PreserveNewest" />` (igual que Web.Tests) y los paquetes que falten.
-  - [ ] T3-T5 en `AuditoriaEnBaseTests`, T6-T8 en `ProteccionAuditoriaTests`.
-- [ ] [SEQ] Task 6: Verificación (AC: 10, 11)
-  - [ ] Correr los comandos de "Como verificar que funciona"; contar 8 pruebas con `Story=1.3` (T1, T6 y T7 son `[Theory]`: el runner muestra más casos, pero son 8 métodos) y R1, R2 en verde.
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar que la story 1.1 está implementada: existen `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs`, la carpeta `Persistencia/Migraciones/`, los proyectos `HospitalTurnos.Dominio.Tests` y `HospitalTurnos.Aplicacion.Tests`, y `src/HospitalTurnos.Api/` ya **no** existe.
+  - [x] Anotar la firma real del constructor de `HospitalDbContext` y si `OnModelCreating` usa `ApplyConfigurationsFromAssembly` (decide si hay que registrar la configuración a mano).
+  - [x] Confirmar que 1.1 crea los roles `turnos_owner` y `turnos_app` en el arranque de Docker Compose (sin esos roles el `GRANT` de la migración falla).
+  - [x] Confirmar si `TimeProvider` ya está registrado (`RelojHospital`, story 1.2). Si **no** está: las pruebas igual corren (usan `FakeTimeProvider`), pero `AuditoriaEnBase` no se resuelve en la app. **DETENERSE** y avisar; no registrar `TimeProvider.System` como parche (viola NFR-06).
+  - [x] Confirmar que existe `tests/HospitalTurnos.Web.Tests/PostgresFixture.cs` (story 1.1) con `CadenaDuenio`, `CadenaApp`, `01-roles.sh` vía `WithResourceMapping` y migraciones como dueño (contrato §Pruebas). Si no coincide → DETENERSE.
+  - [x] Si `tests/HospitalTurnos.Aplicacion.Tests/PostgresFixture.cs` ya existe, comparar con la de Web.Tests (`diff` ignorando la línea `namespace`): tiene que ser idéntica. **No** extenderla ni agregarle métodos: lo propio de cada story va en `Ayudas/` o en la clase de prueba.
+  - [x] Archivo de solución: el contrato dice `HospitalTurnos.sln`; el 2026-10-09 el repo tenía `HospitalTurnos.slnx`. Usar el que haya dejado 1.1.
+  - [x] Si CUALQUIER asunción no coincide → DETENERSE → corregir la story primero.
+- [x] [SEQ] Task 2: Dominio (AC: 1, 2, 3)
+  - [x] `CanalAuditoria { Web, Recepcion, Personal, Sistema }` con el significado de cada valor en comentarios (ver Dev Notes).
+  - [x] `RegistroAuditoria` con constructor validado, setters privados y constructor sin parámetros `private` para EF.
+  - [x] `AccionesAuditoria` con las constantes de FR-33 (ver Dev Notes).
+  - [x] T1, T2 en `Dominio.Tests`.
+- [x] [SEQ] Task 3: Puerto y adaptador (AC: 4, 5)
+  - [x] `ActorAuditoria` (record) e `IAuditoria` en Aplicacion.
+  - [x] `AuditoriaEnBase : IAuditoria` en Infraestructura: toma `Cuando` de `TimeProvider.GetUtcNow()`, serializa `detalle` con `JsonSerializerOptions.Web` y hace `Add` sin guardar.
+  - [x] Registrar `servicios.AddScoped<IAuditoria, AuditoriaEnBase>()` en `AgregarInfraestructura` (`ServiciosDeInfraestructura.cs`), al lado del reloj. `Program.cs` no cambia.
+- [x] [SEQ] Task 4: Persistencia y migración (AC: 4, 6, 7, 8, 9)
+  - [x] `RegistroAuditoriaConfiguracion` (largos, `jsonb`, enum como texto; **sin** `ToTable`: el nombre `registros_auditoria` sale de la convención de 1.1) y `DbSet<RegistroAuditoria> RegistrosAuditoria` en `HospitalDbContext`.
+  - [x] `dotnet ef migrations add AgregarRegistroAuditoria …` (comando en Dev Notes) y agregar al final de `Up` el SQL de permisos y disparadores; al principio de `Down`, el SQL inverso.
+- [x] [SEQ] Task 5: Fixture e integración (AC: 4-9)
+  - [x] Copiar `PostgresFixture` de Web.Tests (idéntica salvo el `namespace`), crear `ColeccionPostgres` (`[CollectionDefinition("Postgres")] … : ICollectionFixture<PostgresFixture>`) y `Ayudas/ContextoDePrueba.cs`.
+  - [x] En `HospitalTurnos.Aplicacion.Tests.csproj`: `<None Include="..\..\docker\postgres\initdb\01-roles.sh" Link="initdb/01-roles.sh" CopyToOutputDirectory="PreserveNewest" />` (igual que Web.Tests). Los paquetes ya están.
+  - [x] T3-T5 en `AuditoriaEnBaseTests`, T6-T8 en `ProteccionAuditoriaTests`.
+- [x] [SEQ] Task 6: Verificación (AC: 10, 11)
+  - [x] Correr los comandos de "Como verificar que funciona"; contar 8 pruebas con `Story=1.3` (T1, T6 y T7 son `[Theory]`: el runner muestra más casos, pero son 8 métodos) y R1, R2 en verde.
 
 ### Task Dependencies
 
@@ -188,14 +189,16 @@ T1 → T2 → T3 → T4 → T5 → T6 (secuencial: la migración necesita la ent
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-09)
+#### En hospital-turnos (verificado 2026-10-15, con 1.1 y 1.2 en `main`)
 
-- `HospitalTurnos.slnx` sólo referencia `src/HospitalTurnos.Api/HospitalTurnos.Api.csproj` y `tests/HospitalTurnos.Tests/HospitalTurnos.Tests.csproj`, código **descartable** que borra la story 1.1 (contrato §Repositorio). Nada de ese código se usa acá.
-- **No existe todavía (lo crea la story 1.1):** los proyectos `HospitalTurnos.Dominio`, `.Aplicacion`, `.Infraestructura`, `.Web` y sus proyectos de pruebas; `HospitalDbContext` en `src/HospitalTurnos.Infraestructura/Persistencia/`; la carpeta de migraciones; `docker-compose.yml` con los roles `turnos_owner` / `turnos_app`; `Directory.Packages.props`.
-- **No existe todavía (lo crea la story 1.2):** `RelojHospital : TimeProvider` registrado como singleton.
-- **Lo crea la story 1.1 (y esta story la copia):** `tests/HospitalTurnos.Web.Tests/PostgresFixture.cs`, la única especificación de la fixture (contrato §Pruebas).
-- **No existe (lo crea esta story):** todo lo de `Auditoria/` en las tres capas, la tabla `registros_auditoria`, el disparador, la copia de `PostgresFixture` en Aplicacion.Tests (salvo que otra story la haya copiado antes — ver Task 1).
-- Git: la rama `master` no tiene commits todavía.
+- `HospitalTurnos.slnx` lista los 7 proyectos de la 1.1 (4 de `src/` y 3 de `tests/`); el código descartable de `Api` ya no existe.
+- `HospitalDbContext(DbContextOptions<HospitalDbContext>)` en `src/HospitalTurnos.Infraestructura/Persistencia/`. **No** usa `ApplyConfigurationsFromAssembly`: `OnModelCreating` sólo llama `ConvencionSnakeCase.Aplicar(modelBuilder)` al final. La configuración de auditoría se aplica a mano **antes** de esa llamada.
+- Migraciones en `Persistencia/Migraciones/` (hoy sólo `Inicial`); las aplica `AplicadorDeMigraciones` con la cadena `Migraciones` (dueño) al arrancar.
+- `AgregarInfraestructura` (`src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs`) registra el `DbContext` con la cadena `App` y `RelojHospital` como `TimeProvider` singleton (1.2). `Program.cs` sólo llama a ese método: `IAuditoria` se registra **ahí**, no en `Program.cs`.
+- `docker/postgres/initdb/01-roles.sh` crea `turnos_owner` y `turnos_app` (1.1).
+- `tests/HospitalTurnos.Web.Tests/PostgresFixture.cs` y `ColeccionPostgres.cs` (1.1): la fixture que esta story copia.
+- `HospitalTurnos.Aplicacion.Tests.csproj` ya tiene `Testcontainers.PostgreSql` y `Microsoft.Extensions.TimeProvider.Testing`; le falta el enlace a `01-roles.sh`.
+- **No existe (lo crea esta story):** todo lo de `Auditoria/` en las tres capas, la tabla `registros_auditoria`, el disparador, la copia de `PostgresFixture` en Aplicacion.Tests.
 
 #### Contrato que esta story implementa (`docs/stories/00-contrato-tecnico.md` §Auditoría y §Pruebas)
 
@@ -377,9 +380,8 @@ SQL propio no aplica los privilegios por defecto de `01-roles.sh`. Con ella, T6 
 borrara el `REVOKE ALL` de la migración, y las pruebas de otras stories que usan `CadenaApp` sobre tablas
 creadas por el dueño fallarían con `42501`. La verificación previa de T8 deja esto controlado.
 
-Paquetes en `HospitalTurnos.Aplicacion.Tests.csproj` (versiones en `Directory.Packages.props`):
-`Testcontainers.PostgreSql`, `Microsoft.Extensions.TimeProvider.Testing` (si 1.1 no los agregó), y el
-`<None Include=… 01-roles.sh …>` de Task 5.
+Paquetes en `HospitalTurnos.Aplicacion.Tests.csproj`: `Testcontainers.PostgreSql` y
+`Microsoft.Extensions.TimeProvider.Testing` ya están (1.1). Falta sólo el `<None Include=… 01-roles.sh …>` de Task 5.
 
 **Comando de la migración:**
 ```bash
@@ -410,8 +412,9 @@ dotnet ef migrations add AgregarRegistroAuditoria \
 | Crear | `tests/HospitalTurnos.Aplicacion.Tests/Auditoria/ProteccionAuditoriaTests.cs` (T6, T7, T8) |
 | Modificar | `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs` (agregar `RegistrosAuditoria`; aplicar la configuración si no hay `ApplyConfigurationsFromAssembly`) |
 | Modificar | `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs` (lo regenera `dotnet ef`) |
-| Modificar | `src/HospitalTurnos.Web/Program.cs` (`AddScoped<IAuditoria, AuditoriaEnBase>()`) |
-| Modificar | `tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj` (paquetes de Testcontainers y FakeTimeProvider; enlace a `01-roles.sh`) |
+| Modificar | `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs` (`AddScoped<IAuditoria, AuditoriaEnBase>()` en `AgregarInfraestructura`) |
+| Modificar | `tests/HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj` (enlace a `01-roles.sh`; los paquetes ya están) |
+| Modificar | `tests/HospitalTurnos.Web.Tests/Arranque/RolesDeBaseTests.cs` (T5 de la 1.1: deja de exigir una sola migración; aprobado por el docente) |
 
 ### Lo que NO hay que hacer
 
@@ -491,13 +494,45 @@ docker compose exec -T db psql -U turnos_owner -d "$DB" -c "TRUNCATE registros_a
 
 ### Agent Model Used
 
+Claude Opus 5.5 (claude-opus-5-5), como Amelia (desarrolladora del equipo BMAD).
+
 ### Debug Log References
+
+- Salvaguarda (Task 1): `Story=1.1|Story=1.2` 41/41 en verde antes de tocar nada; Docker andando; `dotnet-ef` 10.0.13 local; `01-roles.sh` con privilegios por defecto (SELECT/INSERT/UPDATE/DELETE) para `turnos_app`; `HospitalDbContext(DbContextOptions<HospitalDbContext>)` sin `ApplyConfigurationsFromAssembly`; `RelojHospital` registrado en `AgregarInfraestructura`.
+- Rojos vistos (pruebas primero): (1) no compilaban, faltaban las clases; (2) con la entidad y sin migración, EF se negó a migrar (`PendingModelChangesWarning`): el modelo cambió y no hay migración; (3) con la migración y **sin** el SQL de protección: T3–T5 en verde, pero la app **pudo** hacer `UPDATE` y `DELETE` (privilegios por defecto), el dueño pudo todo y T8 falló. `TRUNCATE` como app ya fallaba (los privilegios por defecto no lo incluyen). (4) Con el SQL: verde.
+- R1 rompió una prueba de la 1.1 (T5, `RolApp_TablaDeMigracionesDelDuenio_PuedeLeerla`): exigía **una sola** migración aplicada y ahora hay dos. No es un error de la app: la aserción quedaba vieja con cualquier migración nueva. Decisión del docente: hacerla robusta (todas las migraciones del proyecto, cada una una vez, con `_Inicial`). AC 10 decía "sin cambios": es la única excepción.
+- `Id`: identity por convención de Npgsql (`IdentityByDefaultColumn`).
+- Build: 0 advertencias (`-warnaserror`). Pruebas (`test-gate.sh` no reconoce `.slnx`, se corrió por proyecto): Dominio.Tests 20/20, Aplicacion.Tests 20/20, Web.Tests 28/28 (68/68; incluye las de 1.1 y 1.2).
+- Cobertura de los archivos nuevos de `src/` (coverlet, a mano): 100% salvo `RegistroAuditoria.cs` 30/31 (el constructor privado para EF, que sólo se usa al leer con EF).
+- Prueba en vivo contra el Compose reconstruido (el arranque aplicó la migración con el dueño): 11/11 AC observados. Una sonda fuera del repo (`DOTNET_STARTUP_HOOKS`, contenedor aparte con la misma imagen) usó la `IAuditoria` que resuelve la app; `psql` como `turnos_app` y `turnos_owner` mostró los rechazos por permisos y por disparador, y los privilegios exactos.
+- Las filas de la prueba en vivo quedan en la base de desarrollo (no se pueden borrar: es la garantía); su `entidad_id` empieza con `T-vivo-`.
 
 ### Completion Notes List
 
+- 8 métodos de prueba con `Story=1.3` (27 casos: T1 tiene 16, T6 y T7 tienen 3 cada uno).
+- `IAuditoria` se registra como `Scoped` en `AgregarInfraestructura`; `Program.cs` no cambió.
+- `PostgresFixture` de Aplicacion.Tests idéntica a la de Web.Tests salvo el `namespace` (verificado con `diff`). `ColeccionPostgres` también es copia.
+- Pase adversarial: salteado por decisión del docente.
+
 ### File List
+
+- Creados en `src/`: `HospitalTurnos.Dominio/Auditoria/{RegistroAuditoria,CanalAuditoria,AccionesAuditoria}.cs`, `HospitalTurnos.Aplicacion/Auditoria/{IAuditoria,ActorAuditoria}.cs`, `HospitalTurnos.Infraestructura/Auditoria/AuditoriaEnBase.cs`, `HospitalTurnos.Infraestructura/Persistencia/Configuraciones/RegistroAuditoriaConfiguracion.cs`, `HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016010013_AgregarRegistroAuditoria.cs` (+ `.Designer.cs`, generado).
+- Modificados en `src/`: `HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs`, `HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs` (regenerado), `HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs`.
+- Creados en `tests/`: `HospitalTurnos.Dominio.Tests/Auditoria/RegistroAuditoriaTests.cs`; `HospitalTurnos.Aplicacion.Tests/{PostgresFixture,ColeccionPostgres}.cs`, `Ayudas/ContextoDePrueba.cs`, `Auditoria/{AuditoriaEnBase,ProteccionAuditoria}Tests.cs`.
+- Modificados en `tests/`: `HospitalTurnos.Aplicacion.Tests/HospitalTurnos.Aplicacion.Tests.csproj` (enlace a `01-roles.sh`); `HospitalTurnos.Web.Tests/Arranque/RolesDeBaseTests.cs` (T5 de la 1.1, ver Change Log).
+- Documentación: esta story y la tabla de pruebas de la 1.1 (T5).
 
 ### Change Log
 
 - 2026-10-09: Story escrita (Mary, analista BMAD).
 - 2026-10-09: Correcciones de la revisión adversarial (`revision-sprint-1.md`): C-1 (una sola `PostgresFixture`, copiada de 1.1; verificación previa de privilegios por defecto en T8), I-1 (`CanalAuditoria.Personal` y significado de cada canal), I-8 (garantía real del disparador, reglas para migraciones y limpiadores futuros), M-3 (sin `ToTable`), M-4 (`CadenaDuenio`), M-5 (R1, R2 para AC 10 y 11).
+- 2026-10-15: Antes de implementar (a pedido del validador, aprobado por el docente): "Qué existe hoy" actualizado con 1.1 y 1.2 en `main`; `IAuditoria` se registra en `AgregarInfraestructura` (`ServiciosDeInfraestructura.cs` reemplaza a `Program.cs` en `files_to_modify`); los paquetes de pruebas ya estaban; estado del cuerpo alineado.
+- 2026-10-15: Durante la implementación (aprobado por el docente): T5 de la 1.1 ajustada para no exigir una sola migración; `RolesDeBaseTests.cs` entra en `files_to_modify`.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C5 — `docs/stories/1-3-auditoria.md` — tycon-ac-coverage-checker: AC 10 lo asigna R1 (regresión declarativa con --filter Story=1.1|Story=1.2), no hay gap. <!-- fkey:ACCOV-C5|docs/stories/1-3-auditoria.md -->
+- [x] **[CRITICAL]** ACCOV-C1 — `docs/stories/1-3-auditoria.md` — tycon-ac-coverage-checker: R1 no es un test con nombre (corre los de 1.1/1.2) y R2 existe en tests/HospitalTurnos.Dominio.Tests/Arquitectura/HoraDelSistemaTests.cs:12. <!-- fkey:ACCOV-C1|docs/stories/1-3-auditoria.md -->

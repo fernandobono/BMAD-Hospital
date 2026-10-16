@@ -22,4 +22,9 @@
     <Using Include="Xunit" />
   </ItemGroup>
 
+  <!-- El MISMO script de roles que usa el Compose (contrato técnico, C-1): no hay dos versiones. -->
+  <ItemGroup>
+    <None Include="..\..\docker\postgres\initdb\01-roles.sh" Link="initdb\01-roles.sh" CopyToOutputDirectory="PreserveNewest" />
+  </ItemGroup>
+
 </Project>
