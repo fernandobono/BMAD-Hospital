@@ -1,5 +1,6 @@
 using DotNet.Testcontainers.Configurations;
 using HospitalTurnos.Infraestructura.Persistencia;
+using Microsoft.EntityFrameworkCore;
 using Npgsql;
 
 namespace HospitalTurnos.Web.Tests.Arranque;
@@ -25,8 +26,11 @@ public class RolesDeBaseTests(PostgresFixture fixture)
             while (await lector.ReadAsync())
                 migraciones.Add(lector.GetString(0));
 
-        var unica = Assert.Single(migraciones);
-        Assert.EndsWith("_Inicial", unica);
+        // Todas las del proyecto, cada una una sola vez (no "una sola fila": cada story agrega la suya, story 1.3).
+        await using var contexto = new HospitalDbContext(
+            new DbContextOptionsBuilder<HospitalDbContext>().UseNpgsql(fixture.CadenaApp).Options);
+        Assert.Equal(contexto.Database.GetMigrations().Order(), migraciones.Order());
+        Assert.Contains(migraciones, m => m.EndsWith("_Inicial"));
     }
 
     [Fact]

@@ -132,7 +132,7 @@ para que todas las stories siguientes se escriban sobre la arquitectura aprobada
 | T2 | `Salud_BaseCaidaDespuesDeArrancar_Devuelve503SinDetalles` | 10 | integration | Contenedor propio del test; la app arranca, se hace `StopAsync()` del contenedor, `GET /salud` | 503, `{"estado":"sin conexión con la base"}`, sin `Npgsql`/`Exception`, respuesta ≤ 5 s |
 | T3 | `Inicio_Get_MuestraNombreDelHospitalYNoLasPaginasDeEjemplo` | 11 | integration | `GET /`, `GET /counter`, `GET /weather` | `/` 200 con `lang="es"`, `Hospital Municipal Las Acacias` y `Gestión de turnos`; los otros dos 404 |
 | T4 | `Arranque_SinCadenaOBaseInaccesible_FallaConMensajeQueNombraLaCadena` | 7 | integration | `[Theory]` 3 casos: sin `App`; sin `Migraciones`; `Migraciones` apuntando a `Host=127.0.0.1;Port=1;Timeout=2` | `CreateClient()` lanza; la excepción (o su `InnerException`) es `InvalidOperationException` con el fragmento esperado de AC 7 |
-| T5 | `RolApp_TablaDeMigracionesDelDuenio_PuedeLeerla` | 4, 6 | integration | `AplicadorDeMigraciones.AplicarAsync(CadenaDuenio)` dos veces; luego `SELECT "MigrationId" FROM "__EFMigrationsHistory"` como `turnos_app` | No falla la segunda vez; devuelve una fila que termina en `_Inicial` |
+| T5 | `RolApp_TablaDeMigracionesDelDuenio_PuedeLeerla` | 4, 6 | integration | `AplicadorDeMigraciones.AplicarAsync(CadenaDuenio)` dos veces; luego `SELECT "MigrationId" FROM "__EFMigrationsHistory"` como `turnos_app` | No falla la segunda vez; devuelve todas las migraciones del proyecto, cada una una vez, incluida la que termina en `_Inicial` (ajustado en la story 1.3: con la segunda migración, "una sola fila" dejó de valer) |
 | T6 | `RolApp_CrearTabla_EsRechazadoPorPermisos` | 4, 5 | integration | Como `turnos_app`: `CREATE TABLE prueba (id int)` | `PostgresException` con `SqlState == "42501"` |
 | T7 | `ASnakeCase_NombrePascalCase_DevuelveMinusculasConGuionBajo` | 8 | unit | `[Theory]` con los 6 pares de AC 8 | Cada par convierte exacto |
 | T8 | `Solucion_ProyectosYReferencias_CumplenElContratoTecnico` | 1, 2, 3, 14 | unit | Lee `HospitalTurnos.slnx`, los 7 `.csproj`, `Directory.Packages.props` y `src/Directory.Build.props` desde la raíz del repo | 7 proyectos exactos; referencias iguales a la tabla del contrato; no existen las carpetas viejas; `ManagePackageVersionsCentrally=true`; `TreatWarningsAsErrors=true` en `src/`; ningún `PackageReference` con `Version` |
@@ -512,6 +512,7 @@ Claude Opus 5.5 (claude-opus-5-5), como Amelia (desarrolladora del equipo BMAD).
 
 
 - 2026-10-15 — `init: true` en el servicio `web` del Compose (aprobado por el docente). Al juntar evidencia en vivo del AC 7 se vio que, sin `ConnectionStrings:App`, la imagen escribía el error pero el proceso no terminaba: como proceso 1 del contenedor, la señal de cierre de .NET se ignora y queda al 100% de CPU. Con `init` sale en 2 s con código ≠ 0. Las pruebas en memoria (T4) no podían verlo.
+- 2026-10-15 — Story 1.3 (aprobado por el docente): T5 deja de exigir una sola migración; pide todas las del proyecto, cada una una vez, con `_Inicial` incluida.
 
 ## Review Follow-ups (Advisors)
 
