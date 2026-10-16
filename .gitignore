@@ -6,6 +6,10 @@
 # dotenv files
 .env
 
+# Integración continua local (story 1.5): resultados de pruebas y reporte de cobertura
+resultados/
+reporte-cobertura/
+
 # User-specific files
 *.rsuser
 *.suo

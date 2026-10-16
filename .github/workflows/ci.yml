@@ -1,0 +1,133 @@
+# =================================================================================================
+# Integración continua del sistema de turnos del Hospital Las Acacias (story 1.5).
+#
+# El orden de los trabajos es una estrategia de feedback rápido, la pirámide de pruebas puesta en
+# fila: primero lo que más rápido falla y más barato es de arreglar.
+#
+#   0 · Compilar  →  1 · Unitarias  →  2 · Integración  →  3 · Cobertura (NFR-11)
+#                 ↘  · Dependencias vulnerables (SCA)
+#                 ↘  · Imagen Docker
+#
+# Si no compila, no se corre ninguna prueba. Si falla una unitaria (segundos, sin base de datos), no
+# se gasta en levantar PostgreSQL para las de integración. La cobertura se mide al final, sumando lo
+# que cubren todas las pruebas sobre Dominio y Aplicacion: 80 % de líneas o el flujo queda en rojo.
+# SCA e imagen no dependen de las pruebas, así que corren en paralelo apenas compila.
+#
+# Los comandos con lógica viven en scripts/ci/*.sh: scripts/ci/local.sh corre los mismos en la
+# máquina, en el mismo orden, sin subir nada.
+# =================================================================================================
+name: CI
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  compilar:
+    name: 0 · Compilar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restaurar paquetes
+        run: dotnet restore
+      # Los proyectos de src/ tienen TreatWarningsAsErrors: una advertencia también corta el flujo.
+      - name: Compilar en Release
+        run: dotnet build --no-restore -c Release
+
+  unit:
+    name: 1 · Pruebas unitarias
+    needs: compilar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Pruebas de Dominio con cobertura
+        run: dotnet test tests/HospitalTurnos.Dominio.Tests -c Release --logger "trx;LogFileName=unit.trx" --collect:"XPlat Code Coverage" --results-directory ./resultados/unit
+      # if: always() — los resultados se suben aunque falle una prueba: es justo cuando más se necesitan.
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-unit
+          path: resultados/unit
+
+  integracion:
+    name: 2 · Pruebas de integración
+    needs: unit
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      # PostgreSQL real con Testcontainers: Docker viene instalado en ubuntu-latest. Si Docker no
+      # anda, las pruebas fallan; ninguna se saltea.
+      - name: Pruebas de Aplicacion con cobertura
+        run: dotnet test tests/HospitalTurnos.Aplicacion.Tests -c Release --logger "trx;LogFileName=aplicacion.trx" --collect:"XPlat Code Coverage" --results-directory ./resultados/integracion
+      # Un nombre de .trx por proyecto: con el mismo nombre, el segundo pisaría al primero.
+      - name: Pruebas de Web con cobertura
+        run: dotnet test tests/HospitalTurnos.Web.Tests -c Release --logger "trx;LogFileName=web.trx" --collect:"XPlat Code Coverage" --results-directory ./resultados/integracion
+      - name: Subir resultados
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: resultados-integracion
+          path: resultados/integracion
+
+  cobertura:
+    name: 3 · Cobertura (NFR-11)
+    needs: [unit, integracion]
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Bajar los resultados de las pruebas
+        uses: actions/download-artifact@v4
+        with:
+          pattern: resultados-*
+          merge-multiple: true
+          path: ./resultados
+      - name: Medir cobertura de Dominio y Aplicacion (umbral 80 %)
+        run: bash scripts/ci/cobertura.sh ./resultados ./reporte-cobertura
+      # El reporte HTML se sube también en rojo: ahí se ve qué líneas faltan cubrir.
+      - name: Subir reporte de cobertura
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: reporte-cobertura
+          path: reporte-cobertura
+
+  sca:
+    name: · Dependencias vulnerables (SCA)
+    needs: compilar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+      - name: Restaurar paquetes
+        run: dotnet restore
+      - name: Buscar paquetes con vulnerabilidades conocidas
+        run: bash scripts/ci/sca.sh
+
+  imagen:
+    name: · Imagen Docker
+    needs: compilar
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      # La imagen compila dentro de Docker: no hace falta instalar .NET en la máquina del flujo.
+      - name: Construir la imagen y verificar la zona horaria
+        run: bash scripts/ci/imagen.sh
