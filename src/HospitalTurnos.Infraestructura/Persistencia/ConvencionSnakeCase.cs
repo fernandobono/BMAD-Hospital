@@ -50,8 +50,10 @@ public static class ConvencionSnakeCase
             foreach (var propiedad in entidad.GetProperties())
             {
                 var columna = propiedad.GetColumnName(tablaReal);
+                // Sin StoreObjectIdentifier: el nombre por defecto vale para la tabla Y para las consultas
+                // FromSql (story 1.4). Con el nombre sólo para la tabla, FromSql buscaba "CreadoEl".
                 if (columna is not null)
-                    propiedad.SetColumnName(ASnakeCase(columna), tablaReal);
+                    propiedad.SetColumnName(ASnakeCase(columna));
             }
 
             foreach (var clave in entidad.GetKeys())
