@@ -13,11 +13,12 @@ public static class EstadoDeAgenda
         var agendas = agendasDelMedico.ToList();
         if (agendas.Any(a => a.Estado == EstadoPropuesta.Enviada))
             return new(EstadoAgendaMedico.PropuestaPendiente);
-        if (AgendaMedico.QueRigeEn(agendas, hoy) is not null)
-            return new(EstadoAgendaMedico.Vigente);
         var proxima = agendas.Where(a => a.Estado == EstadoPropuesta.Aprobada && a.VigenteDesde > hoy)
                              .Select(a => (DateOnly?)a.VigenteDesde)
-                             .Min();
-        return new(EstadoAgendaMedico.SinAgenda, proxima);   // proxima = null si no hay ninguna
+                             .Min();                         // null si no hay ninguna
+        // Story 3.3 (AC 61): con una vigente, la próxima aprobada es el día en que "Cambia el" horario.
+        if (AgendaMedico.QueRigeEn(agendas, hoy) is not null)
+            return new(EstadoAgendaMedico.Vigente, CambiaEl: proxima);
+        return new(EstadoAgendaMedico.SinAgenda, proxima);
     }
 }

@@ -35,6 +35,8 @@ public static class ServiciosDeInfraestructura
         servicios.AddScoped<IConsultaAgendas, ConsultaAgendasEnBase>();
         // Story 4.2: la propuesta del médico (M2); usa el contexto, la auditoría y el IActorVigente del alcance.
         servicios.AddScoped<IPropuestaAgenda, PropuestaAgendaEnBase>();
+        // Story 3.3: "Creado por / Modificado por" leído de la auditoría (sólo lectura, ADR-07).
+        servicios.AddScoped<IConsultaTrazabilidad, ConsultaTrazabilidadEnBase>();
         return servicios;
     }
 

@@ -4,9 +4,11 @@ using HospitalTurnos.Infraestructura.Email;
 using HospitalTurnos.Infraestructura.Identidad;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Web.Components;
+using HospitalTurnos.Web.Components.Comunes;
 using HospitalTurnos.Web.Errores;
 using HospitalTurnos.Web.Personal;
 using HospitalTurnos.Web.Salud;
+using Microsoft.AspNetCore.Components.Authorization;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.DataProtection.KeyManagement;
 using Microsoft.AspNetCore.DataProtection.Repositories;
@@ -32,6 +34,14 @@ builder.Services.AddSesionPersonal();
 builder.Services.AddAuthorization();
 builder.Services.AddCascadingAuthenticationState();
 builder.Services.AddRazorComponents().AddInteractiveServerComponents();
+// Story 3.3 (ADR-08, AC 5): en las páginas interactivas la sesión se revalida dentro del circuito.
+builder.Services.AddScoped<AuthenticationStateProvider, RevalidacionDeCircuito>();
+// Las notificaciones de éxito: una lista por circuito (AC 20).
+builder.Services.AddScoped<Notificaciones>();
+// Un solo menú "⋯" abierto por pantalla (AC 30).
+builder.Services.AddScoped<MenuDeAcciones.UnoAbierto>();
+// Cada consulta o acción de una página interactiva en su propio alcance, como un pedido HTTP (AC 94).
+builder.Services.AddSingleton<AlcancePorOperacion>();
 // NFR-09: un solo lugar decide qué ve el usuario ante un error y qué queda en el registro técnico.
 builder.Services.AddExceptionHandler<ManejadorGlobalDeErrores>();
 builder.Services.AddProblemDetails();

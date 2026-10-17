@@ -1,0 +1,240 @@
+@typeparam TFila
+@implements IDisposable
+@inject ILogger<TablaAbm<TFila>> Registro
+
+@* La tabla estándar de un listado (guía, "Tabla" y "Estados de la interfaz"; story 3.3, AC 27 a 29 y 83). Pide sus
+   datos (paginados en la base) y distingue cargando (filas esqueleto), vacío inicial, sin resultados y error de
+   carga. Bajo 768 px cada fila es una tarjeta con su nombre, su badge y el menú "⋯". *@
+@if (error)
+{
+    <div class="estado-vacio" role="alert">
+        <span class="estado-vacio__icono" aria-hidden="true">⚠</span>
+        <p class="mb-0">No pudimos cargar la lista.</p>
+        <button type="button" class="btn btn-outline-secondary" @onclick="RecargarAsync">Reintentar</button>
+    </div>
+}
+else if (!cargando && items.Count == 0)
+{
+    <div class="estado-vacio">
+        <span class="estado-vacio__icono" aria-hidden="true">☐</span>
+        @if (HayFiltros)
+        {
+            <p class="mb-0">@(Buscado is null ? $"No hay {Entidad} que coincidan con los filtros aplicados." : $"No hay {Entidad} que coincidan con '{Buscado}'")</p>
+            <button type="button" class="btn btn-link" @onclick="AlLimpiar">Limpiar filtros</button>
+        }
+        else
+        {
+            <p class="mb-0">@TextoVacio</p>
+            @AccionVacio
+        }
+    </div>
+}
+else
+{
+    <table class="tabla-abm" aria-busy="@(cargando ? "true" : "false")">
+        <thead>
+            <tr>
+                @foreach (var columna in ColumnasVisibles)
+                {
+                    var ordenada = columna.Orden is not null && CampoDeOrden == columna.Orden;
+                    <th scope="col" class="@(columna.Numero ? "numero" : null)"
+                        aria-sort="@(ordenada ? (Descendente ? "descending" : "ascending") : null)">
+                        @if (columna.Orden is null)
+                        {
+                            @columna.Titulo
+                        }
+                        else
+                        {
+                            <button type="button" class="tabla-abm__orden" @onclick="() => OrdenarAsync(columna.Orden)">
+                                @columna.Titulo
+                                @if (ordenada)
+                                {
+                                    <span class="tabla-abm__indicador" aria-hidden="true">@(Descendente ? "▼" : "▲")</span>
+                                }
+                            </button>
+                        }
+                    </th>
+                }
+                @if (Acciones is not null)
+                {
+                    <th scope="col" class="table-actions"><span class="visually-hidden">Acciones</span></th>
+                }
+            </tr>
+        </thead>
+        <tbody>
+            @if (cargando)
+            {
+                @for (var i = 0; i < 5; i++)
+                {
+                    <tr class="esqueleto" aria-hidden="true">
+                        @foreach (var _ in ColumnasVisibles)
+                        {
+                            <td><span class="esqueleto__barra"></span></td>
+                        }
+                        @if (Acciones is not null)
+                        {
+                            <td class="table-actions"><span class="esqueleto__barra"></span></td>
+                        }
+                    </tr>
+                }
+            }
+            else
+            {
+                @foreach (var fila in items)
+                {
+                    <tr>
+                        @foreach (var columna in ColumnasVisibles)
+                        {
+                            <td class="@(columna.Numero ? "numero" : null)">@columna.Contenido(fila)</td>
+                        }
+                        @if (Acciones is not null)
+                        {
+                            <td class="table-actions">@Acciones(fila)</td>
+                        }
+                    </tr>
+                }
+            }
+        </tbody>
+    </table>
+    @if (!cargando && Tarjeta is not null)
+    {
+        <ul class="tarjetas-abm">
+            @foreach (var fila in items)
+            {
+                <li class="tarjeta-abm">
+                    <div class="tarjeta-abm__datos">@Tarjeta(fila)</div>
+                    @if (Acciones is not null)
+                    {
+                        <div class="table-actions">@Acciones(fila)</div>
+                    }
+                </li>
+            }
+        </ul>
+    }
+    <Paginador Total="total" Pagina="PaginaVisible" Tamano="Tamano" PaginaCambiada="PaginaCambiada" TamanoCambiado="TamanoCambiado" />
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<ColumnaAbm<TFila>> Columnas { get; set; } = [];
+
+    /// <summary>La consulta paginada del caso de uso; se repite cuando cambia la Clave (el estado del listado).</summary>
+    [Parameter, EditorRequired]
+    public Func<CancellationToken, Task<PaginaDeResultados<TFila>>> Consultar { get; set; } = default!;
+
+    [Parameter]
+    public object? Clave { get; set; }
+
+    [Parameter]
+    public string Orden { get; set; } = "";
+
+    [Parameter]
+    public EventCallback<string> OrdenCambiado { get; set; }
+
+    /// <summary>La última columna: una acción visible y el menú "⋯" (AC 51, 62, 76).</summary>
+    [Parameter]
+    public RenderFragment<TFila>? Acciones { get; set; }
+
+    /// <summary>Lo que muestra la tarjeta en celular: el nombre y el badge (AC 29).</summary>
+    [Parameter]
+    public RenderFragment<TFila>? Tarjeta { get; set; }
+
+    /// <summary>En plural y minúscula: "No hay médicos que coincidan con …".</summary>
+    [Parameter, EditorRequired]
+    public string Entidad { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string TextoVacio { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? AccionVacio { get; set; }
+
+    [Parameter]
+    public string? Buscado { get; set; }
+
+    [Parameter]
+    public bool HayFiltros { get; set; }
+
+    [Parameter]
+    public EventCallback AlLimpiar { get; set; }
+
+    [Parameter]
+    public int Pagina { get; set; } = 1;
+
+    [Parameter]
+    public int Tamano { get; set; } = EstadoDeListado.TamanoPorDefecto;
+
+    [Parameter]
+    public EventCallback<int> PaginaCambiada { get; set; }
+
+    [Parameter]
+    public EventCallback<int> TamanoCambiado { get; set; }
+
+    /// <summary>El total del filtro aplicado, para el encabezado "Título · N" (AC 22).</summary>
+    [Parameter]
+    public EventCallback<int> TotalCambiado { get; set; }
+
+    private IReadOnlyList<TFila> items = [];
+    private int total;
+    private bool cargando = true;
+    private bool error;
+    private bool cargada;
+    private object? claveCargada;
+    private CancellationTokenSource? cancelacion;
+
+    private IEnumerable<ColumnaAbm<TFila>> ColumnasVisibles => Columnas.Where(c => c.Visible);
+    private bool Descendente => Orden.StartsWith('-');
+    private string CampoDeOrden => Orden.TrimStart('-');
+
+    // Una página mayor que la última se muestra como la última con datos (AC 81): la consulta ya la devolvió.
+    private int PaginaVisible => Math.Clamp(Pagina, 1, Math.Max(1, (int)Math.Ceiling(total / (double)Tamano)));
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (cargada && Equals(Clave, claveCargada))
+            return;
+        cargada = true;
+        claveCargada = Clave;
+        await RecargarAsync();
+    }
+
+    /// <summary>Vuelve a pedir la página actual (después de crear, desactivar o reactivar).</summary>
+    public async Task RecargarAsync()
+    {
+        cancelacion?.Cancel();
+        cancelacion?.Dispose();
+        cancelacion = new CancellationTokenSource();
+        var token = cancelacion.Token;
+        cargando = true;
+        error = false;
+        StateHasChanged();
+        try
+        {
+            var resultado = await Consultar(token);
+            items = resultado.Items;
+            total = resultado.Total;
+            cargando = false;
+            await TotalCambiado.InvokeAsync(total);
+        }
+        catch (OperationCanceledException) when (token.IsCancellationRequested)
+        {
+            // La pidió de nuevo otro filtro: manda la última.
+        }
+        catch (Exception e)
+        {
+            // AC 83 y NFR-09: nunca una pantalla en blanco ni un detalle técnico; el detalle, al registro.
+            Registro.LogError(e, "No se pudo cargar un listado");
+            cargando = false;
+            error = true;
+        }
+    }
+
+    private Task OrdenarAsync(string campo) =>
+        OrdenCambiado.InvokeAsync(CampoDeOrden == campo && !Descendente ? $"-{campo}" : campo);
+
+    public void Dispose()
+    {
+        cancelacion?.Cancel();
+        cancelacion?.Dispose();
+    }
+}

@@ -1,0 +1,20 @@
+@* El detalle en modo lectura (guía, "Detalle frente a edición"; AC 40): consultar no modifica nada por accidente;
+   para cambiar hay que pulsar "Editar". El pie de trazabilidad va al final. *@
+<div class="vista-de-detalle">
+    @ChildContent
+    <div class="formulario-abm__botones">
+        <button type="button" class="btn btn-primary" @onclick="AlEditar">Editar</button>
+    </div>
+    @Pie
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    [Parameter, EditorRequired]
+    public EventCallback AlEditar { get; set; }
+
+    [Parameter]
+    public RenderFragment? Pie { get; set; }
+}

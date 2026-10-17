@@ -1,0 +1,52 @@
+@using System.Globalization
+
+@* El pie de paginación (guía, "Pie"; AC 31): aparece desde 26 registros con "Mostrando 1–25 de N" y 25 / 50 / 100
+   por página. *@
+@if (Total > EstadoDeListado.TamanoPorDefecto)
+{
+    <nav class="paginador" aria-label="Paginación">
+        <span class="paginador__texto">Mostrando @Desde–@Hasta de @Total</span>
+        <div class="paginador__paginas">
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(Pagina <= 1)"
+                    @onclick="() => PaginaCambiada.InvokeAsync(Pagina - 1)">Anterior</button>
+            <span class="align-self-center">Página @Pagina de @Ultima</span>
+            <button type="button" class="btn btn-outline-secondary btn-sm" disabled="@(Pagina >= Ultima)"
+                    @onclick="() => PaginaCambiada.InvokeAsync(Pagina + 1)">Siguiente</button>
+        </div>
+        <div class="paginador__tamano">
+            <label for="tamano">Por página</label>
+            <select id="tamano" class="form-select form-select-sm" value="@Tamano" @onchange="CambiarTamanoAsync">
+                @foreach (var tamano in EstadoDeListado.Tamanos)
+                {
+                    <option value="@tamano" selected="@(tamano == Tamano)">@tamano</option>
+                }
+            </select>
+        </div>
+    </nav>
+}
+
+@code {
+    [Parameter]
+    public int Total { get; set; }
+
+    [Parameter]
+    public int Pagina { get; set; } = 1;
+
+    [Parameter]
+    public int Tamano { get; set; } = EstadoDeListado.TamanoPorDefecto;
+
+    [Parameter]
+    public EventCallback<int> PaginaCambiada { get; set; }
+
+    [Parameter]
+    public EventCallback<int> TamanoCambiado { get; set; }
+
+    private int Ultima => Math.Max(1, (int)Math.Ceiling(Total / (double)Tamano));
+    private int Desde => (Pagina - 1) * Tamano + 1;
+    private int Hasta => Math.Min(Pagina * Tamano, Total);
+
+    private Task CambiarTamanoAsync(ChangeEventArgs e) =>
+        int.TryParse(e.Value?.ToString(), NumberStyles.None, CultureInfo.InvariantCulture, out var tamano)
+            ? TamanoCambiado.InvokeAsync(tamano)
+            : Task.CompletedTask;
+}

@@ -1,0 +1,235 @@
+@implements IDisposable
+@using HospitalTurnos.Web.Errores
+@inject NavigationManager Navegacion
+
+@* El formulario estándar de alta y edición (guía, "Patrón estándar de alta y edición"; AC 33 a 36): una columna,
+   "* Obligatorio" al inicio, "Guardar" y "Cancelar" al pie en ese orden, foco en el primer campo, validación al
+   salir de cada campo y de todos al enviar (el foco va al primero con error), "Guardando…" sin doble envío y aviso
+   de cambios sin guardar. Los errores del dominio quedan junto al campo que corresponde o en el resumen, con su
+   texto de hoy; lo cargado se conserva. Lo inesperado sigue al LimiteDeErrores de la página. *@
+<CascadingValue Value="this" IsFixed="true">
+    <EditForm EditContext="contexto" OnSubmit="EnviarAsync" class="formulario-abm" novalidate>
+        <DataAnnotationsValidator />
+        <p class="formulario-abm__nota">* Obligatorio</p>
+        @if (resumen is not null)
+        {
+            <div class="resumen-de-errores" role="alert" tabindex="-1" @ref="resumenDeErrores">@resumen</div>
+        }
+        @ChildContent
+        <div class="formulario-abm__botones">
+            <button type="submit" class="btn btn-primary" disabled="@guardando">@(guardando ? "Guardando…" : TextoGuardar)</button>
+            <button type="button" class="btn btn-outline-secondary" @ref="botonCancelar" @onclick="CancelarAsync">Cancelar</button>
+        </div>
+    </EditForm>
+</CascadingValue>
+<NavigationLock OnBeforeInternalNavigation="AntesDeNavegar" ConfirmExternalNavigation="hayCambios" />
+@if (confirmarSalida)
+{
+    <DialogoModal Titulo="Tenés cambios sin guardar. ¿Salir igual?" AlCerrar="SeguirEditando" Origen="botonCancelar">
+        <p>Lo que cambiaste no se guarda.</p>
+        <div class="dialogo__botones">
+            <button type="button" class="btn btn-outline-secondary" @ref="botonSeguir" @onclick="SeguirEditando">Seguir editando</button>
+            <button type="button" class="btn btn-danger" @onclick="SalirSinGuardarAsync">Salir sin guardar</button>
+        </div>
+    </DialogoModal>
+}
+
+@code {
+    /// <summary>Lo que FormularioAbm necesita de cada CampoDeFormulario: para enfocarlo y saber si tiene error.</summary>
+    public interface ICampo
+    {
+        FieldIdentifier Campo { get; }
+        ValueTask EnfocarAsync();
+    }
+
+    [Parameter, EditorRequired]
+    public object Model { get; set; } = default!;
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>EventCallback: al terminar, la página se vuelve a dibujar (cierra el modal, vuelve a la lectura).</summary>
+    [Parameter, EditorRequired]
+    public EventCallback AlGuardar { get; set; }
+
+    [Parameter]
+    public EventCallback AlCancelar { get; set; }
+
+    [Parameter]
+    public string TextoGuardar { get; set; } = "Guardar";
+
+    /// <summary>A qué propiedad del modelo corresponde un error del dominio (p. ej. matrícula repetida, AC 68); null: al resumen.</summary>
+    [Parameter]
+    public Func<Exception, string?>? CampoDelError { get; set; }
+
+    /// <summary>El campo que recibe el foco al abrir, si no es el primero ("Vincular usuario", AC 62).</summary>
+    [Parameter]
+    public string? CampoInicial { get; set; }
+
+    /// <summary>
+    /// Un aviso antes de guardar, con el formulario ya válido (el homónimo de A1, AC 69): false no guarda y deja los
+    /// cambios como están; la página vuelve a llamar a GuardarAsync cuando el usuario confirma.
+    /// </summary>
+    [Parameter]
+    public Func<Task<bool>>? AntesDeGuardar { get; set; }
+
+    private readonly List<ICampo> campos = [];
+    private EditContext contexto = default!;
+    private ValidationMessageStore? delDominio;
+    private object? modeloActual;
+    private string? resumen;
+    private bool guardando;
+    private bool hayCambios;
+    private bool confirmarSalida;
+    private bool saliendo;
+    private string? destino;
+    private bool enfocarError;
+    private bool enfocarSeguir;
+    private bool enfocarResumen;
+    private ElementReference resumenDeErrores;
+    private ElementReference botonCancelar;
+    private ElementReference botonSeguir;
+
+    protected override void OnParametersSet()
+    {
+        if (ReferenceEquals(Model, modeloActual))
+            return;
+        if (contexto is not null)
+            contexto.OnFieldChanged -= AlCambiarUnCampo;
+        modeloActual = Model;
+        contexto = new EditContext(Model);
+        contexto.OnFieldChanged += AlCambiarUnCampo;
+        delDominio = new ValidationMessageStore(contexto);
+    }
+
+    // El error del dominio de un campo se va cuando el usuario lo corrige.
+    private void AlCambiarUnCampo(object? remitente, FieldChangedEventArgs e) => delDominio?.Clear(e.FieldIdentifier);
+
+    public void Registrar(ICampo campo) => campos.Add(campo);
+
+    public void Quitar(ICampo campo) => campos.Remove(campo);
+
+    public void MarcarCambio()
+    {
+        if (hayCambios)
+            return;
+        hayCambios = true;
+        StateHasChanged();
+    }
+
+    private Task EnviarAsync() => GuardarAsync(conAviso: true);
+
+    /// <summary>Guardar sin el aviso previo: lo usa la página cuando el usuario ya lo confirmó ("Guardar igual").</summary>
+    public Task GuardarAsync() => GuardarAsync(conAviso: false);
+
+    private async Task GuardarAsync(bool conAviso)
+    {
+        if (guardando)
+            return;   // un segundo clic no envía de nuevo (AC 35)
+        resumen = null;
+        delDominio?.Clear();
+        if (!contexto.Validate())
+        {
+            enfocarError = true;
+            return;
+        }
+        if (conAviso && AntesDeGuardar is not null && !await AntesDeGuardar())
+            return;
+        guardando = true;
+        try
+        {
+            await AlGuardar.InvokeAsync();
+            hayCambios = false;
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))
+        {
+            var campo = CampoDelError?.Invoke(e);
+            if (campo is null)
+            {
+                resumen = e.Message;
+                // "Guardando…" deshabilitó el botón y el navegador sacó el foco del formulario: vuelve al resumen, así se
+                // lee el error y Esc o Tab siguen actuando dentro del diálogo (lo encontró la prueba en vivo).
+                enfocarResumen = true;
+            }
+            else
+            {
+                delDominio!.Add(contexto.Field(campo), e.Message);
+                contexto.NotifyValidationStateChanged();
+                enfocarError = true;
+            }
+        }
+        finally
+        {
+            guardando = false;
+        }
+    }
+
+    private Task CancelarAsync()
+    {
+        if (!hayCambios)
+            return AlCancelar.InvokeAsync();
+        destino = null;
+        AbrirConfirmacion();
+        return Task.CompletedTask;
+    }
+
+    // Un enlace del sistema o una navegación de la página con cambios: se pregunta antes (AC 36).
+    private void AntesDeNavegar(LocationChangingContext navegacion)
+    {
+        // Mientras guarda, la navegación es la del propio guardado (el alta va a la ficha): no se pregunta.
+        if (!hayCambios || saliendo || guardando)
+            return;
+        navegacion.PreventNavigation();
+        destino = navegacion.TargetLocation;
+        AbrirConfirmacion();
+        StateHasChanged();
+    }
+
+    private void AbrirConfirmacion()
+    {
+        confirmarSalida = true;
+        enfocarSeguir = true;   // "Seguir editando" es la opción segura
+    }
+
+    private void SeguirEditando() => confirmarSalida = false;
+
+    private async Task SalirSinGuardarAsync()
+    {
+        saliendo = true;
+        hayCambios = false;
+        confirmarSalida = false;
+        if (destino is not null)
+            Navegacion.NavigateTo(destino);
+        else
+            await AlCancelar.InvokeAsync();
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender)
+        {
+            var inicial = campos.FirstOrDefault(c => c.Campo.FieldName == CampoInicial) ?? campos.FirstOrDefault();
+            if (inicial is not null)
+                await inicial.EnfocarAsync();
+        }
+        if (enfocarError)
+        {
+            enfocarError = false;
+            var conError = campos.FirstOrDefault(c => contexto.GetValidationMessages(c.Campo).Any());
+            if (conError is not null)
+                await conError.EnfocarAsync();
+        }
+        if (enfocarResumen && resumen is not null)
+        {
+            enfocarResumen = false;
+            await resumenDeErrores.FocusAsync();
+        }
+        if (enfocarSeguir && confirmarSalida)
+        {
+            enfocarSeguir = false;
+            await botonSeguir.FocusAsync();
+        }
+    }
+
+    public void Dispose() => contexto.OnFieldChanged -= AlCambiarUnCampo;
+}

@@ -1,40 +1,52 @@
 @using System.Security.Claims
-@using HospitalTurnos.Aplicacion.Personal
 
-@* Sólo las secciones del rol, en el orden de UX §3 (AC 14). Arriba, quién está y el botón Salir. *@
-<div class="mb-4">
-    <p class="fw-bold mb-3" style="color: #1F5FA8;">Las Acacias</p>
-    <div class="d-flex align-items-center justify-content-between gap-2">
-        <span>@nombre</span>
-        <form method="post" action="@RutasPersonal.Salir">
-            <AntiforgeryToken />
-            <button type="submit" class="btn btn-sm btn-outline-secondary">Salir</button>
-        </form>
-    </div>
-</div>
+@* El menú lateral (story 3.3, guía "Menú lateral"): sólo los grupos del rol, con su rótulo; la opción activa
+   resaltada y con aria-current (NavLink, también en las subrutas: la ficha marca "Médicos"). Estático. *@
 <nav aria-label="Secciones">
-    <ul class="list-unstyled">
-        @foreach (var seccion in secciones)
-        {
-            <li class="mb-2"><a href="@seccion.Ruta" style="color: #1F5FA8;">@seccion.Titulo</a></li>
-        }
-    </ul>
+    @foreach (var grupo in grupos)
+    {
+        <div class="menu-lateral__grupo">
+            <p class="menu-lateral__rotulo">@grupo.Rotulo</p>
+            <ul class="menu-lateral__lista">
+                @foreach (var seccion in grupo.Secciones)
+                {
+                    <li>
+                        @* data-enhance-nav="false": recarga la página, así el navegador avisa si una pantalla tiene
+                           cambios sin guardar (AC 36; la navegación rápida no pasa por ese aviso). *@
+                        <NavLink class="menu-lateral__item" href="@seccion.Ruta" Match="NavLinkMatch.Prefix" data-enhance-nav="false">
+                            <span>@seccion.Titulo</span>
+                            @if (seccion.Pendientes is > 0)
+                            {
+                                <span class="menu-lateral__contador" aria-label="@($"{seccion.Pendientes} pendientes")">@seccion.Pendientes</span>
+                            }
+                        </NavLink>
+                    </li>
+                }
+            </ul>
+        </div>
+    }
 </nav>
 
 @code {
     [CascadingParameter]
     private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
 
-    private string nombre = "";
-    private IReadOnlyList<RutasPersonal.Seccion> secciones = [];
+    /// <summary>Sólo para probar el contador (AC 17): sin valor, los grupos del rol.</summary>
+    [Parameter]
+    public IReadOnlyList<RutasPersonal.GrupoDeMenu>? Grupos { get; set; }
+
+    private IReadOnlyList<RutasPersonal.GrupoDeMenu> grupos = [];
 
     protected override async Task OnParametersSetAsync()
     {
+        if (Grupos is not null)
+        {
+            grupos = Grupos;
+            return;
+        }
         if (EstadoDeAutenticacion is null)
             return;
-        var usuario = (await EstadoDeAutenticacion).User;
-        nombre = usuario.FindFirstValue(ClaimsPersonal.NombreCompleto) ?? usuario.Identity?.Name ?? "";
-        // Un rol por usuario (FR-09): el ingreso ya rechaza a quien tiene varios (AC 24).
-        secciones = RutasPersonal.SeccionesDe(usuario.FindFirstValue(ClaimTypes.Role));
+        // Un rol por usuario (FR-09): el ingreso ya rechaza a quien tiene varios (AC 24 de la 2.1).
+        grupos = RutasPersonal.GruposDe((await EstadoDeAutenticacion).User.FindFirstValue(ClaimTypes.Role));
     }
 }

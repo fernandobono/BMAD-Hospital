@@ -1,0 +1,89 @@
+@using System.Globalization
+@using System.Text
+
+@* El select de la guía ("select con búsqueda cuando hay más de 10 opciones"; AC 37): con 10 o menos es un select
+   común; con más, un buscador arriba filtra las opciones (sin tildes ni mayúsculas). Todo operable con teclado. *@
+@if (ConBuscador)
+{
+    <input id="@($"{Id}-buscar")" type="search" class="form-control select-con-busqueda__buscador" autocomplete="off"
+           placeholder="Escribí para filtrar" aria-label="@($"Filtrar {Etiqueta?.ToLowerInvariant() ?? "opciones"}")"
+           aria-controls="@Id" @oninput="Filtrar" />
+}
+<select id="@Id" class="form-select" value="@Valor" aria-describedby="@DescritoPor" aria-invalid="@(Invalido ? "true" : null)"
+        aria-required="@(Obligatorio ? "true" : null)" @ref="control" @onchange="CambiarAsync" @onblur="AlSalir">
+    @if (TextoVacio is not null)
+    {
+        <option value="" selected="@string.IsNullOrEmpty(Valor)">@TextoVacio</option>
+    }
+    @foreach (var opcion in Visibles)
+    {
+        <option value="@opcion.Valor" selected="@(opcion.Valor == Valor)">@opcion.Texto</option>
+    }
+</select>
+
+@code {
+    public sealed record Opcion(string Valor, string Texto);
+
+    public const int LimiteSinBuscador = 10;
+
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public string? Valor { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> ValorCambiado { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Opcion> Opciones { get; set; } = [];
+
+    /// <summary>La opción vacía ("Elegí una especialidad", "Sin usuario", "Todas").</summary>
+    [Parameter]
+    public string? TextoVacio { get; set; }
+
+    [Parameter]
+    public string? Etiqueta { get; set; }
+
+    [Parameter]
+    public string? DescritoPor { get; set; }
+
+    [Parameter]
+    public bool Invalido { get; set; }
+
+    [Parameter]
+    public bool Obligatorio { get; set; }
+
+    [Parameter]
+    public EventCallback AlSalir { get; set; }
+
+    private string filtro = "";
+    private ElementReference control;
+
+    private bool ConBuscador => Opciones.Count > LimiteSinBuscador;
+
+    // La elegida queda siempre a la vista, aunque el filtro no la incluya.
+    private IEnumerable<Opcion> Visibles => filtro.Length == 0
+        ? Opciones
+        : Opciones.Where(o => Normalizar(o.Texto).Contains(filtro, StringComparison.Ordinal) || o.Valor == Valor);
+
+    public ValueTask EnfocarAsync() => control.FocusAsync();
+
+    private void Filtrar(ChangeEventArgs e) => filtro = Normalizar(e.Value?.ToString() ?? "");
+
+    private Task CambiarAsync(ChangeEventArgs e)
+    {
+        var valor = e.Value?.ToString();
+        return ValorCambiado.InvokeAsync(string.IsNullOrEmpty(valor) ? null : valor);
+    }
+
+    private static string Normalizar(string texto)
+    {
+        var descompuesto = texto.Trim().ToLowerInvariant().Normalize(NormalizationForm.FormD);
+        var sinTildes = new StringBuilder(descompuesto.Length);
+        foreach (var c in descompuesto)
+            if (CharUnicodeInfo.GetUnicodeCategory(c) != UnicodeCategory.NonSpacingMark)
+                sinTildes.Append(c);
+        return sinTildes.ToString().Normalize(NormalizationForm.FormC);
+    }
+}

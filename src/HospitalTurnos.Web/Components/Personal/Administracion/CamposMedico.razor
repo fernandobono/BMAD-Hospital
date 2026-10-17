@@ -1,41 +1,14 @@
-@* Los campos del formulario de A1 (story 3.2), comunes al alta y a la ficha. Cada uno con su etiqueta visible
-   (NFR-05) y su mensaje debajo (AC 7). Las listas las carga la página en cada pedido. *@
-<div class="mb-3">
-    <label for="nombre" class="form-label">Nombre</label>
-    <InputText id="nombre" class="form-control" @bind-Value="Input.Nombre" autocomplete="off" />
-    <ValidationMessage For="() => Input.Nombre" class="text-danger" />
-</div>
-<div class="mb-3">
-    <label for="apellido" class="form-label">Apellido</label>
-    <InputText id="apellido" class="form-control" @bind-Value="Input.Apellido" autocomplete="off" />
-    <ValidationMessage For="() => Input.Apellido" class="text-danger" />
-</div>
-<div class="mb-3">
-    <label for="matricula" class="form-label">Matrícula</label>
-    <InputText id="matricula" class="form-control" @bind-Value="Input.Matricula" autocomplete="off" />
-    <ValidationMessage For="() => Input.Matricula" class="text-danger" />
-</div>
-<div class="mb-3">
-    <label for="especialidad" class="form-label">Especialidad</label>
-    <InputSelect id="especialidad" class="form-select" @bind-Value="Input.EspecialidadId">
-        <option value="">Elegí una especialidad</option>
-        @foreach (var especialidad in Especialidades)
-        {
-            <option value="@especialidad.Id">@(especialidad.Activa ? especialidad.Nombre : $"{especialidad.Nombre} (desactivada)")</option>
-        }
-    </InputSelect>
-    <ValidationMessage For="() => Input.EspecialidadId" class="text-danger" />
-</div>
-<div class="mb-3">
-    <label for="usuario" class="form-label">Usuario del sistema</label>
-    <InputSelect id="usuario" class="form-select" @bind-Value="Input.UsuarioPersonalId">
-        <option value="">Sin usuario</option>
-        @foreach (var usuario in Usuarios)
-        {
-            <option value="@usuario.Id">@usuario.NombreCompleto (@usuario.Usuario)</option>
-        }
-    </InputSelect>
-</div>
+@* Los campos de A1 (story 3.2), comunes al alta y a la ficha, con el estándar de la guía (story 3.3, AC 67): en el
+   orden en que se piensa al médico (identidad, clasificación, configuración), con ayuda donde hay formato o un
+   porqué. La especialidad es un select con búsqueda; el usuario del sistema es opcional. *@
+<CampoDeFormulario TValor="string" Etiqueta="Nombre" Id="nombre" Obligatorio="true" @bind-Valor="Input.Nombre" />
+<CampoDeFormulario TValor="string" Etiqueta="Apellido" Id="apellido" Obligatorio="true" @bind-Valor="Input.Apellido" />
+<CampoDeFormulario TValor="string" Etiqueta="Matrícula" Id="matricula" Obligatorio="true" Ayuda="Ejemplo: MP 1234"
+                   @bind-Valor="Input.Matricula" />
+<CampoDeFormulario TValor="long?" Etiqueta="Especialidad" Id="especialidad" Obligatorio="true" TextoVacio="Elegí una especialidad"
+                   Opciones="OpcionesDeEspecialidad" @bind-Valor="Input.EspecialidadId" />
+<CampoDeFormulario TValor="Guid?" Etiqueta="Usuario del sistema" Id="usuario" TextoVacio="Sin usuario" Opciones="OpcionesDeUsuario"
+                   Ayuda="Vinculalo para que el médico pueda ver y gestionar su agenda." @bind-Valor="Input.UsuarioPersonalId" />
 
 @code {
     [Parameter, EditorRequired]
@@ -46,4 +19,12 @@
 
     [Parameter, EditorRequired]
     public IReadOnlyList<OpcionUsuarioMedico> Usuarios { get; set; } = [];
+
+    private IReadOnlyList<SelectConBusqueda.Opcion> OpcionesDeEspecialidad =>
+    [
+        .. Especialidades.Select(e => new SelectConBusqueda.Opcion(e.Id.ToString(), e.Activa ? e.Nombre : $"{e.Nombre} (desactivada)")),
+    ];
+
+    private IReadOnlyList<SelectConBusqueda.Opcion> OpcionesDeUsuario =>
+        [.. Usuarios.Select(u => new SelectConBusqueda.Opcion(u.Id.ToString(), $"{u.NombreCompleto} ({u.Usuario})"))];
 }

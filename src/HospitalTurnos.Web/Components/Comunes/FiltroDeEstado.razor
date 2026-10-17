@@ -1,0 +1,37 @@
+@* El filtro de estado de toda entidad con baja lógica (guía, "Barra de filtros"; AC 25): "Activos" por defecto. *@
+<div class="filter-bar__campo">
+    <label for="@Id" class="form-label mb-0">Estado</label>
+    <select id="@Id" class="form-select" value="@Valor" @onchange="CambiarAsync">
+        @foreach (var estado in EstadoDeListado.Estados)
+        {
+            <option value="@estado" selected="@(estado == Valor)">@Etiqueta(estado, Femenino)</option>
+        }
+    </select>
+</div>
+
+@code {
+    [Parameter]
+    public string Valor { get; set; } = EstadoDeListado.EstadoPorDefecto;
+
+    [Parameter]
+    public EventCallback<string> ValorCambiado { get; set; }
+
+    /// <summary>"Activas / Inactivas / Todas" (especialidades).</summary>
+    [Parameter]
+    public bool Femenino { get; set; }
+
+    [Parameter]
+    public string Id { get; set; } = "estado";
+
+    public static string Etiqueta(string estado, bool femenino) => (estado, femenino) switch
+    {
+        ("activos", false) => "Activos",
+        ("inactivos", false) => "Inactivos",
+        ("todos", false) => "Todos",
+        ("activos", true) => "Activas",
+        ("inactivos", true) => "Inactivas",
+        _ => femenino ? "Todas" : "Todos",
+    };
+
+    private Task CambiarAsync(ChangeEventArgs e) => ValorCambiado.InvokeAsync(e.Value?.ToString() ?? EstadoDeListado.EstadoPorDefecto);
+}

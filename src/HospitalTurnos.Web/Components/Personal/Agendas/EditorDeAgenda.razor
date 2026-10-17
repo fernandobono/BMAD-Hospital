@@ -9,13 +9,13 @@
 
 <div class="mb-3">
     <label for="duracion-turno" class="form-label">Duración del turno (minutos)</label>
-    <InputNumber id="duracion-turno" class="form-control" style="max-width: 8rem;" @bind-Value="Input.DuracionTurnoMinutos" />
+    <InputNumber id="duracion-turno" class="form-control campo-corto" @bind-Value="Input.DuracionTurnoMinutos" />
     <ValidationMessage For="() => Input.DuracionTurnoMinutos" class="text-danger" />
 </div>
 <div class="mb-3">
     <label for="vigente-desde" class="form-label">Rige desde</label>
     <div class="d-flex align-items-center gap-2">
-        <InputDate id="vigente-desde" class="form-control" style="max-width: 12rem;" @bind-Value="Input.VigenteDesde" />
+        <InputDate id="vigente-desde" class="form-control campo-fecha" @bind-Value="Input.VigenteDesde" />
         @if (MinimoVigenteDesde is { } minimo)
         {
             <span>(mín. @Fecha(minimo))</span>
@@ -24,7 +24,7 @@
     <ValidationMessage For="() => Input.VigenteDesde" class="text-danger" />
 </div>
 
-<table class="table align-middle" style="max-width: 48rem;">
+<table class="table align-middle tabla-franjas">
     <thead>
         <tr>
             <th scope="col">Día</th>
@@ -42,7 +42,7 @@
             var aviso = revision.Avisos.GetValueOrDefault(i);
             <tr class="@(problema is null ? null : "table-danger")">
                 <td>
-                    <InputSelect class="form-select" style="min-width: 9.5rem;" @bind-Value="Input.Franjas[i].Dia"
+                    <InputSelect class="form-select selector-de-dia" @bind-Value="Input.Franjas[i].Dia"
                                  aria-label="@($"Día de la franja {i + 1}")">
                         @foreach (var dia in Dias)
                         {

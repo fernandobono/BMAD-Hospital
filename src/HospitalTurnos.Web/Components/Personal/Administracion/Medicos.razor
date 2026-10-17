@@ -1,43 +1,124 @@
 @page "/personal/admin/medicos"
 @layout LayoutPersonal
 @attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
-@inject IGestionMedicos Gestion
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IDisposable
+@inject AlcancePorOperacion Operaciones
+@inject NavigationManager Navegacion
+@inject ILogger<Medicos> Registro
 
-@* A1, el listado (UX §7, story 3.2), renderizado estático. El buscador es un GET común: no necesita token. *@
-<PageTitle>Médicos · Las Acacias</PageTitle>
+@* A1, el listado, con el estándar de la guía UX/UI (story 3.3, sección H): buscador, filtros por especialidad y
+   estado de agenda, orden y paginación, todo en la URL. Interactiva en el servidor (ADR-08). *@
+<PaginaAbm Titulo="Médicos" Total="total" Migas="Migas" TextoNuevo="Nuevo médico" AlNuevo="IrAlAlta">
+    <BarraDeFiltros Buscar="@estado.Buscar" BuscarCambiado="Buscar" Placeholder="Buscar por apellido, nombre o matrícula"
+                    ErrorBuscador="@ErrorDeBusqueda" FiltrosActivos="@FiltrosActivos" AlLimpiar="Limpiar">
+        <div class="filter-bar__campo">
+            <label for="especialidad" class="form-label mb-0">Especialidad</label>
+            <SelectConBusqueda Id="especialidad" Etiqueta="Especialidad" TextoVacio="Todas" Opciones="especialidades"
+                               Valor="@estado.Especialidad?.ToString()" ValorCambiado="CambiarEspecialidad" />
+        </div>
+        <div class="filter-bar__campo">
+            <label for="agenda" class="form-label mb-0">Estado de agenda</label>
+            <select id="agenda" class="form-select" value="@(estado.Agenda ?? "")" @onchange="CambiarAgenda">
+                <option value="" selected="@(estado.Agenda is null)">Todos</option>
+                @foreach (var (valor, texto) in EstadosDeAgenda)
+                {
+                    <option value="@valor" selected="@(estado.Agenda == valor)">@texto</option>
+                }
+            </select>
+        </div>
+    </BarraDeFiltros>
 
-<h1>Médicos</h1>
-
-<p><a href="@RutasPersonal.NuevoMedico" class="btn btn-primary" style="background-color: #1F5FA8;">Nuevo médico</a></p>
-
-<form method="get" class="mb-3" style="max-width: 32rem;">
-    <label for="buscar" class="form-label">Buscar</label>
-    <div class="d-flex gap-2">
-        <input id="buscar" name="buscar" class="form-control" value="@Buscar" aria-describedby="@(busquedaLarga ? "buscar-mensaje" : null)" />
-        <button type="submit" class="btn btn-outline-primary">Buscar</button>
-    </div>
-    @if (busquedaLarga)
-    {
-        <div id="buscar-mensaje" class="text-danger">La búsqueda tiene como máximo 100 caracteres.</div>
-    }
-</form>
-
-<TablaMedicos Medicos="medicos" Buscado="@(busquedaLarga ? null : Buscar?.Trim())" />
+    <TablaMedicos Estado="estado" Consultar="ConsultarAsync" OrdenCambiado="Ordenar" PaginaCambiada="IrAPagina"
+                  TamanoCambiado="CambiarTamano" TotalCambiado="t => total = t" AlLimpiar="Limpiar" AlNuevo="IrAlAlta" />
+</PaginaAbm>
 
 @code {
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+    private const string Ruta = RutasPersonal.Medicos;
+    private static readonly IReadOnlyList<(string Valor, string Texto)> EstadosDeAgenda =
+    [
+        ("vigente", "Vigente"), ("programada", "Programada"), ("pendiente", "Pendiente de aprobación"), ("sin-agenda", "Sin agenda"),
+    ];
+    private static readonly ReglasDeListado Reglas = new("medico", ["medico", "matricula", "especialidad"],
+        Agendas: EstadosDeAgenda.Select(e => e.Valor).ToList());
+    private static readonly IReadOnlyList<Miga> Migas = [new("Catálogos", RutasPersonal.Medicos), new("Médicos", null)];
 
-    [SupplyParameterFromQuery(Name = "buscar")]
-    private string? Buscar { get; set; }
+    private readonly CancellationTokenSource cancelacion = new();
+    private EstadoDeListado estado = EstadoDeListado.PorDefecto(Reglas);
+    private int? total;
+    private IReadOnlyList<SelectConBusqueda.Opcion> especialidades = [];
 
-    private IReadOnlyList<MedicoListado> medicos = [];
-    private bool busquedaLarga;
+    // AC 82: un texto más largo no filtra; la pantalla avisa, como hoy.
+    private string? ErrorDeBusqueda => estado.Buscar is { Length: > IGestionMedicos.LargoMaximoBusqueda }
+        ? "La búsqueda tiene como máximo 100 caracteres."
+        : null;
+
+    private IReadOnlyList<string> FiltrosActivos => estado.FiltrosActivos(
+        id => especialidades.FirstOrDefault(e => e.Valor == id.ToString())?.Texto,
+        etiquetaDeAgenda: a => EstadosDeAgenda.First(e => e.Valor == a).Texto);
 
     protected override async Task OnInitializedAsync()
     {
-        // Más de 100 no filtra y avisa (AC 2): el caso de uso aplica el mismo límite.
-        busquedaLarga = (Buscar?.Trim().Length ?? 0) > IGestionMedicos.LargoMaximoBusqueda;
-        medicos = await Gestion.ListarAsync(Buscar, HttpContext.RequestAborted);
+        estado = EstadoDeListado.Leer(Navegacion.Uri, Reglas);
+        Navegacion.LocationChanged += AlNavegar;
+        // El filtro ofrece sólo las especialidades que tienen médicos (AC 58).
+        var consulta = new ConsultaDeListado(null, new Dictionary<string, string> { ["estado"] = "todos" }, "nombre", 1, int.MaxValue / 2);
+        try
+        {
+            var todas = await Operaciones.EjecutarAsync<ICatalogoEspecialidades, PaginaDeResultados<EspecialidadFila>>(
+                c => c.ListarPaginadoAsync(consulta, cancelacion.Token));
+            especialidades = [.. todas.Items.Where(e => e.MedicosAsociados > 0).Select(e => new SelectConBusqueda.Opcion(e.Id.ToString(), e.Nombre))];
+        }
+        catch (Exception e) when (!cancelacion.IsCancellationRequested)
+        {
+            // Sin la base, el filtro queda vacío y la tabla avisa con "Reintentar" (AC 83). Un error al iniciar la página no
+            // lo atrapa ningún límite: sin este catch se caía el circuito y la pantalla quedaba en blanco (prueba en vivo).
+            Registro.LogError(e, "No se pudieron cargar las especialidades del filtro de médicos");
+            especialidades = [];
+        }
+    }
+
+    private void AlNavegar(object? remitente, LocationChangedEventArgs e) => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            estado = EstadoDeListado.Leer(e.Location, Reglas);
+            StateHasChanged();
+        }
+        catch (Exception error)
+        {
+            await DispatchExceptionAsync(error);   // nadie espera esta tarea: el error no se pierde
+        }
+    });
+
+    private void Navegar(EstadoDeListado nuevo)
+    {
+        estado = nuevo;
+        Navegacion.NavigateTo(nuevo.Url(Ruta, Reglas));
+    }
+
+    private void Buscar(string? texto) => Navegar(estado with { Buscar = texto, Pagina = 1 });
+    private void CambiarEspecialidad(string? valor) =>
+        Navegar(estado with { Especialidad = long.TryParse(valor, out var id) ? id : null, Pagina = 1 });
+    private void CambiarAgenda(ChangeEventArgs e) =>
+        Navegar(estado with { Agenda = e.Value?.ToString() is { Length: > 0 } agenda ? agenda : null, Pagina = 1 });
+    private void Ordenar(string orden) => Navegar(estado with { Orden = orden, Pagina = 1 });
+    private void IrAPagina(int numero) => Navegar(estado with { Pagina = numero });
+    private void CambiarTamano(int tamano) => Navegar(estado with { Tamano = tamano, Pagina = 1 });
+    private void Limpiar() => Navegar(estado.Limpio(Reglas));
+    private void IrAlAlta() => Navegacion.NavigateTo(RutasPersonal.NuevoMedico);
+
+    // En su propio alcance (AC 94): la tabla y la carga del filtro de especialidades corren a la vez.
+    private Task<PaginaDeResultados<MedicoListado>> ConsultarAsync(CancellationToken ct)
+    {
+        var consulta = estado.AConsulta();
+        return Operaciones.EjecutarAsync<IGestionMedicos, PaginaDeResultados<MedicoListado>>(g => g.ListarPaginadoAsync(consulta, ct));
+    }
+
+    public void Dispose()
+    {
+        Navegacion.LocationChanged -= AlNavegar;
+        cancelacion.Cancel();
+        cancelacion.Dispose();
     }
 }

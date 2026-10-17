@@ -4,7 +4,8 @@ namespace HospitalTurnos.Web.Personal;
 
 /// <summary>
 /// Las rutas del personal (todas bajo /personal/: la raíz queda para la web del paciente, sprint 5) y
-/// qué rol entra a cada una (AC 13). Un solo lugar para el menú, los inicios por rol y el ReturnUrl.
+/// qué rol entra a cada una (AC 13). Un solo lugar para el menú (agrupado desde la story 3.3), los inicios por
+/// rol y el ReturnUrl.
 /// </summary>
 public static class RutasPersonal
 {
@@ -30,7 +31,11 @@ public static class RutasPersonal
     public const string Usuarios = "/personal/admin/usuarios";
     public const string Auditoria = "/personal/admin/auditoria";
 
-    public sealed record Seccion(string Ruta, string Titulo);
+    /// <summary>Una opción del menú. Pendientes: el contador de trabajo por resolver (B-1.7); lo trae la 4.3.</summary>
+    public sealed record Seccion(string Ruta, string Titulo, int? Pendientes = null);
+
+    /// <summary>Un grupo del menú lateral, con su rótulo (story 3.3, AC 13).</summary>
+    public sealed record GrupoDeMenu(string Rotulo, IReadOnlyList<Seccion> Secciones);
 
     private static readonly Seccion SeccionTurnos = new(Turnos, "Turnos");
     private static readonly Seccion SeccionAgendas = new(Agendas, "Agendas");
@@ -44,16 +49,30 @@ public static class RutasPersonal
     private static readonly Seccion SeccionUsuarios = new(Usuarios, "Usuarios del personal");
     private static readonly Seccion SeccionAuditoria = new(Auditoria, "Auditoría");
 
-    // El orden es el del mapa de navegación de UX §3 (AC 14); el primero es el inicio del rol.
-    private static readonly Dictionary<string, Seccion[]> PorRol = new()
+    // Agrupadas por tarea y ordenadas por frecuencia de uso (guía, "Menú lateral"). La guía define los grupos
+    // del administrador; los de recepción y médico los aprobó el docente con la story 3.3 (S-36).
+    private static readonly Dictionary<string, GrupoDeMenu[]> PorRol = new()
     {
-        [Roles.Recepcionista] = [SeccionTurnos, SeccionAgendas, SeccionParaAvisar],
-        [Roles.Medico] = [SeccionMiAgenda, SeccionMiPropuesta],
+        [Roles.Recepcionista] =
+        [
+            new("Recepción", [SeccionTurnos]),
+            new("Agenda", [SeccionAgendas, SeccionParaAvisar]),
+        ],
+        [Roles.Medico] = [new("Mi agenda", [SeccionMiAgenda, SeccionMiPropuesta])],
         [Roles.Administrador] =
         [
-            SeccionMedicos, SeccionPropuestas, SeccionEspecialidades, SeccionBloqueos,
-            SeccionUsuarios, SeccionAuditoria, SeccionParaAvisar, SeccionAgendas,
+            new("Agenda", [SeccionAgendas, SeccionPropuestas, SeccionBloqueos, SeccionParaAvisar]),
+            new("Catálogos", [SeccionMedicos, SeccionEspecialidades]),
+            new("Administración", [SeccionUsuarios, SeccionAuditoria]),
         ],
+    };
+
+    // La pantalla principal de cada rol, explícita: reordenar el menú no cambia a dónde entra cada uno (AC 14).
+    private static readonly Dictionary<string, string> InicioPorRol = new()
+    {
+        [Roles.Recepcionista] = Turnos,
+        [Roles.Medico] = MiAgenda,
+        [Roles.Administrador] = Medicos,
     };
 
     private static readonly Seccion[] Todas =
@@ -62,11 +81,15 @@ public static class RutasPersonal
         SeccionPropuestas, SeccionEspecialidades, SeccionBloqueos, SeccionUsuarios, SeccionAuditoria,
     ];
 
-    public static IReadOnlyList<Seccion> SeccionesDe(string? rol) =>
-        rol is not null && PorRol.TryGetValue(rol, out var secciones) ? secciones : [];
+    public static IReadOnlyList<GrupoDeMenu> GruposDe(string? rol) =>
+        rol is not null && PorRol.TryGetValue(rol, out var grupos) ? grupos : [];
+
+    /// <summary>Las secciones del rol en el orden del menú (los grupos, uno detrás del otro).</summary>
+    public static IReadOnlyList<Seccion> SeccionesDe(string? rol) => GruposDe(rol).SelectMany(g => g.Secciones).ToList();
 
     /// <summary>La pantalla principal del rol. Sin rol conocido, el ingreso.</summary>
-    public static string InicioDe(string? rol) => SeccionesDe(rol).FirstOrDefault()?.Ruta ?? Ingreso;
+    public static string InicioDe(string? rol) =>
+        rol is not null && InicioPorRol.TryGetValue(rol, out var inicio) ? inicio : Ingreso;
 
     public static string TituloDe(string ruta) =>
         Todas.FirstOrDefault(s => string.Equals(s.Ruta, ruta, StringComparison.OrdinalIgnoreCase))?.Titulo ?? "";

@@ -1,0 +1,74 @@
+@implements IDisposable
+@inject AuthenticationStateProvider Autenticacion
+@inject NavigationManager Navegacion
+
+@* El esqueleto común de una pantalla ABM (guía, "Patrón estándar de pantalla de listado"; story 3.3, AC 22): migas,
+   encabezado "Título · N" con un único botón primario a la derecha, y el contenido. Además, lo que toda página
+   interactiva necesita: las notificaciones, el límite de errores (AC 4) y la vigilancia de la sesión (AC 5). *@
+<PageTitle>@Titulo · Las Acacias</PageTitle>
+<ZonaDeNotificaciones />
+<LimiteDeErrores>
+    <MigasDePan Migas="Migas" />
+    <header class="page-header">
+        <div class="page-header__titulo">
+            <h1 tabindex="-1">@Titulo@if (Total is { } total)
+                {<span class="page-header__total"> · @total</span>}</h1>
+            @Encabezado
+        </div>
+        @if (TextoNuevo is not null)
+        {
+            <button type="button" class="btn btn-primary page-header__accion boton-alta-fijo" @ref="BotonNuevo"
+                    @onclick="AlNuevo">@TextoNuevo</button>
+        }
+    </header>
+    @ChildContent
+</LimiteDeErrores>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Titulo { get; set; } = "";
+
+    /// <summary>El total del filtro aplicado; sin valor, el encabezado no lo muestra (fichas).</summary>
+    [Parameter]
+    public int? Total { get; set; }
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Miga> Migas { get; set; } = [];
+
+    /// <summary>El texto del único primario ("Nueva especialidad"); sin valor no hay botón.</summary>
+    [Parameter]
+    public string? TextoNuevo { get; set; }
+
+    [Parameter]
+    public EventCallback AlNuevo { get; set; }
+
+    /// <summary>Lo que va junto al título: el badge de estado en una ficha (AC 65).</summary>
+    [Parameter]
+    public RenderFragment? Encabezado { get; set; }
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Para devolverle el foco al cerrar el diálogo que abrió (AC 38).</summary>
+    public ElementReference BotonNuevo { get; private set; }
+
+    protected override void OnInitialized() => Autenticacion.AuthenticationStateChanged += AlCambiarLaSesion;
+
+    // RevalidacionDeCircuito dejó la sesión anónima (usuario desactivado o sello cambiado): al ingreso con recarga
+    // completa, así la cookie se revisa por HTTP y se vence (AC 5).
+    // Nadie espera esta tarea: un error se entrega a Blazor (registro del circuito), no se pierde.
+    private void AlCambiarLaSesion(Task<AuthenticationState> estado) => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            if ((await estado).User.Identity?.IsAuthenticated != true)
+                Navegacion.NavigateTo(RutasPersonal.Ingreso, forceLoad: true);
+        }
+        catch (Exception e)
+        {
+            await DispatchExceptionAsync(e);
+        }
+    });
+
+    public void Dispose() => Autenticacion.AuthenticationStateChanged -= AlCambiarLaSesion;
+}

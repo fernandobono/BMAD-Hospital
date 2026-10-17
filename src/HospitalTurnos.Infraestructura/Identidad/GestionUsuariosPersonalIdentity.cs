@@ -1,5 +1,6 @@
 using System.Text.RegularExpressions;
 using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Aplicacion.Comun;
 using HospitalTurnos.Aplicacion.Personal;
 using HospitalTurnos.Dominio.Auditoria;
 using HospitalTurnos.Dominio.Excepciones;
@@ -52,6 +53,53 @@ public sealed class GestionUsuariosPersonalIdentity(
                     u.LockoutEnd > ahora ? u.LockoutEnd : null, u.DebeCambiarContrasena);
             }),
         ];
+    }
+
+    public async Task<PaginaDeResultados<UsuarioPersonalFila>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct)
+    {
+        var lista = contexto.Users.AsNoTracking();
+        var texto = consulta.Buscar?.Trim();
+        if (!string.IsNullOrEmpty(texto))
+        {
+            // Con ESCAPE '\': % y _ dejan de ser comodines, como en A1. El patrón viaja como parámetro.
+            var patron = $"%{texto.Replace("\\", "\\\\").Replace("%", "\\%").Replace("_", "\\_")}%";
+            lista = lista.Where(u => EF.Functions.ILike(u.UserName!, patron, "\\") || EF.Functions.ILike(u.NombreCompleto, patron, "\\"));
+        }
+        lista = consulta.Filtro("estado") switch
+        {
+            "activos" => lista.Where(u => u.Activo),
+            "inactivos" => lista.Where(u => !u.Activo),
+            _ => lista,
+        };
+        var rolesDeUsuario = from ur in contexto.UserRoles join r in contexto.Roles on ur.RoleId equals r.Id select new { ur.UserId, r.Name };
+        if (consulta.Filtro("rol") is { } rolBuscado)
+            lista = lista.Where(u => rolesDeUsuario.Any(x => x.UserId == u.Id && x.Name == rolBuscado));
+
+        var total = await lista.CountAsync(ct);
+        var conRol = lista.Select(u => new { Usuario = u, Rol = rolesDeUsuario.Where(x => x.UserId == u.Id).Min(x => x.Name) });
+        var ordenada = (consulta.CampoDeOrden, consulta.Descendente) switch
+        {
+            ("rol", false) => conRol.OrderBy(x => x.Rol).ThenBy(x => x.Usuario.NombreCompleto),
+            ("rol", true) => conRol.OrderByDescending(x => x.Rol).ThenBy(x => x.Usuario.NombreCompleto),
+            (_, true) => conRol.OrderByDescending(x => x.Usuario.NombreCompleto).ThenByDescending(x => x.Usuario.UserName),
+            _ => conRol.OrderBy(x => x.Usuario.NombreCompleto).ThenBy(x => x.Usuario.UserName),
+        };
+        var pagina = await ordenada.Skip(consulta.Saltear(total)).Take(consulta.Tamano).Select(x => x.Usuario).ToListAsync(ct);
+
+        var ids = pagina.Select(u => u.Id).ToList();
+        var roles = await rolesDeUsuario.Where(x => ids.Contains(x.UserId)).ToListAsync(ct);
+        var rolesPorUsuario = roles.ToLookup(x => x.UserId, x => x.Name!);
+        var ahora = reloj.GetUtcNow();
+        return new PaginaDeResultados<UsuarioPersonalFila>(
+        [
+            .. pagina.Select(u =>
+            {
+                var suyos = rolesPorUsuario[u.Id].ToList();
+                var rol = suyos.Count switch { 0 => SinRolTexto, 1 => suyos[0], _ => VariosRolesTexto };
+                return new UsuarioPersonalFila(u.Id, u.UserName!, u.NombreCompleto, rol, u.Activo,
+                    u.LockoutEnd > ahora ? u.LockoutEnd : null, u.DebeCambiarContrasena);
+            }),
+        ], total);
     }
 
     public async Task<AltaUsuarioPersonal> CrearAsync(NuevoUsuarioPersonal datos, ActorAuditoria actor, CancellationToken ct)

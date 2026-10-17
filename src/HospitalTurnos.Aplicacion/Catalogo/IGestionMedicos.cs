@@ -1,4 +1,5 @@
 using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Aplicacion.Comun;
 using HospitalTurnos.Dominio.Agendas;
 
 namespace HospitalTurnos.Aplicacion.Catalogo;
@@ -15,6 +16,13 @@ public interface IGestionMedicos
 
     /// <summary>Ordenados por apellido y nombre; con texto, los que lo contienen en apellido, nombre o matrícula.</summary>
     Task<IReadOnlyList<MedicoListado>> ListarAsync(string? buscar, CancellationToken ct);
+
+    /// <summary>
+    /// A1 paginada en la base (story 3.3, AC 44): busca como ListarAsync (un texto de más de 100 caracteres no
+    /// filtra), filtra por "especialidad" y por "agenda" (vigente, programada, pendiente, sin-agenda) y ordena por
+    /// "medico" (apellido y nombre), "matricula" o "especialidad".
+    /// </summary>
+    Task<PaginaDeResultados<MedicoListado>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct);
 
     Task<DatosFichaMedico?> ObtenerAsync(long id, CancellationToken ct);
 

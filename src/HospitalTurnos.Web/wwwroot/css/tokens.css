@@ -1,0 +1,62 @@
+/*
+ * Tokens de diseño de Las Acacias (guía UX/UI, "Hoja de estilos única y tokens de diseño"; story 3.3, AC 6).
+ * Es el ÚNICO archivo con colores en hexadecimal: el resto de las hojas usa estas variables.
+ * Cada par texto/fondo que usa la hoja tiene contraste AA verificado por prueba (HojaDeEstilosTests, AC 10).
+ */
+:root {
+  /* Color de marca y semánticos: verde = éxito o vigente, ámbar = atención o pendiente, rojo = error o
+     peligro, azul = información o programado, gris = inactivo o neutro. */
+  --color-primario: #1F5FA8;
+  --color-primario-oscuro: #184C87;
+  --color-sobre-primario: #FFFFFF;
+  --color-exito: #1B6E2E;
+  --color-exito-suave: #E7F4EA;
+  --color-atencion: #B45309;
+  --color-atencion-suave: #FEF3E2;
+  --color-peligro: #B42318;
+  --color-peligro-oscuro: #8F1C13;
+  --color-peligro-suave: #FDECEA;
+  --color-info: #1557A0;
+  --color-info-suave: #E6EFFA;
+  --color-neutro: #4B5560;
+  --color-neutro-suave: #ECEEF1;
+
+  /* Texto, fondos y bordes */
+  --color-texto: #1F2933;
+  --color-texto-ayuda: #5F6B76;
+  --color-fondo: #FFFFFF;
+  --color-fondo-app: #F5F7FA;
+  --color-borde: #7A848E;
+  --color-separador: #DDE2E7;
+  --color-velo: rgb(31 41 51 / 0.45);
+
+  /* Tipografía: sans serif del sistema; escala 28 / 20 / 16 / 14 px */
+  --fuente-base: system-ui, -apple-system, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+  --texto-titulo: 1.75rem;
+  --texto-subtitulo: 1.25rem;
+  --texto-cuerpo: 1rem;
+  --texto-ayuda: 0.875rem;
+
+  /* Espaciado: grilla de 8 px */
+  --esp-1: 0.5rem;
+  --esp-2: 1rem;
+  --esp-3: 1.5rem;
+  --esp-4: 2rem;
+
+  --radio: 0.5rem;
+  --sombra: 0 2px 8px rgb(31 41 51 / 0.12);
+  --sombra-alta: 0 12px 32px rgb(31 41 51 / 0.24);
+
+  /* Bootstrap se personaliza desde los tokens, no clase por clase en cada pantalla. */
+  --bs-primary: var(--color-primario);
+  --bs-danger: var(--color-peligro);
+  --bs-success: var(--color-exito);
+  --bs-body-font-family: var(--fuente-base);
+  --bs-body-font-size: var(--texto-cuerpo);
+  --bs-body-color: var(--color-texto);
+  --bs-body-bg: var(--color-fondo);
+  --bs-link-color: var(--color-primario);
+  --bs-link-hover-color: var(--color-primario-oscuro);
+  --bs-border-color: var(--color-separador);
+  --bs-border-radius: var(--radio);
+}

@@ -1,0 +1,21 @@
+@* Un estado como badge (guía, "Estados de negocio como badges"; AC 32): siempre con texto, nunca sólo color. *@
+<span class="badge-estado badge-estado--@Clase">@Texto</span>
+
+@code {
+    public enum Tono { Vigente, Programada, Pendiente, Inactivo, Activo, Info }
+
+    [Parameter, EditorRequired]
+    public string Texto { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public Tono Variante { get; set; }
+
+    private string Clase => Variante.ToString().ToLowerInvariant();
+
+    protected override void OnParametersSet()
+    {
+        // El color nunca es el único portador del significado: un badge sin texto es un error de programación.
+        if (string.IsNullOrWhiteSpace(Texto))
+            throw new ArgumentException("Un badge de estado necesita texto.", nameof(Texto));
+    }
+}

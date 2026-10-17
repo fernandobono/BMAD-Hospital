@@ -1,0 +1,17 @@
+@using HospitalTurnos.Aplicacion.Auditoria
+@inject TimeProvider Reloj
+
+@* "Creado por / Modificado por" con fecha y hora del hospital (guía, "Detalle frente a edición"; AC 40), leído de la
+   auditoría. *@
+@if (Traza is { } traza)
+{
+    <p class="pie-de-trazabilidad">
+        Creado por @traza.Creado.Quien el @Formatos.FechaHora(traza.Creado.Cuando, Reloj.LocalTimeZone)@if (traza.Modificado is { } modificado)
+        {<text> · Modificado por @modificado.Quien el @Formatos.FechaHora(modificado.Cuando, Reloj.LocalTimeZone)</text>}
+    </p>
+}
+
+@code {
+    [Parameter]
+    public Trazabilidad? Traza { get; set; }
+}

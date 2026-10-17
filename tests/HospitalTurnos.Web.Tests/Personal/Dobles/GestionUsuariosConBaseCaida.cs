@@ -1,4 +1,5 @@
 using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Aplicacion.Comun;
 using HospitalTurnos.Aplicacion.Personal;
 using Npgsql;
 
@@ -13,6 +14,9 @@ public sealed class GestionUsuariosConBaseCaida : IGestionUsuariosPersonal
 {
     public Task<IReadOnlyList<UsuarioPersonalFila>> ListarAsync(CancellationToken ct) =>
         Task.FromResult<IReadOnlyList<UsuarioPersonalFila>>([]);
+
+    public Task<PaginaDeResultados<UsuarioPersonalFila>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct) =>
+        Task.FromResult(new PaginaDeResultados<UsuarioPersonalFila>([], 0));
 
     public Task<AltaUsuarioPersonal> CrearAsync(NuevoUsuarioPersonal datos, ActorAuditoria actor, CancellationToken ct) =>
         throw new NpgsqlException("detalle secreto de la base");
