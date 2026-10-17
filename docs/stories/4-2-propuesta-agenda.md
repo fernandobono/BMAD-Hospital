@@ -2,7 +2,7 @@
 epic: 4
 story: "4.2"
 title: "El médico arma, guarda y envía su propuesta de agenda"
-status: review
+status: done
 sprint: 3
 priority: "P0"
 approach: "[CREATE]"
@@ -42,7 +42,7 @@ files_to_modify:
 
 # Story 4.2: El médico arma, guarda y envía su propuesta de agenda
 
-Status: review
+Status: done
 
 ## Story
 
@@ -1155,6 +1155,7 @@ Claude Opus 5.5 (Amelia, pipeline del equipo), sesión 15 (2026-10-17).
   filas). AC 21: un POST de un médico sin vínculo daba `400` en blanco; ahora el `403` con el cartel (T33). AC 13
   en pantalla: `sin-cambios` y un `?resultado=` desconocido (T36). Implementación concreta: tres notas (sólo
   lectura del AC 6 en el GET, POST sin vínculo, título `Tu propuesta`).
+- 2026-10-17: `done` tras el merge del PR #15 (`7e098b7`), con la CI en verde (6/6 en las dos corridas).
 
 
 ## Review Follow-ups (Advisors)
