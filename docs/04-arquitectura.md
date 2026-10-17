@@ -1,11 +1,12 @@
 ---
 documento: Arquitectura de la solución
 proyecto: Gestión de turnos — Hospital Municipal Las Acacias (caso simulado)
-version: 1.0
-fecha: 2026-10-09
+version: 1.1
+fecha: 2026-10-17
 autor: Winston (arquitectura) con John y Sally
 estado: aprobado (2026-10-09)
-entrada: docs/01-brief.md (v1.1) · docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0)
+entrada: docs/01-brief.md (v1.1) · docs/02-prd.md (v1.2) · docs/03-ux.md (v1.1) · docs/ux/guia-ux-ui-abm.md
+cambios: "1.1 (2026-10-17): modo de renderizado de las pantallas ABM (§4), componentes de interfaz reutilizables (§5.1), ADR-08."
 ---
 
 # Arquitectura — Gestión de turnos
@@ -72,7 +73,7 @@ flowchart TB
 |---|---|---|
 | Plataforma | .NET 10 (LTS) | Decisión del docente; soporte hasta noviembre de 2028. |
 | Pantallas del paciente | Blazor, **renderizado en el servidor sin conexión permanente** (SSR estático con formularios mejorados) | Páginas livianas para celulares de gama baja y conexiones malas (NFR-05). Funcionan aun si se corta la conexión entre clics. |
-| Pantallas del personal | Blazor **interactivo en el servidor** | La pantalla de recepción necesita teclado, listas que se actualizan y cero recargas (CE-04). Todo en C#, sin un segundo lenguaje. |
+| Pantallas del personal | Blazor **interactivo en el servidor**, puesto **por página** (`@rendermode`), sin prerender | La pantalla de recepción necesita teclado, listas que se actualizan y cero recargas (CE-04), y la guía UX/UI pide modal, notificaciones, validación al salir del campo y aviso de cambios sin guardar. Todo en C#, sin JavaScript propio. El ingreso (S0) y el cambio de contraseña siguen en SSR estático porque escriben la cookie en la respuesta HTTP; el layout y el menú lateral también (ADR-08). |
 | Base de datos | PostgreSQL 17 | Gratuita, robusta y con índices parciales (los usa la regla de un turno por horario). |
 | Acceso a datos | Entity Framework Core 10 | Estándar de .NET; migraciones versionadas. |
 | Usuarios del personal | ASP.NET Core Identity con cookies | Contraseñas con hash, bloqueo por intentos y roles, ya resueltos. |
@@ -99,6 +100,48 @@ HospitalTurnos.slnx
 
 Las dependencias apuntan hacia adentro: **Web → Aplicación → Dominio** e
 **Infraestructura → Aplicación → Dominio**. El dominio no conoce la base, ni la web, ni el email.
+
+### 5.1 Componentes de interfaz reutilizables
+
+La [guía UX/UI](ux/guia-ux-ui-abm.md) es obligatoria (UX §0). Para que todas las pantallas se vean y se
+usen igual, se arman con estas piezas de `HospitalTurnos.Web/Components/Comunes/`. Ninguna pantalla
+define estilos propios: todo sale de `wwwroot/css/tokens.css` (variables) y `wwwroot/app.css` (clases de
+componente, con Bootstrap 5 personalizado vía `--bs-*`).
+
+| Componente | Qué resuelve | Punto de la guía |
+|---|---|---|
+| `tokens.css` + clases `.page-header`, `.filter-bar`, `.table-actions`, `.badge-estado--*` | Colores, tipografía, grilla de 8 px, radios; único lugar con hexadecimales | Hoja de estilos única |
+| `MarcoPersonal` (layout) | Barra superior, menú de usuario (Cambiar contraseña · Cerrar sesión), menú lateral agrupado con opción activa y `aria-current`, ☰ bajo 992 px. Estático: usa `<details>` nativo, sin circuito | Navegación y menú principal |
+| `MigasDePan` | "Catálogos / Especialidades", "Médicos / Ríos, Pablo" | Estructura de la aplicación |
+| `PaginaAbm` | Esqueleto común de un ABM: migas, encabezado "Título · total" con el único botón primario, zona de notificaciones y contenido | Patrón de listado §1 |
+| `BarraDeFiltros` + `FiltroDeEstado` | Buscador con placeholder y filtrado al escribir (300 ms), selects de filtro, Activos/Inactivos/Todos, filtros activos y "Limpiar filtros" | Patrón de listado §2 |
+| `EstadoDeListado` | Búsqueda, filtros, orden, página y tamaño ↔ URL (para compartir y volver con Atrás) | Patrón de listado §2 |
+| `TablaAbm<TFila>` | Columnas con orden ▲▼, esqueleto de carga, vacío inicial ≠ sin resultados, error con "Reintentar", columna de acciones, tarjetas bajo 768 px | Patrón de listado §3, estados de la interfaz |
+| `MenuDeAcciones` | Botón "⋯" con nombre accesible ("Más acciones para Ríos, Pablo"); las destructivas sólo acá | Tabla, baja |
+| `Paginador` | "Mostrando 1–25 de 124" y 25 / 50 / 100 por página | Patrón de listado §4 |
+| `InsigniaDeEstado` | Badge con texto y color semántico; cada entidad publica su tabla de estados | Estados de negocio como badges |
+| `FormularioAbm` + `CampoDeFormulario` | Una columna (640 px), "\* Obligatorio", etiqueta arriba, ayuda, error con ícono y `aria-describedby`, validación al salir del campo, foco en el primer campo, "Guardar" + "Cancelar" al pie, "Guardando…" y aviso de cambios sin guardar (`NavigationLock`), resumen del error de regla arriba | Patrón de alta y edición |
+| `SelectConBusqueda` | Select con búsqueda cuando hay más de 10 opciones | Campos |
+| `VistaDeDetalle` + `PieDeTrazabilidad` | Detalle en modo lectura con "Editar"; secciones; "Creado por / Modificado por" con fecha (leído de la auditoría) | Detalle frente a edición |
+| `DialogoModal` | Modal accesible: foco atrapado, Esc cierra, devuelve el foco a quien lo abrió | Accesibilidad |
+| `DialogoDeConfirmacion` | Nombra el registro y la consecuencia, botón con verbo (rojo) y "Cancelar" con el foco; modo "no se puede" que explica el bloqueo | Baja, desactivación y acciones destructivas |
+| `Notificaciones` (servicio) + `ZonaDeNotificaciones` | Toast arriba a la derecha, 4 s, `aria-live`, verbo en pasado | Estados de la interfaz: éxito |
+
+**Reglas de uso**
+
+- Las páginas ABM (A1, A2, A4 y las que vengan) llevan `@rendermode @(new InteractiveServerRenderMode(prerender: false))`.
+  Sin prerender, la carga se ve con el esqueleto de `TablaAbm` y los datos se leen una sola vez.
+- En un circuito interactivo **no hay `HttpContext`**: el actor sale del `AuthenticationState` en cascada
+  (no de `HttpContext.User`), y los errores esperables del dominio se muestran en la página (junto al
+  campo o en el resumen del formulario) **sin código HTTP**. `ManejadorGlobalDeErrores.FijarEstadoEnPagina`
+  queda sólo para páginas estáticas. Lo inesperado lo atrapa un `ErrorBoundary` con el mensaje genérico
+  de NFR-09 y el detalle va al registro técnico.
+- La sesión del personal se revalida también dentro del circuito (vencimiento por inactividad y usuario
+  desactivado, AC 25 de la 2.1): un usuario desactivado o con la sesión vencida vuelve al ingreso.
+- Las consultas de los listados devuelven **una página y el total** (`ConsultaDeListado` → `PaginaDeResultados<T>`)
+  y paginan en la base: es lectura, no agrega reglas.
+- Las pruebas de componentes usan bUnit con eventos (clic, tecla, `blur`); la accesibilidad de cada
+  pantalla se verifica con axe en E2E.
 
 ## 6. Modelo del dominio
 
@@ -290,7 +333,7 @@ los lee cada 15 segundos y los envía.
 | NFR-02 Sin turnos duplicados | Índice único parcial + bloqueo de fila (§7.1, §7.2) | Prueba que lanza 20 reservas simultáneas del mismo horario y verifica que entra 1 |
 | NFR-03 HTTPS y contraseñas | Proxy con HTTPS; Identity con hash PBKDF2 | Revisión de seguridad |
 | NFR-04 Vencimiento de sesión | Cookies con expiración deslizante | Prueba con reloj fijo |
-| NFR-05 Accesibilidad | Páginas del paciente sin dependencias de JavaScript; HTML semántico | Auditoría con axe en las pruebas E2E |
+| NFR-05 Accesibilidad | Páginas del paciente sin dependencias de JavaScript; HTML semántico; WCAG 2.2 AA y checklist de la guía UX/UI en toda pantalla | Auditoría con axe en las pruebas E2E |
 | NFR-08 Respaldo diario | `pg_dump` programado; restauración probada | Procedimiento operativo |
 | NFR-09 Errores sin detalle | Manejador global: mensaje genérico al usuario y detalle en el registro técnico | Prueba de endpoints |
 | NFR-10 Validación doble | Validación en el formulario + reglas en el dominio | Pruebas unitarias y de seguridad |
@@ -307,6 +350,7 @@ los lee cada 15 segundos y los envía.
 | ADR-05 | Bandeja de salida para los emails | Envío directo | Un SMTP caído no puede hacer fallar una reserva ni perder un aviso. |
 | ADR-06 | Agendas versionadas por fecha de vigencia | Editar la agenda en el lugar | Conserva la historia y permite aprobar cambios a futuro (FR-14d). |
 | ADR-07 | Auditoría protegida por permisos y disparador en la base | Sólo control en el código | La ley pide que no se pueda alterar; el código solo no alcanza. La contraseña del dueño queda fuera de la aplicación en producción. |
+| ADR-08 | Pantallas ABM del personal interactivas en el servidor, por página, con componentes comunes (§5.1) (2026-10-17, decisión del docente) | SSR estático + un archivo JavaScript propio; SSR estático declarando excepciones a la guía | La guía UX/UI pide modal, notificaciones, validación al salir del campo y aviso de cambios sin guardar. Interactivo en el servidor lo resuelve en C#, como ya decía la §4. El ingreso queda estático por la cookie. |
 
 ## 10. Qué pasa con el código ya escrito
 
