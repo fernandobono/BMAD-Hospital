@@ -25,4 +25,7 @@ public sealed class GestionUsuariosConBaseCaida : IGestionUsuariosPersonal
 
     public Task DesbloquearAsync(Guid usuarioId, ActorAuditoria actor, CancellationToken ct) =>
         throw new NpgsqlException("detalle secreto de la base");
+
+    public Task<ContrasenaRestablecida> RestablecerContrasenaAsync(Guid usuarioId, ActorAuditoria actor, CancellationToken ct) =>
+        throw new NpgsqlException("detalle secreto de la base");
 }
