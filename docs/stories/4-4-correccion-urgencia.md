@@ -276,7 +276,17 @@ de una propuesta, y para que quede en la auditoría quién lo hizo y por qué (F
     2.1 no cambian. `HoraDelSistemaTests` sigue en verde. Cobertura de líneas de Dominio y Aplicacion
     sobre el 80 % (NFR-11).
 
-### Tests (28 verificaciones)
+### Guía UX/UI (agregado 2026-10-17, cambio de rumbo del docente)
+
+29. La corrección de agenda en la ficha del médico (A1) **cumple la guía UX/UI** (`docs/ux/guia-ux-ui-abm.md`, checklist del final) **y usa
+    los componentes definidos** en la arquitectura §5.1 (los crea la story 3.3). Lo que la guía no cubre se
+    pregunta al docente antes de decidir (`docs/project-context.md`, regla 2).
+
+> ⚠ Esta story se escribió para páginas SSR estáticas con formularios POST. Con ADR-08 (pantallas del
+> personal interactivas en el servidor) su diseño técnico y varias pruebas cambian: se revisa contra la
+> guía y la arquitectura v1.1 **antes de implementarla**.
+
+### Tests (29 verificaciones)
 
 | # | Test | AC | Nivel | Escenario | Resultado esperado |
 |---|------|----|-------|-----------|--------------------|
@@ -308,6 +318,7 @@ de una propuesta, y para que quede en la auditoría quién lo hizo y por qué (F
 | T26 | `CorregirAgenda_SinPermisoOSinToken_NoEntraNiGuarda` | 25, 26 | integration | `[Theory]`: GET con `recepcion1` y con `medico1` → 403; GET sin ingresar → 302; POST de un administrador propio desactivado después de ingresar → 403 con cartel; POST de `admin1` sin `__RequestVerificationToken` → 400 | Los códigos indicados; los textos `No tenés permiso para entrar a esta sección.` / el del AC 9; `ReturnUrl` con la ruta; en los dos POST, 0 agendas y 0 registros del médico |
 | T27 | `PostCorregirAgenda_TurnosFueraDeAgenda_AvisaYCorrigeAlConfirmar` | 23, 27 | integration | `app.WithWebHostBuilder(b => b.ConfigureTestServices(s => s.AddScoped<ITurnosFueraDeAgenda>(_ => new TurnosFueraDeAgendaFijos(...))))` con 1 y con 3 turnos (como la T31 de la 4.3); POST `corregir` y después POST `corregir-igual` con lo mismo | Con `corregir`: `200`, el aviso de `AvisoTurnosFueraDeAgenda` (`⚠ 1 turno ya dado queda fuera de la nueva agenda. Se mantiene.` / `⚠ 3 turnos ya dados quedan fuera de la nueva agenda. Se mantienen.`), el botón `Corregir igual` (`value="corregir-igual"`), 0 agendas; con `corregir-igual`: `302` a la ficha |
 | T28 | `PostCorregirAgenda_BotonesDelEditor_RedibujanSinGuardarNiPedirElMotivo` | 18, 19, 21, 27 | integration | Médico con vigente (lunes 08–12, 20 min) y una aprobada desde hoy + 40; motivo vacío; `[Theory]` de POST: `agregar-franja`; `quitar-franja:0`; `actualizar` con `Rige desde` = hoy + 50; `actualizar` con `Rige desde` = hoy + 10; `Input.Accion = borrar` | `200` con una fila más / sin la fila / sin el aviso de reemplazo / con el aviso y la fecha de hoy + 40 / `400` con `No reconocemos esa acción. Recargá la página.`; en los cuatro `200`, **ningún** `Escribí el motivo de la corrección.`; en todos, 0 agendas nuevas y 0 registros del médico (C-1 e I-2 de la revisión) |
+| T29 | `Pantalla_CumpleChecklistDeLaGuiaUx_YUsaLosComponentesComunes` | 29 | integration | Matriz en vivo con el checklist de la guía (listado, formulario, baja, accesibilidad, navegación) y revisión de que la pantalla usa los componentes de `Components/Comunes/` sin `style=` ni hexadecimales | Todos los puntos **Debe** del checklist cumplidos; 0 estilos en línea |
 
 Todas llevan `[Trait("Story", "4.4")]` y un `[Trait("AC", "n")]` por AC de su columna.
 T1–T8 van en `HospitalTurnos.Dominio.Tests` (sin base, con `FakeTimeProvider`). T9–T19, en

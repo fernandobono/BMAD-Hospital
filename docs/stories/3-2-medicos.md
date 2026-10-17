@@ -39,6 +39,11 @@ files_to_modify:
   - "src/HospitalTurnos.Web/Components/_Imports.razor"
   - "src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor"
   - "tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs"
+followed_up_by:
+  - id: "3.3"
+    date: "2026-10-17"
+    type: "extension"
+    summary: "A1 pasa al estándar: listado con filtros, orden, paginación y badges; ficha en modo lectura"
 ---
 
 # Story 3.2: Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico

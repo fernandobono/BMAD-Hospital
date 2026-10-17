@@ -28,6 +28,11 @@ files_to_modify:
   - "src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs"
   - "src/HospitalTurnos.Web/Components/Personal/Secciones/SeccionesAdministracion.razor"
   - "tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs"
+followed_up_by:
+  - id: "3.3"
+    date: "2026-10-17"
+    type: "extension"
+    summary: "A2 pasa al estándar de la guía UX/UI: modal de alta, filtros, menú de acciones y confirmación de baja"
 ---
 
 # Story 3.1: Especialidades: alta, desactivación y reactivación (pantalla A2)
