@@ -385,7 +385,17 @@ turno ya dado por un cambio de agenda.
     story no tiene migración**: las tablas que usa ya existen (`agendas_medico`, `franjas_agenda`,
     `registros_auditoria`, `mensajes_salientes`, `asp_net_users`).
 
-### Tests (34 verificaciones)
+### Guía UX/UI (agregado 2026-10-17, cambio de rumbo del docente)
+
+31. A6 (listado y detalle de propuestas) y el contador del menú **cumple la guía UX/UI** (`docs/ux/guia-ux-ui-abm.md`, checklist del final) **y usa
+    los componentes definidos** en la arquitectura §5.1 (los crea la story 3.3). Lo que la guía no cubre se
+    pregunta al docente antes de decidir (`docs/project-context.md`, regla 2).
+
+> ⚠ Esta story se escribió para páginas SSR estáticas con formularios POST. Con ADR-08 (pantallas del
+> personal interactivas en el servidor) su diseño técnico y varias pruebas cambian: se revisa contra la
+> guía y la arquitectura v1.1 **antes de implementarla**.
+
+### Tests (35 verificaciones)
 
 | # | Test | AC | Nivel | Escenario | Resultado esperado |
 |---|------|----|-------|-----------|--------------------|
@@ -423,6 +433,7 @@ turno ya dado por un cambio de agenda.
 | T32 | `Detalle_OtroRolOAdminDesactivado_403` | 2,11 | integration | `[Theory]`: GET del detalle como `recepcion1`; GET como `medico1`; POST `aprobar` de un administrador propio que se desactiva en la base después de ingresar (cookie viva) | Los dos GET: `403` con `No tenés permiso para entrar a esta sección.`; el POST: `403` con `Sólo un administrador puede aprobar o rechazar propuestas de agenda.` en el cartel y la propuesta sigue `Enviada` |
 | T33 | `AvisoTurnosFueraDeAgenda_SegunCantidad_MuestraElTextoQueCorresponde` | 22,26 | unit | bUnit; `[Theory]` lista vacía, 1 turno, 3 turnos | Vacía: markup vacío; 1: el texto en singular; 3: en plural; con turnos, `role="alert"` y una línea por turno en `<details>` |
 | T34 | `GetMiPropuesta_Rechazada_MuestraQuienLaRechazo` | 17,25 | integration | Médico propio vinculado (`MedicoIngresadoAsync` de la 4.2); su enviada rechazada por `admin1` desde la pantalla (POST `rechazar`); el médico abre M2 (`RutasPersonal.MiPropuesta`) | `200`; el motivo y la línea completa `Rechazada el dd/MM/yyyy a las HH:mm por Lucía Pérez.` (fecha y hora local de `rechazada_el` leída de la base) |
+| T35 | `Pantalla_CumpleChecklistDeLaGuiaUx_YUsaLosComponentesComunes` | 31 | integration | Matriz en vivo con el checklist de la guía (listado, formulario, baja, accesibilidad, navegación) y revisión de que la pantalla usa los componentes de `Components/Comunes/` sin `style=` ni hexadecimales | Todos los puntos **Debe** del checklist cumplidos; 0 estilos en línea |
 
 Todas llevan `[Trait("Story", "4.3")]` y un `[Trait("AC", "n")]` por AC de su columna.
 T1–T2 van en `HospitalTurnos.Dominio.Tests` (unitarias, con `RelojDePrueba` y `AgendaBuilder`).

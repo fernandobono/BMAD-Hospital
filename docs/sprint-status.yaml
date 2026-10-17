@@ -1,0 +1,79 @@
+# Estado de las stories del proyecto Las Acacias.
+# Creado el 2026-10-17 (sesión 16) a partir del frontmatter de cada story y del plan de sprints
+# (docs/05-epicas-y-plan.md §3). El estado de cada story sigue viviendo también en su frontmatter;
+# este archivo fija el ORDEN: la próxima story es la primera ready-for-dev de arriba hacia abajo.
+#
+# Estados: backlog (sin escribir) · ready-for-dev (escrita y aprobada) · in-progress · review · done
+# Épicas: backlog · in-progress · done
+
+generated: 2026-10-17
+last_updated: 2026-10-17
+project: Gestión de turnos — Hospital Municipal Las Acacias
+story_location: docs/stories
+
+development_status:
+  # S1 y S2: cerrados
+  epic-1: done
+  1-1-estructura-solucion: done   # el frontmatter dice review; se mergeó en la sesión 02
+  1-2-reloj-y-errores: done
+  1-3-auditoria: done
+  1-4-bandeja-de-salida: done
+  1-5-integracion-continua: done
+  epic-2: in-progress
+  2-1-ingreso-personal: done
+  2-2-gestion-usuarios: done
+  epic-3: in-progress
+  3-1-especialidades: done
+  3-2-medicos: done
+  epic-4: in-progress
+  4-1-dominio-agenda: done
+
+  # S3 en curso. La 3.3 entra primera por el cambio de rumbo de la guía UX/UI (2026-10-17).
+  2-3-contrasena-olvidada: done
+  4-2-propuesta-agenda: done
+  3-3-alinear-abm-con-guia-ux: ready-for-dev
+  4-3-aprobacion-propuestas: ready-for-dev
+  4-4-correccion-urgencia: ready-for-dev
+  epic-5: in-progress
+  5-1-pacientes: ready-for-dev
+
+  # S4
+  2-4-email-personal: backlog
+  2-5-concurrencia-a4: backlog
+  5-2-disponibilidad: backlog
+  5-3-reserva-de-turno: backlog
+  5-4-cancelacion-recepcion: backlog
+  5-5-pantalla-recepcion: backlog
+
+  # S5
+  epic-6: backlog
+  6-1-ingreso-paciente: backlog
+  6-2-registro-paciente: backlog
+  6-3-mis-turnos: backlog
+  6-4-sacar-turno: backlog
+  6-5-email-confirmacion: backlog
+  6-6-mis-datos: backlog
+
+  # S6
+  epic-7: backlog
+  7-1-bloquear-agenda: backlog
+  7-2-cancelacion-hospital: backlog
+  7-3-pacientes-para-avisar: backlog
+  7-4-levantar-bloqueo: backlog
+  epic-8: backlog
+  8-1-mi-agenda: backlog
+  8-2-agenda-recepcion: backlog
+  epic-9: backlog
+  9-1-consulta-auditoria: backlog
+
+  # S7
+  epic-10: backlog
+  10-1-recorridos-e2e: backlog
+  10-2-prueba-de-carga: backlog
+  10-3-respaldo: backlog
+
+  # Sin sprint: salen del análisis de brechas de la guía UX/UI (decisión D3, 2026-10-17).
+  # El docente los ubica en un sprint al planificar.
+  3-4-renombrar-especialidad: backlog
+  3-5-desactivar-medico: backlog
+  9-2-historial-por-registro: backlog

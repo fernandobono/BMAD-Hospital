@@ -252,7 +252,17 @@ pasar por la planilla y sin cargar dos veces al mismo paciente (R-08).
     la recepción (`/personal/recepcion/turnos`), la redirección tras el ingreso (2.1 T10) y la
     protección de `registros_auditoria` no cambian.
 
-### Tests (33 verificaciones)
+### Guía UX/UI (agregado 2026-10-17, cambio de rumbo del docente)
+
+23. La parte paciente de R1 **cumple la guía UX/UI** (`docs/ux/guia-ux-ui-abm.md`, checklist del final) **y usa
+    los componentes definidos** en la arquitectura §5.1 (los crea la story 3.3). Lo que la guía no cubre se
+    pregunta al docente antes de decidir (`docs/project-context.md`, regla 2).
+
+> ⚠ Esta story se escribió para páginas SSR estáticas con formularios POST. Con ADR-08 (pantallas del
+> personal interactivas en el servidor) su diseño técnico y varias pruebas cambian: se revisa contra la
+> guía y la arquitectura v1.1 **antes de implementarla**.
+
+### Tests (34 verificaciones)
 
 | # | Test | AC | Nivel | Escenario | Resultado esperado |
 |---|------|----|-------|-----------|--------------------|
@@ -289,6 +299,7 @@ pasar por la planilla y sin cargar dos veces al mismo paciente (R-08).
 | T31 | `RutaDeTurnos_OtrosRolesOSinSesion_NoEntran` | 16 | integration | `[Theory]`: `admin1` y `medico1` × (`/personal/recepcion/turnos`, `?paciente={id}` de un paciente propio), siguiendo redirecciones; y sin sesión en las mismas dos rutas | Con sesión: `403` y `No tenés permiso para entrar a esta sección.` (y no aparece el nombre del paciente); sin sesión: `302` a `/personal/ingreso?ReturnUrl=<ruta codificada>` |
 | T32 | `PostPacientes_SinTokenAntiforgery_Responde400SinGuardar` | 19 | integration | `[Theory]` sin `__RequestVerificationToken`: (a) búsqueda; (b) alta válida con DNI propio; (c) edición de un paciente propio con otro teléfono | `400`; (b) 0 pacientes con ese DNI; (c) el teléfono no cambió y 0 registros `paciente.editado` con su id |
 | T33 | `PanelPaciente_ConYSinEmail_MuestraLosDatosComoLosLeeLaRecepcion` | 4, 21 | unit | bUnit con `PanelPaciente` y `Paciente = new DatosPaciente(7, "23456789", "Rosa", "Domínguez", "351-555-1234", …)`: (a) con `"rosa@gmail.com"`; (b) con `null` | (a) `Rosa Domínguez · DNI 23.456.789` y `Tel. 351-555-1234 · rosa@gmail.com`; (b) `Tel. 351-555-1234 · Sin email`; en los dos, enlace `Editar datos` a `/personal/recepcion/turnos?paciente=7&editar=si` |
+| T34 | `Pantalla_CumpleChecklistDeLaGuiaUx_YUsaLosComponentesComunes` | 23 | integration | Matriz en vivo con el checklist de la guía (listado, formulario, baja, accesibilidad, navegación) y revisión de que la pantalla usa los componentes de `Components/Comunes/` sin `style=` ni hexadecimales | Todos los puntos **Debe** del checklist cumplidos; 0 estilos en línea |
 
 Todas llevan `[Trait("Story", "5.1")]` y un `[Trait("AC", "n")]` por AC de su columna.
 T1–T6 en `HospitalTurnos.Dominio.Tests`; T7–T19 en `HospitalTurnos.Aplicacion.Tests`; T20–T33 en

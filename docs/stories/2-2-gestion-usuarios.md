@@ -12,6 +12,10 @@ followed_up_by:
     date: "2026-10-17"
     type: "extension"
     summary: "A4 suma la acción de generar otra contraseña temporal a un usuario existente, reusando el generador y la marca de la 2.2"
+  - id: "3.3"
+    date: "2026-10-17"
+    type: "extension"
+    summary: "A4 pasa al estándar: modal de alta, badges, menú de acciones y confirmaciones"
 files_to_create:
   - "src/HospitalTurnos.Dominio/Personal/ReglasUsuarioPersonal.cs"
   - "src/HospitalTurnos.Aplicacion/Personal/IGestionUsuariosPersonal.cs"
