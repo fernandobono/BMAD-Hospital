@@ -2,7 +2,7 @@
 epic: 2
 story: "2.3"
 title: "Contraseña olvidada: el administrador genera otra contraseña temporal desde A4"
-status: ready-for-dev
+status: review
 sprint: 3
 priority: "P0"
 approach: "[ADAPT]"
@@ -14,6 +14,7 @@ followup_of:
 followup_reason: deuda-declarada
 files_to_create:
   - "docs/qa/2.3-pasos.md"
+  - "docs/qa/2.3-legibilidad.md"
 files_to_modify:
   - "src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs"
   - "src/HospitalTurnos.Aplicacion/Personal/IGestionUsuariosPersonal.cs"
@@ -26,7 +27,7 @@ files_to_modify:
 
 # Story 2.3: Contraseña olvidada: el administrador genera otra contraseña temporal desde A4
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -200,17 +201,18 @@ que tocar la base de datos para destrabarla.
 | T7 | `RestablecerContrasenaAsync_UsuarioInexistente_LanzaNoEncontrado` | 9 | integration | Admin propio; Guid nuevo | `NoEncontradoException` con `No encontramos ese usuario. Recargá la página.` |
 | T8 | `RestablecerContrasenaAsync_OtroCambioSeAdelanta_LanzaConflictoSinCambios` | 11 | integration | Admin y usuario creados con el proveedor **sin** interceptor; segundo proveedor con `InterceptorQueSeAdelanta(fixture.CadenaApp, "UPDATE asp_net_users SET concurrency_stamp = 'otro-<m>' WHERE id = '<id>'")`; restablecer con ése | `interceptor.SeAdelanto` = `true`; `ConflictoException` con el texto del AC 11; la contraseña anterior sigue verificando, marca `false`, `lockout_end` igual; 0 filas `usuario-personal.contrasena-restablecida` con su id |
 | T9 | `RestablecerContrasenaAsync_FallaLaAuditoria_NoCambiaNada` | 10 | integration | Admin y usuario creados con el proveedor normal; segundo proveedor con `IAuditoria` = `AuditoriaQueFalla`; restablecer | La excepción sale del caso de uso; la contraseña anterior sigue verificando; marca `false`; sello igual al guardado antes |
-| T10 | `GetUsuarios_BotonNuevaContrasena_SoloEnActivosAjenos` | 12 | integration | `admin1`; usuarios propios: activo, desactivado, bloqueado (5 fallos); GET A4 | Fila del activo y del bloqueado: `value="restablecer:<id>"` y el texto `Nueva contraseña temporal`; fila del desactivado: no contiene `restablecer:`; fila de `admin1`: no contiene `restablecer:` y dice `(sos vos)` |
+| T10 | `GetUsuarios_BotonNuevaContrasena_SoloEnActivosAjenos` | 12,17 | integration | `admin1`; usuarios propios: activo, desactivado, bloqueado (5 fallos), `(sin rol)` y `(varios roles)`; GET A4 | Fila del activo, del bloqueado, del `(sin rol)` y del `(varios roles)`: `value="restablecer:<id>"` y el texto `Nueva contraseña temporal`; fila del desactivado: no contiene `restablecer:`; fila de `admin1`: no contiene `restablecer:` y dice `(sos vos)`; AC 17: siguen `desactivar:` en la del activo, `reactivar:` en la del desactivado y `desbloquear:` en la del bloqueado |
 | T11 | `PostRestablecer_UsuarioActivo_MuestraLaTemporalUnaSolaVez` | 1,2,4,13 | integration | `admin1`; usuario propio `Recepcionista` con `ClavePropia`; POST `acciones-usuarios` con `Accion = restablecer:<id>`; después GET A4; después, en otro cliente, ingreso con `ClavePropia` y con la temporal | POST: `200`, `no-store`, `Estado(html)` = texto del AC 13 con su usuario y la temporal, `<code id="contrasena-temporal">` con 12 caracteres; la fila dice `Debe cambiar la contraseña`; ninguna entrada de `app.Registro` ni el `detalle` de su fila de auditoría contiene la temporal; GET: no contiene la temporal ni `contrasena-temporal`; ingreso con la anterior: `200` con `Usuario o contraseña incorrectos.`; con la temporal: `302` a `/personal/cambiar-contrasena` |
 | T12 | `PostRestablecer_UsuarioBloqueado_AvisaQueTambienQuedoDesbloqueado` | 5,13 | integration | `admin1`; usuario propio con `FallarAsync(app, id, 5)`; POST `restablecer:<id>` | `200`; `Estado(html)` termina con `Su usuario también quedó desbloqueado.`; su fila ya no dice `Bloqueado hasta las` ni tiene `desbloquear:` |
 | T13 | `PostRestablecer_Errores_MuestranCartelConSuCodigo` | 6,7,8,9 | integration | `[Theory]`: (a) admin propio (`Admin-Propio-26`) ingresa y envía `restablecer:<su id>`; (b) `admin1` a un desactivado; (c) `admin1` a un Guid nuevo; (d) admin propio ingresa, se lo desactiva en la base (`MarcarInactivoAsync`) y, **sin** adelantar el reloj, envía `restablecer:` a un usuario activo | (a) `400`; (b) `409`; (c) `404`; (d) `403`; cada uno con su texto exacto en `Alerta(html)`; en la base, el sello y la marca del objetivo (y del admin propio en (a)) sin cambio |
-| T14 | `Restablecer_SesionAbiertaDelUsuario_SeCortaAlRevalidar` | 3 | integration | Usuario propio `Recepcionista` ingresa en el cliente B; `admin1` le restablece la contraseña desde el cliente A; `app.Reloj.Advance(6 min)`; B pide `/personal/recepcion/turnos` | `302` con destino `/personal/ingreso?ReturnUrl=%2Fpersonal%2Frecepcion%2Fturnos` |
+| T14 | `Restablecer_SesionAbiertaDelUsuario_SeCortaAlRevalidar` | 3 | integration | Usuario propio `Recepcionista` ingresa en el cliente B; `admin1` le restablece la contraseña desde el cliente A; `app.Reloj.Advance(6 min)`; B pide `/personal/recepcion/turnos`. Control: otro usuario propio ingresado en el cliente C, sin restablecer, pide lo mismo | B: `302` con destino `/personal/ingreso?ReturnUrl=%2Fpersonal%2Frecepcion%2Fturnos`; C: `200` |
 | T15 | `PostRestablecer_SinTokenOOtroRol_NoCambiaNada` | 14 | integration | `[Theory]`: (a) `admin1` envía `restablecer:<id>` sin `__RequestVerificationToken`; (b) `recepcion1` envía `restablecer:<id>` con el token de su propia página de inicio (como la T21 de la 2.2) | (a) `400`; (b) `302` con destino que empieza con `/personal/acceso-denegado`; en los dos, sello, hash y marca del objetivo sin cambio |
 | T16 | `PostRestablecer_FallaLaBase_MuestraErrorGenericoSinContrasena` | 15,16 | integration | Fábrica con `IGestionUsuariosPersonal` = `GestionUsuariosConBaseCaida`; POST `restablecer:<Guid nuevo>` con `Accept: text/html` | `500`; el cuerpo decodificado contiene `Algo falló. Probá de nuevo en unos minutos.` y no contiene `Npgsql`, `secreto` ni `contrasena-temporal`; `app.Registro` tiene la excepción |
 
 Todas llevan `[Trait("Story", "2.3")]` y un `[Trait("AC", "n")]` por AC de su columna. El AC 17
-(no-regresión) lo verifican la suite completa y `dotnet test --filter "Story=2.2"` sin cambios en
-esas pruebas ("Como verificar", pasos 2 y 3).
+(no-regresión) lo cuida T10 en A4 (los botones de la 2.2 siguen en su fila) y, en todo lo demás, la
+suite completa y `dotnet test --filter "Story=2.2"` sin cambios en esas pruebas ("Como verificar",
+pasos 2 y 3).
 T1–T9 van en `tests/HospitalTurnos.Aplicacion.Tests/Personal/GestionUsuariosPersonalIdentityTests.cs`
 y T10–T16 en `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs`, **en las mismas
 clases** de la 2.2, para reusar sus ayudas privadas (ver Given/Fixture) en lugar de copiarlas. Las
@@ -239,6 +241,11 @@ Dev Agent Record.
   `ActorAuditado`. Usuarios con `UsuariosDePrueba.CrearAsync(proveedor, roles, activo, nombre)` y
   contraseña `UsuariosDePrueba.Clave`. Si alguna de esas ayudas tiene otro nombre al implementar, se
   usa la que existe (Task 1), no se escribe otra.
+- **`Detalle` no sirve para esta story**: la ayuda lee cada valor con `GetString()`, y `desbloqueado`
+  es un booleano JSON (`GetString()` lanza `InvalidOperationException`). T1 y T3 leen el detalle con
+  `JsonDocument.Parse(fila.Detalle!).RootElement`: `GetProperty("usuario").GetString()`,
+  `GetProperty("desbloqueado").GetBoolean()` y que tenga exactamente esas dos propiedades. La ayuda de
+  la 2.2 no se toca.
 - **Verificar una contraseña sin ingresar**: `IPasswordHasher<UsuarioPersonal>.VerifyHashedPassword`
   sobre el usuario recargado, como la T1 de la 2.2.
 - **T3**: 5 llamadas a `UserManager.AccessFailedAsync` en un alcance (como la T12 de la 2.2).
@@ -277,45 +284,45 @@ Dev Agent Record.
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar contra `main` que existe y dice lo que cita "Que existe hoy": `IGestionUsuariosPersonal`
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar contra `main` que existe y dice lo que cita "Que existe hoy": `IGestionUsuariosPersonal`
         (cinco métodos), `GestionUsuariosPersonalIdentity` (constructor, `SinPermiso`, `EntidadTipo`,
         `BuscarAsync`, `Asegurar`), `ContrasenaTemporal.Generar`, `UsuarioPersonal.DebeCambiarContrasena`,
         `AccionesAuditoria` (sin `ContrasenaPersonalRestablecida`), `UsuariosPersonal.razor` (`EjecutarAccionAsync`
         con el `switch` de tres tipos, `alta`/`confirmacion`/`cartel`, `idPropio`), `GestionUsuariosConBaseCaida`,
         `InterceptorQueSeAdelanta`, `AuditoriaQueFalla`, y las ayudas privadas citadas en Given/Fixture.
-  - [ ] Confirmar en `HospitalDbContextModelSnapshot.cs` que `concurrency_stamp` de `asp_net_users` es
+  - [x] Confirmar en `HospitalDbContextModelSnapshot.cs` que `concurrency_stamp` de `asp_net_users` es
         `IsConcurrencyToken()`. No hay migración: no se toca la base.
-  - [ ] Las decisiones 14 a 18 están tomadas con la opción recomendada (ver "Decisiones tomadas por el
+  - [x] Las decisiones 14 a 18 están tomadas con la opción recomendada (ver "Decisiones tomadas por el
         docente"): los AC y las pruebas ya las reflejan.
-  - [ ] `dotnet test` en verde antes de tocar nada; anotar los totales por proyecto.
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio y Aplicacion (AC: 1, 16)
-  - [ ] `AccionesAuditoria.ContrasenaPersonalRestablecida = "usuario-personal.contrasena-restablecida"`,
+  - [x] `dotnet test` en verde antes de tocar nada; anotar los totales por proyecto.
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio y Aplicacion (AC: 1, 16)
+  - [x] `AccionesAuditoria.ContrasenaPersonalRestablecida = "usuario-personal.contrasena-restablecida"`,
         en el bloque de la 2.2 con un comentario `// Story 2.3`.
-  - [ ] `IGestionUsuariosPersonal.RestablecerContrasenaAsync` y el registro `ContrasenaRestablecida`.
-  - [ ] `GestionUsuariosConBaseCaida.RestablecerContrasenaAsync` (si no, Web.Tests no compila).
-- [ ] [SEQ] Task 3: Pruebas de Aplicacion primero (AC: 1–11, 16)
-  - [ ] T1–T9 en `GestionUsuariosPersonalIdentityTests`; correrlas y anotar el rojo (no compila o falla
+  - [x] `IGestionUsuariosPersonal.RestablecerContrasenaAsync` y el registro `ContrasenaRestablecida`.
+  - [x] `GestionUsuariosConBaseCaida.RestablecerContrasenaAsync` (si no, Web.Tests no compila).
+- [x] [SEQ] Task 3: Pruebas de Aplicacion primero (AC: 1–11, 16)
+  - [x] T1–T9 en `GestionUsuariosPersonalIdentityTests`; correrlas y anotar el rojo (no compila o falla
         por el método ausente: rojo legítimo).
-- [ ] [SEQ] Task 4: Infraestructura (AC: 1–11)
-  - [ ] `GestionUsuariosPersonalIdentity.RestablecerContrasenaAsync` (Implementación concreta) y la
+- [x] [SEQ] Task 4: Infraestructura (AC: 1–11)
+  - [x] `GestionUsuariosPersonalIdentity.RestablecerContrasenaAsync` (Implementación concreta) y la
         ayuda `AsegurarSinCarrera`.
-  - [ ] T1–T9 en verde. Romper a propósito: sin la traducción de `ConcurrencyFailure`, T8 falla;
+  - [x] T1–T9 en verde. Romper a propósito: sin la traducción de `ConcurrencyFailure`, T8 falla;
         anotarlo en el Debug Log y restaurar.
-- [ ] [SEQ] Task 5: Web (AC: 12–15)
-  - [ ] T10–T16 en `UsuariosPersonalHttpTests` (rojo primero).
-  - [ ] `UsuariosPersonal.razor`: el botón por fila, el `case "restablecer"` y el mensaje del AC 13
+- [x] [SEQ] Task 5: Web (AC: 12–15)
+  - [x] T10–T16 en `UsuariosPersonalHttpTests` (rojo primero).
+  - [x] `UsuariosPersonal.razor`: el botón por fila, el `case "restablecer"` y el mensaje del AC 13
         (Implementación concreta).
-  - [ ] T10–T16 en verde.
-- [ ] [SEQ] Task 6: Verificación y pasada del tester no técnico (AC: todos; B-6)
-  - [ ] Suite completa y `bash scripts/ci/local.sh` sin regresiones (AC 17).
-  - [ ] Escribir `docs/qa/2.3-pasos.md` con el formato de `docs/qa/2.2-pasos.md` (un bloque por AC,
+  - [x] T10–T16 en verde.
+- [x] [SEQ] Task 6: Verificación y pasada del tester no técnico (AC: todos; B-6)
+  - [x] Suite completa y `bash scripts/ci/local.sh` sin regresiones (AC 17).
+  - [x] Escribir `docs/qa/2.3-pasos.md` con el formato de `docs/qa/2.2-pasos.md` (un bloque por AC,
         en castellano llano, con usuario y resultado esperado).
-  - [ ] Pasada del **tester no técnico** sobre esa guía y sobre A4 con el botón nuevo (texto del botón,
+  - [x] Pasada del **tester no técnico** sobre esa guía y sobre A4 con el botón nuevo (texto del botón,
         el mensaje con la contraseña, el cartel de cada error). Sus hallazgos vuelven al docente antes
         de cambiar textos de los AC.
-  - [ ] Prueba en vivo (Como verificar, paso 4). Los scripts del navegador buscan por **texto o rol**
+  - [x] Prueba en vivo (Como verificar, paso 4). Los scripts del navegador buscan por **texto o rol**
         (el botón por su nombre `Nueva contraseña temporal` dentro de la fila del usuario), no por
         clases CSS (L-14). Resultado en el Dev Agent Record.
 
@@ -328,7 +335,7 @@ pueden ir en paralelo; la pasada del tester va después de la guía.
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-17 contra `main`, commit `a8432c3`, con 1.1 a 4.1 en done)
+#### En hospital-turnos (verificado 2026-10-17 contra `main`, commit `a8432c3`, con 1.1 a 4.1 en done; re-verificado el mismo día contra `6bbea4a`, después del PR #12, que sólo tocó la CI)
 
 - `IGestionUsuariosPersonal` (Aplicacion/Personal): `ListarAsync`, `CrearAsync`, `DesactivarAsync`,
   `ReactivarAsync`, `DesbloquearAsync`; registros `NuevoUsuarioPersonal`, `AltaUsuarioPersonal(Id, Usuario, Rol, ContrasenaTemporal)`,
@@ -561,6 +568,7 @@ con el comentario `// Story 2.3: contraseña olvidada, generada otra temporal de
 | Acción | Archivo |
 |---|---|
 | Crear | `docs/qa/2.3-pasos.md` (guía del tester, Task 6) |
+| Crear | `docs/qa/2.3-legibilidad.md` (veredicto del tester no técnico sobre la guía, Task 6) |
 | Modificar | `AccionesAuditoria.cs` (1 constante, AC 16) |
 | Modificar | `IGestionUsuariosPersonal.cs` (método y registro nuevos) |
 | Modificar | `GestionUsuariosPersonalIdentity.cs` (`RestablecerContrasenaAsync`, `AsegurarSinCarrera`, `OtroCambio`) |
@@ -635,11 +643,46 @@ docker compose exec db psql -U postgres -d hospital_turnos \
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), pipeline TYCON con Amelia (`bmad-dev-story`); revisores y tester no
+técnico como subagentes.
+
 ### Debug Log References
+
+- Línea de base (main `6bbea4a`): Dominio 138, Aplicacion 169, Web 174 = 481, 0 fallas.
+- Rojo de T1–T9: no compila por `ContrasenaRestablecida` (símbolo que la story declara crear).
+- Rojo de T10–T16: 9 de 11 casos; los 2 de T15 (sin token y otro rol) pasan en rojo porque esa
+  protección es de toda la página (2.1/2.2) y actúa antes de la acción.
+- Romper a propósito (L-2): sin la traducción de `ConcurrencyFailure`, T8 falla con
+  `InvalidOperationException: … ConcurrencyFailure Optimistic concurrency failure`. Restaurado.
+- Portón de pruebas por proyecto (no reconoce la solución `.slnx`, como en la 4.1): 138 + 180 + 185 = 503,
+  0 fallas. CI local rc=0: 97 % de líneas, 87,7 % de ramas.
 
 ### Completion Notes List
 
+- Implementación literal de "Implementación concreta"; sin migración.
+- Decisión del docente en la implementación: el AC 17 pasa a T10 con tres controles de no-regresión de A4.
+- Revisores, vuelta 1: 6 de 6, sin CRITICAL de juicio; T10 suma `(sin rol)` y `(varios roles)` y T14 un
+  control negativo. Vuelta 2: 4 de 4 limpios (más una nota de documentación). Bloqueo vencido sin prueba
+  propia (TEST-W4): aceptado, la story no lo pide.
+- Guía del tester: tres pasadas (13 marcas, 3, 0). Veredicto OK en `docs/qa/2.3-legibilidad.md`.
+- Prueba en vivo en Chrome contra Compose: 17 de 17 AC (pantalla, bloqueo, errores y fallas, con la
+  auditoría sin permiso, diez pedidos a la vez y la base detenida). El corte de sesión a los 5 minutos
+  (AC 3) se probó con el reloj inyectado (T14); en vivo, el cambio de sello que lo dispara.
+- Proceso: las primeras ediciones (T1–T9 y el contrato) se hicieron por script y no quedaron en el
+  registro de ediciones del pipeline; el orden real fue pruebas primero (rojo de compilación).
+
 ### File List
+
+- `src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs` (modificado)
+- `src/HospitalTurnos.Aplicacion/Personal/IGestionUsuariosPersonal.cs` (modificado)
+- `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs` (modificado)
+- `src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor` (modificado)
+- `tests/HospitalTurnos.Aplicacion.Tests/Personal/GestionUsuariosPersonalIdentityTests.cs` (modificado)
+- `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs` (modificado)
+- `tests/HospitalTurnos.Web.Tests/Personal/Dobles/GestionUsuariosConBaseCaida.cs` (modificado)
+- `docs/qa/2.3-pasos.md`, `docs/qa/2.3-legibilidad.md`, `docs/qa/2.3-legibilidad-ui.md` (nuevos)
+- `docs/stories/2-2-gestion-usuarios.md` (back-link `followed_up_by`)
+- `docs/stories/2-3-contrasena-olvidada.md` (esta story)
 
 ### Change Log
 
@@ -649,3 +692,26 @@ docker compose exec db psql -U postgres -d hospital_turnos \
   opción recomendada (marcas reemplazadas y sección "Decisiones tomadas"); la nota sobre la carrera en
   las otras acciones de A4 pasa a la story 2.5 (decisión 26); AC 16 nombra la 2.4 y la 2.5 del sprint
   4. Sin cambios en AC ni pruebas: 17 AC, 16 verificaciones.
+- 2026-10-17: Validación del pipeline (sesión 14). Re-verificada contra `6bbea4a`; `Status:` alineado
+  con el frontmatter; nota en Given/Fixture: T1 y T3 leen el detalle con `JsonDocument` porque
+  `Detalle` no lee booleanos; back-link `followed_up_by` en la 2.2. Sin cambios en AC ni pruebas.
+- 2026-10-17: Decisión del docente en la implementación (ACCOV-C5): el AC 17 pasa a T10, que suma
+  tres controles de no-regresión de A4 (`desactivar:`, `reactivar:` y `desbloquear:` en su fila).
+  Sigue en 16 verificaciones.
+- 2026-10-17: Revisores, vuelta 1 (avisos del revisor de criterios): T10 suma las filas `(sin rol)` y
+  `(varios roles)` (AC 12) y T14 un control negativo (la sesión de otro usuario sigue viva). El caso
+  de un bloqueo ya vencido (`desbloqueado` falso) queda sin prueba propia: la story no lo pide.
+  `docs/qa/2.3-legibilidad.md` declarado en `files_to_create` y en la tabla de archivos; subtareas
+  hechas de la Task 6 tildadas.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C5 — `docs/stories/2-3-contrasena-olvidada.md` — AC 17 asignado a T10 con tres controles de no-regresión (decisión del docente) <!-- fkey:ACCOV-C5|docs/stories/2-3-contrasena-olvidada.md -->
+- [x] **[WARNING]** ACCOV-W1 — `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs` — T10 suma (sin rol) y (varios roles) <!-- fkey:ACCOV-W1|tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs -->
+- [x] **[WARNING]** ACCOV-C3 — `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs` — T14 con control negativo <!-- fkey:ACCOV-C3|tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs -->
+- [ ] **[WARNING]** TEST-W4 — `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs` — bloqueo vencido sin prueba propia: la story no lo pide <!-- fkey:TEST-W4|src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/2-3-contrasena-olvidada.md` — legibilidad declarada y subtareas tildadas <!-- fkey:VAL-W15|docs/stories/2-3-contrasena-olvidada.md -->
+- [ ] **[WARNING]** TEST-W2 — `.advisors/tests-result.json` — portón no reconoce .slnx; cobertura por CI local 97 % <!-- fkey:TEST-W2|.advisors/tests-result.json -->

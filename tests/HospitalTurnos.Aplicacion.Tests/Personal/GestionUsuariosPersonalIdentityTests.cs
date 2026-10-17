@@ -8,7 +8,9 @@ using HospitalTurnos.Dominio.Excepciones;
 using HospitalTurnos.Dominio.Personal;
 using HospitalTurnos.Infraestructura;
 using HospitalTurnos.Infraestructura.Identidad;
+using HospitalTurnos.Infraestructura.Persistencia;
 using Microsoft.AspNetCore.Identity;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.DependencyInjection.Extensions;
@@ -581,5 +583,256 @@ public class GestionUsuariosPersonalIdentityTests(PostgresFixture fixture)
         Assert.Equal([false, false, true, false], propias.Select(f => f.BloqueadoHasta is not null));
         Assert.Equal([false, false, true, false], propias.Select(f => f.DebeCambiarContrasena));
         Assert.Equal(uno.UserName, propias[0].Usuario);
+    }
+
+    // ---------------------------------------------------------------------------------------------
+    // Story 2.3: contraseña olvidada. Detalle() lee los valores como texto y "desbloqueado" es un
+    // booleano JSON (GetString() lanza): estas pruebas leen el detalle con JsonDocument.
+
+    private static (string? Usuario, bool Desbloqueado) DetalleRestablecida(string? detalle)
+    {
+        var raiz = JsonDocument.Parse(detalle!).RootElement;
+        Assert.Equal(["usuario", "desbloqueado"], raiz.EnumerateObject().Select(p => p.Name));
+        return (raiz.GetProperty("usuario").GetString(), raiz.GetProperty("desbloqueado").GetBoolean());
+    }
+
+    private static PasswordVerificationResult Verificar(ServiceProvider proveedor, UsuarioPersonal usuario, string contrasena) =>
+        proveedor.GetRequiredService<IPasswordHasher<UsuarioPersonal>>()
+            .VerifyHashedPassword(usuario, usuario.PasswordHash!, contrasena);
+
+    private static Task<ContrasenaRestablecida> RestablecerAsync(ServiceProvider proveedor, Guid id, ActorAuditoria actor) =>
+        ConGestionAsync(proveedor, g => g.RestablecerContrasenaAsync(id, actor, CancellationToken.None));
+
+    private async Task SinRestablecimientoAuditadoAsync(Guid id) =>
+        Assert.DoesNotContain(await FilasDeAsync(id), f => f.Accion == AccionesAuditoria.ContrasenaPersonalRestablecida);
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "1")]
+    [Trait("AC", "2")]
+    [Trait("AC", "3")]
+    [Trait("AC", "16")]
+    public async Task RestablecerContrasenaAsync_UsuarioActivo_GeneraTemporalMarcaYAudita()
+    {
+        var captura = new CapturaDeRegistros();
+        await using var proveedor = Proveedor(s => s.AddSingleton<ILoggerProvider>(captura));
+        var (admin, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+        var antes = (await RecargarAsync(proveedor, usuario.Id))!;
+
+        var resultado = await RestablecerAsync(proveedor, usuario.Id, actor);
+
+        Assert.Equal(usuario.Id, resultado.Id);
+        Assert.Equal(usuario.UserName, resultado.Usuario);
+        Assert.Equal(12, resultado.ContrasenaTemporal.Length);
+        Assert.False(resultado.Desbloqueado);
+        var despues = (await RecargarAsync(proveedor, usuario.Id))!;
+        Assert.True(despues.DebeCambiarContrasena);
+        Assert.NotEqual(antes.SecurityStamp, despues.SecurityStamp);
+        Assert.NotEqual(antes.PasswordHash, despues.PasswordHash);
+        Assert.Equal(PasswordVerificationResult.Success, Verificar(proveedor, despues, resultado.ContrasenaTemporal));
+        Assert.Equal(PasswordVerificationResult.Failed, Verificar(proveedor, despues, UsuariosDePrueba.Clave));
+        using (var alcance = proveedor.CreateScope())
+            Assert.False(await alcance.ServiceProvider.GetRequiredService<IIngresoPersonal>()
+                .SesionVigenteAsync(usuario.Id.ToString(), antes.SecurityStamp, CancellationToken.None));
+        Assert.Equal(antes.UserName, despues.UserName);
+        Assert.Equal(antes.NombreCompleto, despues.NombreCompleto);
+        Assert.True(despues.Activo);
+        Assert.Equal([Roles.Recepcionista], await RolesDeAsync(proveedor, usuario.Id));
+
+        var fila = Assert.Single(await FilasDeAsync(usuario.Id));
+        Assert.Equal(AccionesAuditoria.ContrasenaPersonalRestablecida, fila.Accion);
+        Assert.Equal(usuario.Id.ToString(), fila.EntidadId);
+        ActorAuditado(fila, admin);
+        Assert.Equal((usuario.UserName, false), DetalleRestablecida(fila.Detalle));
+        Assert.DoesNotContain(resultado.ContrasenaTemporal, fila.Detalle);
+        Assert.All(captura.Mensajes, mensaje => Assert.DoesNotContain(resultado.ContrasenaTemporal, mensaje));
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "4")]
+    public async Task RestablecerContrasenaAsync_ConLaTemporal_IngresaObligadoYCambiaComoPrimerIngreso()
+    {
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+
+        var temporal = (await RestablecerAsync(proveedor, usuario.Id, actor)).ContrasenaTemporal;
+
+        using (var alcance = proveedor.CreateScope())
+        {
+            var ingreso = alcance.ServiceProvider.GetRequiredService<IIngresoPersonal>();
+            Assert.Equal(EstadoIngreso.CredencialesInvalidas,
+                (await ingreso.ValidarAsync(usuario.UserName!, UsuariosDePrueba.Clave, CancellationToken.None)).Estado);
+            var conTemporal = await ingreso.ValidarAsync(usuario.UserName!, temporal, CancellationToken.None);
+            Assert.Equal(EstadoIngreso.Exitoso, conTemporal.Estado);
+            Assert.True(conTemporal.DebeCambiarContrasena);
+            Assert.Equal("si", conTemporal.Principal!.FindFirst(ClaimsPersonal.DebeCambiarContrasena)?.Value);
+        }
+        using (var alcance = proveedor.CreateScope())
+        {
+            var cambio = await alcance.ServiceProvider.GetRequiredService<ICambioContrasenaPersonal>()
+                .CambiarAsync(usuario.Id.ToString(), temporal, "Nueva-Clave-2026", CancellationToken.None);
+            Assert.True(cambio.Exitoso, string.Join("; ", cambio.Errores));
+        }
+
+        Assert.False((await RecargarAsync(proveedor, usuario.Id))!.DebeCambiarContrasena);
+        var cambiada = Assert.Single(await FilasDeAsync(usuario.Id), f => f.Accion == AccionesAuditoria.ContrasenaPersonalCambiada);
+        Assert.Equal(new Dictionary<string, string?> { ["motivo"] = "primer-ingreso" }, Detalle(cambiada.Detalle));
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "5")]
+    [Trait("AC", "16")]
+    public async Task RestablecerContrasenaAsync_UsuarioBloqueado_TambienLoDesbloquea()
+    {
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+        await BloquearAsync(proveedor, usuario.Id);
+        Assert.True((await RecargarAsync(proveedor, usuario.Id))!.LockoutEnd > reloj.GetUtcNow());
+
+        var resultado = await RestablecerAsync(proveedor, usuario.Id, actor);
+
+        Assert.True(resultado.Desbloqueado);
+        var despues = (await RecargarAsync(proveedor, usuario.Id))!;
+        Assert.Null(despues.LockoutEnd);
+        Assert.Equal(0, despues.AccessFailedCount);
+        var fila = Assert.Single(await FilasDeAsync(usuario.Id));
+        Assert.Equal((usuario.UserName, true), DetalleRestablecida(fila.Detalle));
+        using var alcance = proveedor.CreateScope();
+        var ingreso = await alcance.ServiceProvider.GetRequiredService<IIngresoPersonal>()
+            .ValidarAsync(usuario.UserName!, resultado.ContrasenaTemporal, CancellationToken.None);
+        Assert.Equal(EstadoIngreso.Exitoso, ingreso.Estado);
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "6")]
+    public async Task RestablecerContrasenaAsync_UsuarioDesactivado_LanzaConflictoSinCambios()
+    {
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista], activo: false);
+        var antes = (await RecargarAsync(proveedor, usuario.Id))!;
+
+        var error = await Assert.ThrowsAsync<ConflictoException>(() => RestablecerAsync(proveedor, usuario.Id, actor));
+
+        Assert.Equal("Ese usuario está desactivado. Reactivalo antes de generarle otra contraseña.", error.Message);
+        var despues = (await RecargarAsync(proveedor, usuario.Id))!;
+        Assert.Equal(antes.PasswordHash, despues.PasswordHash);
+        Assert.Equal(antes.SecurityStamp, despues.SecurityStamp);
+        Assert.False(despues.DebeCambiarContrasena);
+        await SinRestablecimientoAuditadoAsync(usuario.Id);
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "7")]
+    public async Task RestablecerContrasenaAsync_ASiMismo_LanzaReglaSinCambios()
+    {
+        await using var proveedor = Proveedor();
+        var (admin, actor) = await AdministradorAsync(proveedor);
+        var antes = (await RecargarAsync(proveedor, admin.Id))!;
+
+        // ThrowsAsync exige el tipo exacto: una ConflictoException (409) no pasa.
+        var error = await Assert.ThrowsAsync<ReglaDeNegocioException>(() => RestablecerAsync(proveedor, admin.Id, actor));
+
+        Assert.Equal("No podés generarte una contraseña temporal a vos mismo. Si querés otra, cambiala en /personal/cambiar-contrasena.",
+            error.Message);
+        var despues = (await RecargarAsync(proveedor, admin.Id))!;
+        Assert.Equal(antes.PasswordHash, despues.PasswordHash);
+        Assert.Equal(antes.SecurityStamp, despues.SecurityStamp);
+        await SinRestablecimientoAuditadoAsync(admin.Id);
+    }
+
+    [Theory]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "8")]
+    [InlineData("recepcionista")]
+    [InlineData("administrador-desactivado")]
+    [InlineData("id-inexistente")]
+    public async Task RestablecerContrasenaAsync_ActorQueNoEsAdministradorActivo_LanzaAccesoDenegado(string tipoDeActor)
+    {
+        await using var proveedor = Proveedor();
+        var actor = tipoDeActor switch
+        {
+            "recepcionista" => UsuariosDePrueba.ActorDe(
+                await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]), Roles.Administrador),
+            "administrador-desactivado" => UsuariosDePrueba.ActorDe(
+                await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Administrador], activo: false), Roles.Administrador),
+            _ => new ActorAuditoria(Guid.NewGuid().ToString(), "Nadie", Roles.Administrador, CanalAuditoria.Personal),
+        };
+        var objetivo = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+        var antes = (await RecargarAsync(proveedor, objetivo.Id))!;
+
+        var error = await Assert.ThrowsAsync<AccesoDenegadoException>(() => RestablecerAsync(proveedor, objetivo.Id, actor));
+
+        Assert.Equal(SinPermiso, error.Message);
+        var despues = (await RecargarAsync(proveedor, objetivo.Id))!;
+        Assert.Equal(antes.PasswordHash, despues.PasswordHash);
+        Assert.Equal(antes.SecurityStamp, despues.SecurityStamp);
+        Assert.False(despues.DebeCambiarContrasena);
+        Assert.Empty(await FilasDeAsync(objetivo.Id));
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "9")]
+    public async Task RestablecerContrasenaAsync_UsuarioInexistente_LanzaNoEncontrado()
+    {
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+
+        var error = await Assert.ThrowsAsync<NoEncontradoException>(() => RestablecerAsync(proveedor, Guid.NewGuid(), actor));
+
+        Assert.Equal("No encontramos ese usuario. Recargá la página.", error.Message);
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "11")]
+    public async Task RestablecerContrasenaAsync_OtroCambioSeAdelanta_LanzaConflictoSinCambios()
+    {
+        // El interceptor se dispara en el PRIMER guardado de su proveedor: admin y usuario se crean en otro.
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+        var antes = (await RecargarAsync(proveedor, usuario.Id))!;
+        var interceptor = new InterceptorQueSeAdelanta(fixture.CadenaApp,
+            $"UPDATE asp_net_users SET concurrency_stamp = 'otro-{Marca()}' WHERE id = '{usuario.Id}'");
+        await using var conCarrera = Proveedor(s => s.ConfigureDbContext<HospitalDbContext>(o => o.AddInterceptors(interceptor)));
+
+        var error = await Assert.ThrowsAsync<ConflictoException>(() => RestablecerAsync(conCarrera, usuario.Id, actor));
+
+        Assert.True(interceptor.SeAdelanto);
+        Assert.Equal("Otro administrador cambió a ese usuario recién. Recargá la página y probá de nuevo.", error.Message);
+        var despues = (await RecargarAsync(proveedor, usuario.Id))!;
+        Assert.Equal(PasswordVerificationResult.Success, Verificar(proveedor, despues, UsuariosDePrueba.Clave));
+        Assert.False(despues.DebeCambiarContrasena);
+        Assert.Equal(antes.LockoutEnd, despues.LockoutEnd);
+        await SinRestablecimientoAuditadoAsync(usuario.Id);
+    }
+
+    [Fact]
+    [Trait("Story", "2.3")]
+    [Trait("AC", "10")]
+    public async Task RestablecerContrasenaAsync_FallaLaAuditoria_NoCambiaNada()
+    {
+        await using var proveedor = Proveedor();
+        var (_, actor) = await AdministradorAsync(proveedor);
+        var usuario = await UsuariosDePrueba.CrearAsync(proveedor, [Roles.Recepcionista]);
+        var antes = (await RecargarAsync(proveedor, usuario.Id))!;
+        await using var sinAuditoria = Proveedor(s => s.AddScoped<IAuditoria, AuditoriaQueFalla>());
+
+        var error = await Assert.ThrowsAsync<InvalidOperationException>(() => RestablecerAsync(sinAuditoria, usuario.Id, actor));
+
+        Assert.Equal("auditoría caída en la prueba", error.Message);
+        var despues = (await RecargarAsync(proveedor, usuario.Id))!;
+        Assert.Equal(PasswordVerificationResult.Success, Verificar(proveedor, despues, UsuariosDePrueba.Clave));
+        Assert.False(despues.DebeCambiarContrasena);
+        Assert.Equal(antes.SecurityStamp, despues.SecurityStamp);
     }
 }

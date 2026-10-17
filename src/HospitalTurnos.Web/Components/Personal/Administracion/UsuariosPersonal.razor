@@ -26,6 +26,11 @@
     @* La contraseña se dibuja acá una sola vez: no se guarda en ningún otro lado (AC 4). *@
     <div class="alert alert-success" role="status">Creaste el usuario @alta.Usuario (@EtiquetaDe(alta.Rol)). Contraseña temporal: <code id="contrasena-temporal">@alta.ContrasenaTemporal</code>. Anotala y dásela a la persona: no se vuelve a mostrar. La tiene que cambiar en su primer ingreso.</div>
 }
+else if (restablecida is not null)
+{
+    @* La contraseña se dibuja acá una sola vez, como la del alta (story 2.3, AC 2). *@
+    <div class="alert alert-success" role="status">Nueva contraseña temporal para @restablecida.Usuario: <code id="contrasena-temporal">@restablecida.ContrasenaTemporal</code>. Anotala y dásela a la persona: no se vuelve a mostrar. La anterior ya no sirve y la tiene que cambiar en su próximo ingreso.@(restablecida.Desbloqueado ? " Su usuario también quedó desbloqueado." : "")</div>
+}
 else if (confirmacion is not null)
 {
     <div class="alert alert-success" role="status">@confirmacion</div>
@@ -105,6 +110,11 @@ else if (confirmacion is not null)
                         {
                             <button type="submit" class="btn btn-sm btn-outline-secondary" name="Accion" value="desbloquear:@fila.Id">Desbloquear</button>
                         }
+                        @if (fila.Activo && fila.Id != idPropio)
+                        {
+                            @* Story 2.3: contraseña olvidada. Ni a desactivados (AC 6) ni a uno mismo (AC 7). *@
+                            <button type="submit" class="btn btn-sm btn-outline-secondary" name="Accion" value="restablecer:@fila.Id">Nueva contraseña temporal</button>
+                        }
                     </td>
                 </tr>
             }
@@ -128,6 +138,7 @@ else if (confirmacion is not null)
     private IReadOnlyDictionary<Guid, string> vinculados = new Dictionary<Guid, string>();
     private Guid? idPropio;
     private AltaUsuarioPersonal? alta;
+    private ContrasenaRestablecida? restablecida;
     private string? confirmacion;
     private string? cartel;
 
@@ -205,6 +216,9 @@ else if (confirmacion is not null)
                 case "desbloquear":
                     await Gestion.DesbloquearAsync(id, actor, ct);
                     confirmacion = $"Desbloqueaste a {usuario}. Ya puede volver a intentar el ingreso.";
+                    break;
+                case "restablecer":
+                    restablecida = await Gestion.RestablecerContrasenaAsync(id, actor, ct);
                     break;
                 default:
                     throw new ReglaDeNegocioException(AccionDesconocida);

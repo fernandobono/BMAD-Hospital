@@ -26,6 +26,8 @@ public static class AccionesAuditoria
     public const string UsuarioPersonalReactivado = "usuario-personal.reactivado";
     public const string UsuarioPersonalDesbloqueado = "usuario-personal.desbloqueado";
     public const string ContrasenaPersonalCambiada = "usuario-personal.contrasena-cambiada";
+    // Story 2.3: contraseña olvidada, generada otra temporal desde A4.
+    public const string ContrasenaPersonalRestablecida = "usuario-personal.contrasena-restablecida";
 
     // Story 3.1: el catálogo de especialidades (A2, canal Personal).
     public const string EspecialidadCreada = "especialidad.creada";

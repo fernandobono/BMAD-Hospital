@@ -28,6 +28,7 @@ public sealed class GestionUsuariosPersonalIdentity(
     private const string EntidadTipo = "UsuarioPersonal";
     private const string SinRolTexto = "(sin rol)";
     private const string VariosRolesTexto = "(varios roles)";
+    private const string OtroCambio = "Otro administrador cambió a ese usuario recién. Recargá la página y probá de nuevo.";
     private const string IndiceNombreDeUsuario = "user_name_index";   // migración IdentidadPersonal (2.1)
 
     public async Task<IReadOnlyList<UsuarioPersonalFila>> ListarAsync(CancellationToken ct)
@@ -156,6 +157,34 @@ public sealed class GestionUsuariosPersonalIdentity(
         await tx.CommitAsync(ct);
     }
 
+    public async Task<ContrasenaRestablecida> RestablecerContrasenaAsync(Guid usuarioId, ActorAuditoria actor, CancellationToken ct)
+    {
+        await using var tx = await contexto.Database.BeginTransactionAsync(ct);
+        var admin = await actorVigente.ExigirAdministradorActivoAsync(actor, SinPermiso, ct);   // AC 8
+        var usuario = await BuscarAsync(usuarioId);                                            // AC 9
+        if (usuario.Id == Guid.Parse(admin.UsuarioId!))                                        // AC 7 (decisión 16)
+            throw new ReglaDeNegocioException(
+                "No podés generarte una contraseña temporal a vos mismo. Si querés otra, cambiala en /personal/cambiar-contrasena.");
+        if (!usuario.Activo)                                                                   // AC 6 (decisión 15)
+            throw new ConflictoException("Ese usuario está desactivado. Reactivalo antes de generarle otra contraseña.");
+
+        var desbloqueado = usuario.LockoutEnd > reloj.GetUtcNow();
+        var temporal = ContrasenaTemporal.Generar();
+        usuario.DebeCambiarContrasena = true;   // la guarda el primer UpdateUserAsync de abajo
+        // Quitar y poner: los dos cambian el sello (la sesión abierta se corta al revalidar, AC 3) y AddPassword
+        // valida la temporal contra la política. ResetPasswordAsync no: pide un proveedor de tokens que no hay.
+        AsegurarSinCarrera(await usuarios.RemovePasswordAsync(usuario));   // primer guardado: acá salta la carrera (AC 11)
+        AsegurarSinCarrera(await usuarios.AddPasswordAsync(usuario, temporal));
+        if (desbloqueado)                                                  // AC 5 (decisión 14)
+            AsegurarSinCarrera(await usuarios.SetLockoutEndDateAsync(usuario, null));
+        AsegurarSinCarrera(await usuarios.ResetAccessFailedCountAsync(usuario));
+        auditoria.Registrar(admin, AccionesAuditoria.ContrasenaPersonalRestablecida, EntidadTipo,
+            usuario.Id.ToString(), new { usuario = usuario.UserName, desbloqueado });   // nunca la contraseña
+        await contexto.SaveChangesAsync(ct);
+        await tx.CommitAsync(ct);
+        return new ContrasenaRestablecida(usuario.Id, usuario.UserName!, temporal, desbloqueado);
+    }
+
     private async Task<UsuarioPersonal> BuscarAsync(Guid id) =>
         await usuarios.FindByIdAsync(id.ToString())
         ?? throw new NoEncontradoException("No encontramos ese usuario. Recargá la página.");
@@ -166,5 +195,14 @@ public sealed class GestionUsuariosPersonalIdentity(
         if (!resultado.Succeeded)
             throw new InvalidOperationException(
                 $"Identity no pudo actualizar el usuario del personal: {string.Join(" ", resultado.Errors.Select(e => $"{e.Code} {e.Description}".Trim()))}");
+    }
+
+    // El sello de concurrencia de Identity es la última defensa: otro pedido cambió la fila entre la lectura y
+    // el guardado. Se traduce a la regla (409 con cartel), nunca a un error interno. Lo demás, como Asegurar.
+    private static void AsegurarSinCarrera(IdentityResult resultado)
+    {
+        if (resultado.Errors.Any(e => e.Code == nameof(IdentityErrorDescriber.ConcurrencyFailure)))
+            throw new ConflictoException(OtroCambio);
+        Asegurar(resultado);
     }
 }
