@@ -2,7 +2,7 @@
 epic: 3
 story: "3.1"
 title: "Especialidades: alta, desactivación y reactivación (pantalla A2)"
-status: ready-for-dev
+status: review
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -32,7 +32,7 @@ files_to_modify:
 
 # Story 3.1: Especialidades: alta, desactivación y reactivación (pantalla A2)
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -166,8 +166,9 @@ recepción elijan sólo entre ellas (stories 5.2, 5.5 y 6.4).
         `No reconocemos esa acción. Recargá la página.`; id inexistente (AC 12) → `404`; actor que ya
         no es administrador activo (AC 13) → `403`. En todos, cartel `role="alert"` **arriba del
         formulario** con el texto de la regla (UX §8 "Error de regla de negocio") y la tabla al día.
-        El campo de alta conserva lo tipeado. El código lo da `ManejadorGlobalDeErrores.EstadoPara`
-        de la 2.2 (decisión 1): la página no escribe códigos a mano.
+        El campo de alta conserva lo tipeado. El código lo fija
+        `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)` de la 2.2 (decisión 1): la
+        página no escribe códigos a mano, y el `404` también llega con su cartel.
 
 ### Contrato con otras stories
 
@@ -185,7 +186,7 @@ recepción elijan sólo entre ellas (stories 5.2, 5.5 y 6.4).
       ficha del médico (3.2) la muestra con su nombre. Qué hace la 3.2 al editar un médico cuya
       especialidad está desactivada lo decide la 3.2.
     - Las piezas compartidas son las de la 2.2 (su AC 26), con la misma firma para la 3.2:
-      `ActorDeSesion.Desde(User)`, `EsEsperable`/`EstadoPara`, `IActorVigente`, la carpeta
+      `ActorDeSesion.Desde(User)`, `EsEsperable`/`FijarEstadoEnPagina`, `IActorVigente`, la carpeta
       `Components/Personal/Administracion/`, `FormularioHttp.EnviarAsync` y `UsuariosDePrueba`.
       Esta story **agrega** una: `InterceptorQueSeAdelanta` (Aplicacion.Tests/Ayudas), el doble que
       prueba la carrera contra un índice único; la 3.2 lo reusa con su propio `INSERT`.
@@ -317,49 +318,49 @@ navegador queda en "Como verificar" y su resultado se anota en el Dev Agent Reco
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar que la 2.2 está en `main` (`depends_on`) y que la suite está en verde
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar que la 2.2 está en `main` (`depends_on`) y que la suite está en verde
         (`bash scripts/ci/local.sh`).
-  - [ ] Confirmar que existen, con estos nombres: `HospitalDbContext` (con `ApplyConfiguration` a mano
+  - [x] Confirmar que existen, con estos nombres: `HospitalDbContext` (con `ApplyConfiguration` a mano
         y `ConvencionSnakeCase.Aplicar` al final de `OnModelCreating`), `AccionesAuditoria`,
         `CanalAuditoria.Personal`, `IAuditoria.Registrar(...)`, `ConflictoException`,
         `ReglaDeNegocioException`, `NoEncontradoException`, `AccesoDenegadoException`,
         `RutasPersonal.Especialidades`, `SeccionesAdministracion.razor` con el `@page` de
         especialidades, `PersonalWebApplicationFactory`, `FormularioHttp`, `ContextoDePrueba`.
-  - [ ] Confirmar las piezas compartidas de la 2.2 (su AC 26) con **su firma real** y anotarlas en el
+  - [x] Confirmar las piezas compartidas de la 2.2 (su AC 26) con **su firma real** y anotarlas en el
         Debug Log: `ActorDeSesion.Desde(ClaimsPrincipal)`, `ManejadorGlobalDeErrores.EsEsperable` y
-        `EstadoPara`, `IActorVigente.ExigirAdministradorActivoAsync(actor, mensajeSiNoLoEs, ct)`,
+        `FijarEstadoEnPagina(HttpContext, Exception)`, `IActorVigente.ExigirAdministradorActivoAsync(actor, mensajeSiNoLoEs, ct)`,
         la carpeta `Components/Personal/Administracion/`, `FormularioHttp.EnviarAsync` / `Estado`,
         `RutasYaConstruidas` en la 2.1 T19 y `UsuariosDePrueba` en Aplicacion.Tests/Ayudas. Esta
         story **no** crea ninguna de ellas: si falta una, DETENERSE (la 2.2 no está completa).
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio (AC: 1–4)
-  - [ ] `Dominio/Catalogo/Especialidad.cs` como dice "Implementación concreta".
-  - [ ] Constantes nuevas en `AccionesAuditoria` (AC 5, 9, 11).
-  - [ ] T1–T5 en verde.
-- [ ] [SEQ] Task 3: Persistencia y migración (AC: 2, 7, 9, 19)
-  - [ ] `EspecialidadConfiguracion` y su `ApplyConfiguration` en `HospitalDbContext`, **antes** de
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio (AC: 1–4)
+  - [x] `Dominio/Catalogo/Especialidad.cs` como dice "Implementación concreta".
+  - [x] Constantes nuevas en `AccionesAuditoria` (AC 5, 9, 11).
+  - [x] T1–T5 en verde.
+- [x] [SEQ] Task 3: Persistencia y migración (AC: 2, 7, 9, 19)
+  - [x] `EspecialidadConfiguracion` y su `ApplyConfiguration` en `HospitalDbContext`, **antes** de
         `ConvencionSnakeCase.Aplicar`; `DbSet<Especialidad> Especialidades`.
-  - [ ] Migración `AgregarEspecialidades` con `dotnet ef migrations add` (ver Como verificar) y el
+  - [x] Migración `AgregarEspecialidades` con `dotnet ef migrations add` (ver Como verificar) y el
         bloque de permisos al final de `Up` (sin `DELETE` para `turnos_app`).
-  - [ ] Revisar a mano el snapshot y la migración generada: tabla `especialidades`, índice único
+  - [x] Revisar a mano el snapshot y la migración generada: tabla `especialidades`, índice único
         `ix_especialidades_nombre_normalizado`, columna `activa` **sin** valor por defecto en la base.
-  - [ ] Correr la Salvaguarda de BD.
-- [ ] [SEQ] Task 4: Caso de uso (AC: 5–7, 9–13, 16)
-  - [ ] `ICatalogoEspecialidades` + `EspecialidadResumen` en `Aplicacion/Catalogo/`.
-  - [ ] `CatalogoEspecialidadesEnBase` en `Infraestructura/Catalogo/`, registrado `Scoped` en
+  - [x] Correr la Salvaguarda de BD.
+- [x] [SEQ] Task 4: Caso de uso (AC: 5–7, 9–13, 16)
+  - [x] `ICatalogoEspecialidades` + `EspecialidadResumen` en `Aplicacion/Catalogo/`.
+  - [x] `CatalogoEspecialidadesEnBase` en `Infraestructura/Catalogo/`, registrado `Scoped` en
         `AgregarInfraestructura`.
-  - [ ] `InterceptorQueSeAdelanta` (Ayudas) y T6–T15 en verde.
-- [ ] [SEQ] Task 5: Pantalla A2 (AC: 8, 13–15, 19)
-  - [ ] Quitar `@page "/personal/admin/especialidades"` de `SeccionesAdministracion.razor` (las otras
-        cinco rutas quedan).
-  - [ ] `Components/Personal/Administracion/Especialidades.razor` (SSR estático,
+  - [x] `InterceptorQueSeAdelanta` (Ayudas) y T6–T15 en verde.
+- [x] [SEQ] Task 5: Pantalla A2 (AC: 8, 13–15, 19)
+  - [x] Quitar `@page "/personal/admin/especialidades"` de `SeccionesAdministracion.razor` (las otras
+        cuatro rutas quedan).
+  - [x] `Components/Personal/Administracion/Especialidades.razor` (SSR estático,
         `@layout LayoutPersonal`, `[Authorize(Roles = Administrador)]`), en la carpeta de A4 (2.2).
-  - [ ] Sumar `/personal/admin/especialidades` a `RutasYaConstruidas` en la 2.1 T19 (AC 19).
-  - [ ] T16–T23 en verde.
-- [ ] [SEQ] Task 6: Cierre (AC: 19)
-  - [ ] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` en verde.
-  - [ ] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent
+  - [x] Sumar `/personal/admin/especialidades` a `RutasYaConstruidas` en la 2.1 T19 (AC 19).
+  - [x] T16–T23 en verde.
+- [x] [SEQ] Task 6: Cierre (AC: 19)
+  - [x] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` en verde.
+  - [x] Verificación manual en el navegador (Como verificar, paso 4) y su resultado en el Dev Agent
         Record.
 
 ### Task Dependencies
@@ -370,16 +371,17 @@ T1 → T2 → T3 → T4 → T5 → T6 (secuencial: cada capa usa la anterior).
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-16 contra `main` en `c3413cc`, con 1.1 a 2.1 en done)
+#### En hospital-turnos (verificado 2026-10-16 contra `main` en `c3413cc`, con 1.1 a 2.1 en done; revalidado en la sesión 10 contra `1a300d6`, con la 2.2 en done)
 
 - **No existe** nada de lo que lista `files_to_create`, ni ninguna carpeta `Catalogo/` en ningún
   proyecto. No hay ninguna entidad de negocio todavía: las del modelo son `RegistroAuditoria` (1.3),
   `MensajeSaliente` (1.4) y las de Identity (2.1).
 - `HospitalDbContext` (`Infraestructura/Persistencia/HospitalDbContext.cs`): hereda de
   `IdentityDbContext<UsuarioPersonal, IdentityRole<Guid>, Guid>`; declara los `DbSet` como
-  `public DbSet<X> Xs => Set<X>();` (líneas 19–20); en `OnModelCreating` llama primero a
-  `base.OnModelCreating`, después **cada configuración a mano** (`ApplyConfiguration`, líneas 30–31,
-  "no hay ApplyConfigurationsFromAssembly") y **al final** `ConvencionSnakeCase.Aplicar` (línea 33).
+  `public DbSet<X> Xs => Set<X>();` (junto a `RegistrosAuditoria` y `MensajesSalientes`); en
+  `OnModelCreating` llama primero a `base.OnModelCreating`, después **cada configuración a mano**
+  (`ApplyConfiguration`, "no hay ApplyConfigurationsFromAssembly") y **al final**
+  `ConvencionSnakeCase.Aplicar`.
 - `ConvencionSnakeCase` renombra tabla (desde el nombre del `DbSet`), columnas, claves, foráneas e
   índices: `Especialidades` → `especialidades`, `NombreNormalizado` → `nombre_normalizado`,
   `IX_Especialidades_NombreNormalizado` → `ix_especialidades_nombre_normalizado`. **No** hace falta
@@ -396,28 +398,33 @@ T1 → T2 → T3 → T4 → T5 → T6 (secuencial: cada capa usa la anterior).
   `REVOKE ALL` + `GRANT` de lo justo + `GRANT USAGE` de la secuencia con `pg_get_serial_sequence`.
 - Auditoría: `IAuditoria.Registrar(ActorAuditoria actor, string accion, string entidadTipo, string entidadId, object? detalle = null)`
   **agrega sin guardar**; el detalle se serializa con `JsonSerializerOptions.Web`. `AccionesAuditoria`
-  tiene hoy 9 constantes con forma `entidad.accion` (de la arquitectura) y 3 de la 2.1 en kebab-case
-  (`ingreso-personal`, …). Esta story sigue el kebab-case de la 2.1 (pedido del brief del sprint 2).
+  tiene hoy 17 constantes: 9 con forma `entidad.accion` (de la arquitectura), 3 de la 2.1 en
+  kebab-case (`ingreso-personal`, …) y 5 de la 2.2 con forma `entidad.accion`
+  (`usuario-personal.creado`, …). Esta story sigue la forma `entidad.accion` del contrato
+  §Auditoría, como la 2.2: `especialidad.creada`.
 - Errores: `ManejadorGlobalDeErrores` (1.2) traduce `ConflictoException` → 409,
   `ReglaDeNegocioException` → 400, `NoEncontradoException` → 404, `AccesoDenegadoException` → 403,
   **pero** si el pedido trae `Accept: text/html` devuelve `false` y la respuesta es la página
   `/Error` con el texto **genérico** `Algo falló. Probá de nuevo en unos minutos.` (`Error.razor` no
   muestra el mensaje de la regla). Por eso A2 muestra la regla en su propia página (decisión 1).
 - Web: `RutasPersonal.Especialidades = "/personal/admin/especialidades"`, título `Especialidades`,
-  en el menú del administrador (3.º lugar). Hoy la atiende `SeccionesAdministracion.razor` (seis
+  en el menú del administrador (3.º lugar). Hoy la atiende `SeccionesAdministracion.razor` (cinco
   `@page`, `[Authorize(Roles = Administrador)]`, `<SeccionEnConstruccion>`). `Ingreso.razor` es el
   modelo de formulario SSR: `EditForm` con `FormName`, `[SupplyParameterFromForm]`,
   `DataAnnotationsValidator`, cartel `role="alert"`, y **sin** `try/catch` genérico.
-  `AccesoDenegado.razor` (línea 21) muestra cómo una página SSR fija su código de estado
-  (`HttpContext.Response.StatusCode = …`).
+  `Administracion/UsuariosPersonal.razor` (2.2, líneas 200-212) muestra cómo una página SSR del
+  administrador fija el código del cartel: `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)`.
+  No se usa `Response.StatusCode = …` a mano: en .NET 10, Blazor SSR no escribe el cuerpo de una página
+  que terminó de dibujarse con `404`, y el cartel no llegaría.
 - El actor de la sesión: el principal trae `ClaimTypes.NameIdentifier` (id), `ClaimTypes.Role`
   (un solo rol, AC 24 de la 2.1) y `ClaimsPersonal.NombreCompleto = "nombre_completo"`
   (`Aplicacion/Personal/IIngresoPersonal.cs`). Hoy **nadie** arma un `ActorAuditoria` desde la sesión
   (la 2.1 lo arma desde el usuario de Identity). Lo agrega la 2.2, que se implementa antes, como
   `ActorDeSesion.Desde(ClaimsPrincipal)`, junto con `IActorVigente` (su AC 26); esta story los usa.
-- Pruebas: la 2.1 T19 (`SesionYPermisosHttpTests.cs`, líneas 119–142) recorre las 11 rutas × 3 roles
+- Pruebas: la 2.1 T19 (`SesionYPermisosHttpTests.Secciones_SegunRol_PermiteLasSuyasYDevuelve403LegibleEnLasAjenas`) recorre las 11 rutas × 3 roles
   y, cuando el rol tiene permiso, exige `<h1>{título}</h1>` **y** `TextoEnConstruccion`. La 2.2 le
-  agrega la lista `RutasYaConstruidas`; esta story suma su ruta ahí (AC 19).
+  agregó la lista `RutasYaConstruidas` (hoy sólo `/personal/admin/usuarios`); esta story suma su
+  ruta ahí (AC 19).
 
 #### Lo que dicen los documentos
 
@@ -440,12 +447,12 @@ lógicas, ni Blazor. Los patrones de esta story salen **del propio repo**, ya pr
 | Patrón | Ancla `archivo:línea` | Qué se toma |
 |---|---|---|
 | Configuración de entidad sin `ToTable` | `src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/MensajeSalienteConfiguracion.cs:9-21` | `IEntityTypeConfiguration<T>`, `HasKey` sobre `long`, `HasMaxLength`, índice con `HasIndex`; el nombre lo pone la convención. |
-| Registro de la configuración | `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs:29-33` | `ApplyConfiguration` a mano, antes de `ConvencionSnakeCase.Aplicar`. |
+| Registro de la configuración | `HospitalDbContext.OnModelCreating` (`src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs`, hoy líneas 29-33) | `ApplyConfiguration` a mano, antes de `ConvencionSnakeCase.Aplicar`. |
 | Quitar permisos que la app no usa | `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida.cs:47-56` | `REVOKE ALL` + `GRANT SELECT, INSERT, UPDATE` + `GRANT USAGE` de la secuencia. |
 | Puerto en Aplicacion, adaptador en Infraestructura | `src/HospitalTurnos.Aplicacion/Personal/IIngresoPersonal.cs:9` y `src/HospitalTurnos.Infraestructura/Identidad/RegistroIdentidad.cs` (`AddScoped<IIngresoPersonal, IngresoPersonalIdentity>`) | El caso de uso es una interfaz de Aplicacion; la implementación con `HospitalDbContext` vive en Infraestructura (Aplicacion no conoce EF). |
-| Registro de servicios scoped | `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs:25` | `AddScoped` junto a `IAuditoria`: mismo alcance que el contexto, así el cambio y la auditoría usan el mismo contexto. |
+| Registro de servicios scoped | `AgregarInfraestructura` (`src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs`, hoy línea 25) | `AddScoped` junto a `IAuditoria`: mismo alcance que el contexto, así el cambio y la auditoría usan el mismo contexto. |
 | Formulario SSR con validación doble y cartel | `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor:19-35,45,82` | `EditForm` + `FormName` + `[SupplyParameterFromForm]` + `DataAnnotationsValidator` + `role="alert"`. |
-| Página SSR que fija su código de estado | `src/HospitalTurnos.Web/Components/Personal/AccesoDenegado.razor:21` | `HttpContext.Response.StatusCode = …` para devolver 409/400/404 con la página. |
+| Página SSR que fija su código de estado | `src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor:200-212` y `src/HospitalTurnos.Web/Errores/ManejadorGlobalDeErrores.cs:40` | `catch (… when EsEsperable(e))` + `FijarEstadoEnPagina(HttpContext, e)`: 400/403/409 en el acto y el 404 al empezar a enviar la respuesta, para que el cartel llegue. |
 | Pruebas de caso de uso contra la base real | `tests/HospitalTurnos.Aplicacion.Tests/Personal/IngresoPersonalIdentityTests.cs:27-40` | `ServiceProvider` con `AgregarInfraestructura` y `CadenaApp`, un alcance por operación, reemplazos de prueba registrados al final. |
 | Pruebas HTTP de un formulario SSR | `tests/HospitalTurnos.Web.Tests/Personal/FormularioHttp.cs` | GET + token + `_handler` + POST, `Destino`, `Alerta`. |
 | Componente con autorización en bUnit | `tests/HospitalTurnos.Web.Tests/Personal/MenuLateralTests.cs:11-17,40-44` | `BunitContext`, `AntiforgeryStateProvider` de prueba, `AddAuthorization().SetRoles(...)`. |
@@ -500,7 +507,8 @@ Numeradas como en `revision-sprint-2.md` ("Decisiones abiertas consolidadas").
   es irreversible y el nombre queda bloqueado para siempre por el índice único.
 - **Decisión 1 — Dónde se ve el error de regla en A2** (era D3). **Elegido:** cartel en la propia
   página con el texto de la regla y el código del manejador global, **con el mecanismo de la 2.2**:
-  `catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))` + `EstadoPara(e)`. Así A2
+  `catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))` +
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)`. Así A2
   también muestra el `403` de `AccesoDenegadoException` (AC 13) y nunca escribe un código a mano.
 - **Decisión 16 — Permiso en el caso de uso.** **Elegido:** se confirma en la base en cada cambio con
   `IActorVigente` de la 2.2 (AC 13, T12, T21).
@@ -677,7 +685,7 @@ como S0), en la misma carpeta que A4 de la 2.2. Lleva sus propios `@using` de
 try { /* caso de uso */ }
 catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
 {
-    HttpContext.Response.StatusCode = ManejadorGlobalDeErrores.EstadoPara(e);   // 409/400/404/403
+    ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);   // 409/400/404/403
     alerta = e.Message;
 }
 await CargarAsync();
@@ -790,14 +798,65 @@ docker compose exec db psql -U postgres -d hospital_turnos \
 
 ### Agent Model Used
 
+Claude Opus 5.5 (sesión 10, 2026-10-16), con el circuito completo del equipo.
+
 ### Debug Log References
+
+- Task 1 (salvaguarda): suite de `main` en `1a300d6` en verde antes de tocar nada (Dominio 20/20,
+  Aplicacion 94/94). Piezas de la 2.2 con su firma real: `ActorDeSesion.Desde(ClaimsPrincipal)`,
+  `ManejadorGlobalDeErrores.EsEsperable(Exception)` y `FijarEstadoEnPagina(HttpContext, Exception)`,
+  `IActorVigente.ExigirAdministradorActivoAsync(ActorAuditoria, string, CancellationToken)`,
+  `FormularioHttp.EnviarAsync`/`Estado`/`Alerta`/`ValorDe`, `RutasYaConstruidas` (sólo usuarios) y
+  `UsuariosDePrueba.CrearAsync`/`ActorDe`.
+- Salvaguarda de BD (Compose): `especialidades` con `id` bigint identity, `nombre` y
+  `nombre_normalizado` varchar(80) not null, `activa` boolean not null sin default, índice único
+  `ix_especialidades_nombre_normalizado`; `turnos_app` DELETE = f, SELECT/INSERT/UPDATE = t;
+  `registros_auditoria` UPDATE = f.
+- Migración generada: `20261017000841_AgregarEspecialidades` (marca UTC, como las anteriores), con el
+  bloque REVOKE/GRANT al final de `Up`.
 
 ### Completion Notes List
 
 - Análisis de contexto completo (skill `tycon-create-story`): documentos, código de `main` y story 2.1
   como modelo. Guía para el desarrollo creada.
+- Implementada con pruebas primero, capa por capa (dominio → base → caso de uso → pantalla). 23
+  verificaciones (T1–T23, 51 casos) más la 2.1 T19 ajustada; suite completa 300 pruebas en verde
+  (antes 249); `scripts/ci/local.sh` rc=0, cobertura de líneas 98,7 % y de ramas 93,7 %.
+- Revisores: 7 de 7 en la primera vuelta, sin hallazgos. Pase adversarial apagado (decisión del docente).
+- Verificación manual en el navegador (Como verificar, paso 4): en Chrome contra el Compose, con
+  Playwright, pasos a–i en verde (la primera corrida, con la base vacía, verificó el estado vacío; un
+  selector del script estaba mal y se repitió con nombres marcados). Además: 404 con su cartel dentro
+  de A2, 403 del administrador desactivado con la sesión abierta, diez altas simultáneas → un 200 y
+  nueve 409, permisos de la base. Matriz por AC 19/19 en vivo. Capturas en `Sesiones/img/10-a2-*.png`.
+- El formulario de alta recorta los espacios de los extremos antes de validar (como A4); los internos
+  repetidos los colapsa el dominio.
+- Revisión de legibilidad (tester no técnico): la guía `docs/qa/3.1-pasos.md` explica ahora los dos
+  casos del AC 13. Marca de pantalla **aceptada por el docente** (sesión 10): al administrador recién
+  desactivado el cartel "Sólo el administrador puede modificar las especialidades." le resulta
+  contradictorio, porque el menú todavía lo muestra como administrador; el texto queda como lo fija el AC 13.
 
 ### File List
+
+- src/HospitalTurnos.Dominio/Catalogo/Especialidad.cs (nuevo)
+- src/HospitalTurnos.Dominio/Auditoria/AccionesAuditoria.cs
+- src/HospitalTurnos.Aplicacion/Catalogo/ICatalogoEspecialidades.cs (nuevo)
+- src/HospitalTurnos.Infraestructura/Catalogo/CatalogoEspecialidadesEnBase.cs (nuevo)
+- src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/EspecialidadConfiguracion.cs (nuevo)
+- src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs
+- src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261017000841_AgregarEspecialidades.cs (nuevo)
+- src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261017000841_AgregarEspecialidades.Designer.cs (nuevo)
+- src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/HospitalDbContextModelSnapshot.cs
+- src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs
+- src/HospitalTurnos.Web/Components/Personal/Administracion/Especialidades.razor (nuevo)
+- src/HospitalTurnos.Web/Components/Personal/Secciones/SeccionesAdministracion.razor
+- tests/HospitalTurnos.Dominio.Tests/Catalogo/EspecialidadTests.cs (nuevo)
+- tests/HospitalTurnos.Aplicacion.Tests/Ayudas/InterceptorQueSeAdelanta.cs (nuevo)
+- tests/HospitalTurnos.Aplicacion.Tests/Catalogo/CatalogoEspecialidadesTests.cs (nuevo)
+- tests/HospitalTurnos.Aplicacion.Tests/Catalogo/ContratoTurnosFuturosTests.cs (nuevo)
+- tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesHttpTests.cs (nuevo)
+- tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesPaginaTests.cs (nuevo)
+- tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs
+- docs/qa/3.1-pasos.md, docs/qa/3.1-legibilidad.md, docs/qa/3.1-legibilidad-ui.md (nuevos)
 
 ### Change Log
 
@@ -813,3 +872,14 @@ docker compose exec db psql -U postgres -d hospital_turnos \
   por el SQL, para que la 3.2 lo reuse; la trampa T15 mira también la tabla `turnos` y nombra la
   herencia de la 3.2 (I-8); botones con `Accion = "tipo:id"` (M-8); ñ en "Decisiones" (M-9).
   Siguen 19 AC y 23 verificaciones; ninguna decisión abierta.
+- 2026-10-16 (sesión 10, antes de implementar): el cartel de error usa la pieza compartida
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)` de la 2.2 en lugar de
+  `Response.StatusCode = EstadoPara(e)`: Blazor (.NET 10) no escribe el cuerpo de una página SSR que
+  responde `404`, y el cartel del AC 12 no llegaría. El patrón de referencia pasa a
+  `UsuariosPersonal.razor`. Sin cambios en AC ni en verificaciones.
+- 2026-10-16 (sesión 10, validación): textos al día con `main` en `1a300d6` (2.2 en done):
+  `AccionesAuditoria` con 17 constantes y la forma `entidad.accion` de la 2.2,
+  `SeccionesAdministracion.razor` con cinco `@page` (quedan cuatro), `RutasYaConstruidas` y las
+  referencias por miembro en lugar de número de línea en los archivos que esta story modifica.
+- 2026-10-16 (sesión 10, implementación): implementada y verificada (300 pruebas, 98,7 % de líneas,
+  matriz en vivo 19/19). Marca de legibilidad del cartel 403 aceptada por el docente sin cambiar el AC 13.

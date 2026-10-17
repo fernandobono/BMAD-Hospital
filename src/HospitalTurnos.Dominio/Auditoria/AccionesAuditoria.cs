@@ -26,4 +26,9 @@ public static class AccionesAuditoria
     public const string UsuarioPersonalReactivado = "usuario-personal.reactivado";
     public const string UsuarioPersonalDesbloqueado = "usuario-personal.desbloqueado";
     public const string ContrasenaPersonalCambiada = "usuario-personal.contrasena-cambiada";
+
+    // Story 3.1: el catálogo de especialidades (A2, canal Personal).
+    public const string EspecialidadCreada = "especialidad.creada";
+    public const string EspecialidadDesactivada = "especialidad.desactivada";
+    public const string EspecialidadReactivada = "especialidad.reactivada";
 }

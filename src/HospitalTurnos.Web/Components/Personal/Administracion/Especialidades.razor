@@ -1,0 +1,169 @@
+@page "/personal/admin/especialidades"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@using System.ComponentModel.DataAnnotations
+@using System.Globalization
+@using HospitalTurnos.Aplicacion.Catalogo
+@using HospitalTurnos.Dominio.Catalogo
+@using HospitalTurnos.Dominio.Excepciones
+@using HospitalTurnos.Web.Errores
+@inject ICatalogoEspecialidades Catalogo
+
+@* A2 (UX §7, story 3.1), renderizado estático como A4. La página atrapa SÓLO las excepciones del dominio y
+   muestra su mensaje en un cartel con el código del manejador global; lo inesperado sigue a ese manejador. *@
+<PageTitle>Especialidades · Las Acacias</PageTitle>
+
+<h1>Especialidades</h1>
+
+@if (alerta is not null)
+{
+    <div class="alert alert-danger" role="alert">@alerta</div>
+}
+@if (estado is not null)
+{
+    <div class="alert alert-success" role="status">@estado</div>
+}
+
+<section class="mb-4" style="max-width: 32rem;">
+    <h2 class="h5">Agregar una especialidad</h2>
+    <EditForm Model="Alta" method="post" OnValidSubmit="CrearAsync" FormName="alta-especialidad">
+        <DataAnnotationsValidator />
+        <div class="mb-3">
+            <label for="nombre" class="form-label">Nombre</label>
+            <InputText id="nombre" class="form-control" @bind-Value="Alta!.Nombre" autocomplete="off" />
+            <ValidationMessage For="() => Alta!.Nombre" class="text-danger" />
+        </div>
+        <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Agregar</button>
+    </EditForm>
+</section>
+
+@if (filas.Count == 0)
+{
+    <p>Todavía no hay especialidades. Agregá la primera con el formulario de arriba.</p>
+}
+else
+{
+    @* Un solo formulario para todas las filas: el navegador envía sólo el botón pulsado (Accion = tipo:id). *@
+    <form method="post" @formname="acciones-especialidades" @onsubmit="EjecutarAccionAsync">
+        <AntiforgeryToken />
+        <table class="table align-middle" style="max-width: 40rem;">
+            <thead>
+                <tr><th>Nombre</th><th>Estado</th><th>Acción</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var fila in filas)
+                {
+                    <tr>
+                        <td>@fila.Nombre</td>
+                        <td>@(fila.Activa ? "Activa" : "Desactivada")</td>
+                        <td>
+                            @if (fila.Activa)
+                            {
+                                <button type="submit" class="btn btn-sm btn-outline-danger" name="Accion" value="desactivar:@fila.Id">Desactivar</button>
+                            }
+                            else
+                            {
+                                <button type="submit" class="btn btn-sm btn-outline-primary" name="Accion" value="reactivar:@fila.Id">Reactivar</button>
+                            }
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    </form>
+}
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "alta-especialidad")]
+    private FormularioAlta? Alta { get; set; }
+
+    [SupplyParameterFromForm(FormName = "acciones-especialidades")]
+    private string? Accion { get; set; }
+
+    private IReadOnlyList<EspecialidadResumen> filas = [];
+    private string? estado;
+    private string? alerta;
+
+    private const string AccionDesconocida = "No reconocemos esa acción. Recargá la página.";
+
+    protected override async Task OnInitializedAsync()
+    {
+        Alta ??= new();
+        // OnInitializedAsync corre ANTES del manejador del formulario: cada manejador vuelve a cargar.
+        await CargarAsync();
+    }
+
+    private async Task CargarAsync() => filas = await Catalogo.ListarAsync(Cancelacion);
+
+    // En bUnit (T23) no hay pedido HTTP; en la app siempre lo hay.
+    private CancellationToken Cancelacion => HttpContext?.RequestAborted ?? CancellationToken.None;
+
+    private async Task CrearAsync()
+    {
+        try
+        {
+            var id = await Catalogo.CrearAsync(ActorDeSesion.Desde(HttpContext.User), Alta!.Nombre!, Cancelacion);
+            await CargarAsync();
+            estado = $"Especialidad {NombreDe(id)} agregada.";
+            Alta = new();   // el campo vuelve vacío
+            return;
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            MostrarCartel(e);   // lo tipeado queda en el campo
+        }
+        await CargarAsync();
+    }
+
+    private async Task EjecutarAccionAsync()
+    {
+        try
+        {
+            var partes = (Accion ?? "").Split(':', 2);
+            if (partes.Length != 2 || !long.TryParse(partes[1], NumberStyles.None, CultureInfo.InvariantCulture, out var id))
+                throw new ReglaDeNegocioException(AccionDesconocida);
+            var actor = ActorDeSesion.Desde(HttpContext.User);
+            switch (partes[0])
+            {
+                case "desactivar":
+                    await Catalogo.DesactivarAsync(actor, id, Cancelacion);
+                    estado = $"Especialidad {NombreDe(id)} desactivada.";
+                    break;
+                case "reactivar":
+                    await Catalogo.ReactivarAsync(actor, id, Cancelacion);
+                    estado = $"Especialidad {NombreDe(id)} reactivada.";
+                    break;
+                default:
+                    throw new ReglaDeNegocioException(AccionDesconocida);
+            }
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            MostrarCartel(e);
+        }
+        await CargarAsync();
+    }
+
+    // El nombre tal como quedó guardado (las filas ya cargadas lo tienen).
+    private string? NombreDe(long id) => filas.FirstOrDefault(f => f.Id == id)?.Nombre;
+
+    // El código del manejador global y el mensaje en un cartel arriba del formulario (decisión 1 del docente).
+    private void MostrarCartel(Exception e)
+    {
+        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+        alerta = e.Message;
+    }
+
+    private sealed class FormularioAlta
+    {
+        private string? nombre;
+
+        // Sin espacios en los extremos antes de validar; el dominio repite la regla (AC 1 y 8).
+        [Required(ErrorMessage = "Ingresá el nombre de la especialidad.")]
+        [StringLength(Especialidad.LargoMaximo, ErrorMessage = "El nombre de la especialidad tiene como máximo 80 caracteres.")]
+        public string? Nombre { get => nombre; set => nombre = value?.Trim(); }
+    }
+}
