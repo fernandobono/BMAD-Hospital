@@ -15,6 +15,10 @@
 #
 # Los comandos con lógica viven en scripts/ci/*.sh: scripts/ci/local.sh corre los mismos en la
 # máquina, en el mismo orden, sin subir nada.
+#
+# La máquina queda fija en ubuntu-24.04 y no en ubuntu-latest: "la última" pasa a Ubuntu 26 el
+# 19/10/2026 y un cambio de sistema operativo no tiene que llegar por sorpresa en el medio de una
+# story. Pasar a 26.04 es una decisión aparte, con su propio PR (acción B-3 de la retro del sprint 2).
 # =================================================================================================
 name: CI
 
@@ -29,10 +33,10 @@ permissions:
 jobs:
   compilar:
     name: 0 · Compilar
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Restaurar paquetes
@@ -44,10 +48,10 @@ jobs:
   unit:
     name: 1 · Pruebas unitarias
     needs: compilar
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Pruebas de Dominio con cobertura
@@ -55,7 +59,7 @@ jobs:
       # if: always() — los resultados se suben aunque falle una prueba: es justo cuando más se necesitan.
       - name: Subir resultados
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resultados-unit
           path: resultados/unit
@@ -63,13 +67,13 @@ jobs:
   integracion:
     name: 2 · Pruebas de integración
     needs: unit
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
-      # PostgreSQL real con Testcontainers: Docker viene instalado en ubuntu-latest. Si Docker no
+      # PostgreSQL real con Testcontainers: Docker viene instalado en ubuntu-24.04. Si Docker no
       # anda, las pruebas fallan; ninguna se saltea.
       - name: Pruebas de Aplicacion con cobertura
         run: dotnet test tests/HospitalTurnos.Aplicacion.Tests -c Release --logger "trx;LogFileName=aplicacion.trx" --collect:"XPlat Code Coverage" --results-directory ./resultados/integracion
@@ -78,7 +82,7 @@ jobs:
         run: dotnet test tests/HospitalTurnos.Web.Tests -c Release --logger "trx;LogFileName=web.trx" --collect:"XPlat Code Coverage" --results-directory ./resultados/integracion
       - name: Subir resultados
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: resultados-integracion
           path: resultados/integracion
@@ -86,14 +90,14 @@ jobs:
   cobertura:
     name: 3 · Cobertura (NFR-11)
     needs: [unit, integracion]
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Bajar los resultados de las pruebas
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           pattern: resultados-*
           merge-multiple: true
@@ -103,7 +107,7 @@ jobs:
       # El reporte HTML se sube también en rojo: ahí se ve qué líneas faltan cubrir.
       - name: Subir reporte de cobertura
         if: always()
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: reporte-cobertura
           path: reporte-cobertura
@@ -111,10 +115,10 @@ jobs:
   sca:
     name: · Dependencias vulnerables (SCA)
     needs: compilar
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-dotnet@v4
+      - uses: actions/checkout@v7
+      - uses: actions/setup-dotnet@v6
         with:
           dotnet-version: '10.0.x'
       - name: Restaurar paquetes
@@ -125,9 +129,9 @@ jobs:
   imagen:
     name: · Imagen Docker
     needs: compilar
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
       # La imagen compila dentro de Docker: no hace falta instalar .NET en la máquina del flujo.
       - name: Construir la imagen y verificar la zona horaria
         run: bash scripts/ci/imagen.sh

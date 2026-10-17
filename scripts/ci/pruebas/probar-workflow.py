@@ -29,6 +29,16 @@ JOBS_ESPERADOS = {
     "imagen": ("· Imagen Docker", ["compilar"]),
 }
 
+# Máquina y versiones de las acciones (acción B-3 de la retro del sprint 2): Node.js 24 y Ubuntu
+# fijo. Subir de versión es un cambio de esta tabla, no de la lógica de la prueba.
+MAQUINA = "ubuntu-24.04"
+CHECKOUT = "actions/checkout@v7"
+SETUP_DOTNET = "actions/setup-dotnet@v6"
+VERSIONES = {
+    "actions/upload-artifact": "actions/upload-artifact@v7",
+    "actions/download-artifact": "actions/download-artifact@v8",
+}
+
 # Artefacto que sube cada job (AC 3, 4 y 5), siempre con if: always().
 ARTEFACTOS = {
     "unit": "resultados-unit",
@@ -82,20 +92,24 @@ def revisar_workflow():
             errores.append(f"job `{job_id}`: nombre {job.get('name')!r}, se esperaba {nombre!r}")
         if sorted(como_lista(job.get("needs"))) != sorted(needs):
             errores.append(f"job `{job_id}`: needs {como_lista(job.get('needs'))}, se esperaba {needs}")
-        if job.get("runs-on") != "ubuntu-latest":
-            errores.append(f"job `{job_id}`: runs-on debe ser ubuntu-latest")
+        if job.get("runs-on") != MAQUINA:
+            errores.append(f"job `{job_id}`: runs-on debe ser {MAQUINA}")
 
         pasos = job.get("steps") or []
         usos = [p.get("uses", "") for p in pasos]
-        if "actions/checkout@v4" not in usos:
-            errores.append(f"job `{job_id}`: falta actions/checkout@v4")
+        if CHECKOUT not in usos:
+            errores.append(f"job `{job_id}`: falta {CHECKOUT}")
+        for uso in usos:
+            base = uso.split("@")[0]
+            if base in VERSIONES and uso != VERSIONES[base]:
+                errores.append(f"job `{job_id}`: usa {uso}, se esperaba {VERSIONES[base]}")
         setup = [p for p in pasos if p.get("uses", "").startswith("actions/setup-dotnet")]
         if job_id == "imagen":
             if setup:
                 errores.append("job `imagen`: no usa setup-dotnet (compila dentro de Docker)")
-        elif not setup or setup[0].get("uses") != "actions/setup-dotnet@v4" or \
+        elif not setup or setup[0].get("uses") != SETUP_DOTNET or \
                 str((setup[0].get("with") or {}).get("dotnet-version")) != "10.0.x":
-            errores.append(f"job `{job_id}`: falta actions/setup-dotnet@v4 con dotnet-version 10.0.x")
+            errores.append(f"job `{job_id}`: falta {SETUP_DOTNET} con dotnet-version 10.0.x")
 
         for paso in pasos:
             run = paso.get("run", "")

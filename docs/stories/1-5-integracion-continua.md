@@ -447,6 +447,10 @@ Claude Opus 5.5 (Amelia, bmad-dev-story) — sesión 06, 2026-10-16.
 - Para seguir (fuera de esta story): la corrida avisa que las acciones `@v4` usan Node.js 20
   (deprecado) y que `ubuntu-latest` pasa a Ubuntu 26 el 19/10/2026; fijar las acciones por SHA
   (sugerencia del revisor de seguridad); la protección de ramas para exigir el flujo en verde.
+- Cambio posterior (17/10/2026, acción B-3 de la retro del sprint 2): las acciones pasaron a
+  `checkout@v7`, `setup-dotnet@v6`, `upload-artifact@v7` y `download-artifact@v8` (Node.js 24), y
+  los trabajos corren en `ubuntu-24.04` fijo en lugar de `ubuntu-latest`. `probar-workflow.py` exige
+  las versiones nuevas. Donde esta story dice `ubuntu-latest` o `@v4`, vale lo de esta nota.
 
 ### File List
 
