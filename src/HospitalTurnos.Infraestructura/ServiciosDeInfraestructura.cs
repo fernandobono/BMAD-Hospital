@@ -1,5 +1,7 @@
 using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Aplicacion.Catalogo;
 using HospitalTurnos.Infraestructura.Auditoria;
+using HospitalTurnos.Infraestructura.Catalogo;
 using HospitalTurnos.Infraestructura.Persistencia;
 using HospitalTurnos.Infraestructura.Tiempo;
 using Microsoft.EntityFrameworkCore;
@@ -23,6 +25,8 @@ public static class ServiciosDeInfraestructura
         servicios.AddSingleton<TimeProvider>(new RelojHospital());
         // Scoped como el contexto: el registro viaja en el mismo SaveChangesAsync que el cambio.
         servicios.AddScoped<IAuditoria, AuditoriaEnBase>();
+        // Story 3.1: mismo alcance que el contexto y la auditoría (necesita el IActorVigente de la identidad).
+        servicios.AddScoped<ICatalogoEspecialidades, CatalogoEspecialidadesEnBase>();
         return servicios;
     }
 

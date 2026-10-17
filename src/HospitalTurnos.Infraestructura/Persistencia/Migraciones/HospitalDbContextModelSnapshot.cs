@@ -86,6 +86,41 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                     b.ToTable("registros_auditoria");
                 });
 
+            modelBuilder.Entity("HospitalTurnos.Dominio.Catalogo.Especialidad", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<bool>("Activa")
+                        .HasColumnType("boolean")
+                        .HasColumnName("activa");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("nombre");
+
+                    b.Property<string>("NombreNormalizado")
+                        .IsRequired()
+                        .HasMaxLength(80)
+                        .HasColumnType("character varying(80)")
+                        .HasColumnName("nombre_normalizado");
+
+                    b.HasKey("Id")
+                        .HasName("pk_especialidades");
+
+                    b.HasIndex("NombreNormalizado")
+                        .IsUnique()
+                        .HasDatabaseName("ix_especialidades_nombre_normalizado");
+
+                    b.ToTable("especialidades");
+                });
+
             modelBuilder.Entity("HospitalTurnos.Infraestructura.Email.MensajeSaliente", b =>
                 {
                     b.Property<long>("Id")
