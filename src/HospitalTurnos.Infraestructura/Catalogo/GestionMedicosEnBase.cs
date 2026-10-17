@@ -1,8 +1,8 @@
 using System.Globalization;
+using HospitalTurnos.Aplicacion.Agendas;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Catalogo;
 using HospitalTurnos.Aplicacion.Personal;
-using HospitalTurnos.Dominio.Agendas;
 using HospitalTurnos.Dominio.Auditoria;
 using HospitalTurnos.Dominio.Catalogo;
 using HospitalTurnos.Dominio.Excepciones;
@@ -18,13 +18,14 @@ namespace HospitalTurnos.Infraestructura.Catalogo;
 /// A1 sobre el HospitalDbContext del alcance (story 3.2). Cada escritura confirma primero en la base que el
 /// actor es un administrador activo (decisión 16), valida sólo lo que cambia (AC 17) y guarda el cambio con
 /// su auditoría, juntos o nada. Las carreras contra los índices únicos se traducen a la misma regla (AC 8 y 12).
-/// La 4.1 agrega al final de la firma IConsultaAgendas (contrato del AC 23).
+/// El estado de agenda de cada médico lo trae IConsultaAgendas (story 4.1, AC 30; contrato del AC 23 de la 3.2).
 /// </summary>
 public sealed class GestionMedicosEnBase(
     HospitalDbContext contexto,
     IAuditoria auditoria,
     ICatalogoEspecialidades catalogo,
-    IActorVigente actorVigente) : IGestionMedicos
+    IActorVigente actorVigente,
+    IConsultaAgendas consultaAgendas) : IGestionMedicos
 {
     private const string SinPermiso = "Sólo un administrador puede dar de alta o modificar médicos.";
     private const string NoExiste = "No existe el médico pedido.";
@@ -50,10 +51,9 @@ public sealed class GestionMedicosEnBase(
             .OrderBy(x => x.m.Apellido).ThenBy(x => x.m.Nombre)
             .Select(x => new { x.m.Id, x.m.Apellido, x.m.Nombre, x.m.Matricula, x.Especialidad })
             .ToListAsync(ct);
-        return filas.Select(x => new MedicoListado(x.Id, x.Apellido, x.Nombre, x.Matricula, x.Especialidad,
-                // Todavía no existen agendas: ningún médico tiene una (FR-13). La 4.1 (su AC 30) reemplaza esta
-                // asignación por IConsultaAgendas.EstadosDeAgendaAsync (contrato, AC 23 de la 3.2).
-                SituacionDeAgenda.SinAgenda))
+        // Una sola consulta de agendas para todo el listado, no una por fila (AC 30 de la 4.1).
+        var agendas = await consultaAgendas.EstadosDeAgendaAsync(filas.Select(x => x.Id).ToList(), ct);
+        return filas.Select(x => new MedicoListado(x.Id, x.Apellido, x.Nombre, x.Matricula, x.Especialidad, agendas[x.Id]))
             .ToList();
     }
 
@@ -65,11 +65,9 @@ public sealed class GestionMedicosEnBase(
             .FirstOrDefaultAsync(ct);
         if (fila is null) return null;
         var m = fila.m;
+        var agenda = await consultaAgendas.EstadosDeAgendaAsync([m.Id], ct);
         return new DatosFichaMedico(m.Id, new DatosMedico(m.Nombre, m.Apellido, m.Matricula, m.EspecialidadId, m.UsuarioPersonalId),
-            fila.Nombre, fila.Activa,
-            // Todavía no existen agendas (FR-13). La 4.1 (su AC 30) reemplaza esta asignación por
-            // IConsultaAgendas.EstadosDeAgendaAsync (contrato, AC 23 de la 3.2).
-            SituacionDeAgenda.SinAgenda);
+            fila.Nombre, fila.Activa, agenda[m.Id]);
     }
 
     public async Task<IReadOnlyList<OpcionUsuarioMedico>> UsuariosParaVincularAsync(long? medicoId, CancellationToken ct)

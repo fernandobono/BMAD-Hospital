@@ -1,5 +1,7 @@
+using HospitalTurnos.Aplicacion.Agendas;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Catalogo;
+using HospitalTurnos.Infraestructura.Agendas;
 using HospitalTurnos.Infraestructura.Auditoria;
 using HospitalTurnos.Infraestructura.Catalogo;
 using HospitalTurnos.Infraestructura.Persistencia;
@@ -29,6 +31,8 @@ public static class ServiciosDeInfraestructura
         servicios.AddScoped<ICatalogoEspecialidades, CatalogoEspecialidadesEnBase>();
         // Story 3.2: igual que la 3.1; además usa el catálogo para validar la especialidad elegida.
         servicios.AddScoped<IGestionMedicos, GestionMedicosEnBase>();
+        // Story 4.1: lectura de agendas; la usa GestionMedicosEnBase para el estado de A1.
+        servicios.AddScoped<IConsultaAgendas, ConsultaAgendasEnBase>();
         return servicios;
     }
 

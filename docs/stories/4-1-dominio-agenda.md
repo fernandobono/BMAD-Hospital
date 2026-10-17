@@ -2,7 +2,7 @@
 epic: 4
 story: "4.1"
 title: "Dominio de agenda: franjas, duración, estados de la propuesta, horarios del día y vigencia"
-status: ready-for-dev
+status: review
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -16,8 +16,8 @@ files_to_create:
   - "src/HospitalTurnos.Infraestructura/Agendas/ConsultaAgendasEnBase.cs"
   - "src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/AgendaMedicoConfiguracion.cs"
   - "src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/FranjaConfiguracion.cs"
-  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/<marca>_AgregarAgendas.cs"
-  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/<marca>_AgregarAgendas.Designer.cs"
+  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261017025538_AgregarAgendas.cs"
+  - "src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261017025538_AgregarAgendas.Designer.cs"
   - "tests/HospitalTurnos.Dominio.Tests/Ayudas/AgendaBuilder.cs"
   - "tests/HospitalTurnos.Dominio.Tests/Ayudas/RelojDePrueba.cs"
   - "tests/HospitalTurnos.Dominio.Tests/Agendas/FranjaTests.cs"
@@ -39,7 +39,7 @@ files_to_modify:
 
 # Story 4.1: Dominio de agenda: franjas, duración, estados de la propuesta, horarios del día y vigencia
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -236,7 +236,9 @@ listado de médicos (3.2) y los horarios libres (5.2) usen **una sola** versión
     `ck_franjas_agenda_horas` (`hasta > desde OR hasta = '00:00'`). Un `INSERT` a mano que los
     viole falla con `23514`.
 27. **Cambios simultáneos**: `agendas_medico` lleva control de concurrencia optimista con la
-    columna de sistema `xmin` de PostgreSQL (propiedad sombra `uint Version` con `IsRowVersion()`).
+    columna de sistema `xmin` de PostgreSQL (propiedad sombra `uint Version` con `IsRowVersion()` y
+    `HasColumnName("xmin")`: sin el nombre explícito, la convención snake_case la convierte en una
+    columna nueva `version`). La migración no crea ninguna columna.
     **Given** dos contextos que leyeron la misma agenda `Enviada` **When** uno la aprueba y guarda,
     y el otro la rechaza y guarda **Then** el segundo `SaveChangesAsync` lanza
     `DbUpdateConcurrencyException` y en la base queda `Aprobada`. (La 4.3 lo traduce a un 409.)
@@ -262,15 +264,17 @@ listado de médicos (3.2) y los horarios libres (5.2) usen **una sola** versión
     decisión 8): `GestionMedicosEnBase` pasa de
     `(contexto, auditoria, catalogo, actorVigente)` a
     `(contexto, auditoria, catalogo, actorVigente, consultaAgendas)` (`IConsultaAgendas`, agregado al
-    final) y, en `ListarAsync` y `ObtenerAsync`, reemplaza la asignación
-    `Agenda = SituacionDeAgenda.SinAgenda` (la línea marcada con el comentario que nombra a la 4.1)
-    por el valor de `EstadosDeAgendaAsync`: una sola llamada con los ids de todo el listado, no una
-    por fila. `EstadoAgendaMedico`, `SituacionDeAgenda`, `TablaMedicos` y las pantallas de la 3.2
+    final) y, en `ListarAsync` y `ObtenerAsync`, reemplaza el argumento
+    `SituacionDeAgenda.SinAgenda` que hoy cierra el constructor de `MedicoListado` y de
+    `DatosFichaMedico` (las dos marcas con el comentario que nombra a la 4.1 y su AC 30) por el valor
+    de `EstadosDeAgendaAsync`: una sola llamada con los ids de todo el listado, no una por fila (en
+    `ObtenerAsync`, con el único id), y quita esos dos comentarios. `EstadoAgendaMedico`, `SituacionDeAgenda`, `TablaMedicos` y las pantallas de la 3.2
     **no** cambian. Las pruebas de la 3.2 resuelven `GestionMedicosEnBase` desde el contenedor (no lo
     construyen a mano): no se tocan, y sus resultados esperados siguen valiendo (esos médicos no
     tienen agendas: `SinAgenda`). **Given** un médico con una aprobada que todavía no rige **When** el
     administrador abre A1 **Then** su fila dice `Sin agenda (rige desde dd/MM)` con la fecha de esa
-    agenda (T44).
+    agenda (T44). @runtime-exempt(DODRT-C8): "reemplaza" y "quita" describen el cambio de código; en
+    vivo la acción del AC es sólo leer A1 (abrir la pantalla), que no muta nada.
 
 ### Contrato con otras stories
 
@@ -358,14 +362,14 @@ listado de médicos (3.2) y los horarios libres (5.2) usen **una sola** versión
 | T33 | `Migracion_AgregarAgendas_CreaTablasColumnasYPermisos` | 23,24,32 | integration | `information_schema` y `has_table_privilege` contra la `PostgresFixture` | Las 2 tablas con las columnas y tipos del AC 23; `turnos_app`: `agendas_medico` SELECT/INSERT/UPDATE = t, DELETE = f; `franjas_agenda` DELETE = t; `registros_auditoria` UPDATE = f |
 | T34 | `Guardar_AgendaConFranjas_SeLeeIgual` | 23,28 | integration | Médico propio; agenda con lunes 08–12 y lunes 20:00–00:00, enviada y rechazada con motivo; guardar con `CadenaApp`, leer con otro contexto (con `Include`) | Mismos `MedicoId`, duración, `VigenteDesde`, `Estado = Rechazada`, `MotivoRechazo`, `EnviadaEl`, `RechazadaEl` y las 2 franjas (la de medianoche con `Hasta = 00:00`); en SQL, `estado = 'Rechazada'` |
 | T35 | `QuitarFranja_EnBorradorGuardado_BorraLaFila` | 24,28 | integration | Médico propio; borrador guardado con 2 franjas; otro contexto la carga, `QuitarFranja`, guarda con `CadenaApp` | `SELECT count(*) FROM franjas_agenda WHERE agenda_medico_id = <id>` = 1 |
-| T36 | `Base_DosEnviadasDelMismoMedico_ElIndiceRechazaLaSegunda` | 25 | integration | Médico propio M1: agenda 1 `Enviada` guardada; agenda 2 `Enviada` → guardar; médico M2 con su `Enviada`; después agenda 1 → `Rechazada`, guardar, y otra vez agenda 2 | Primer intento de la 2: `DbUpdateException` con `PostgresException` `SqlState = 23505` y `ConstraintName = ux_agendas_medico_una_enviada`; M2 se guarda; tras rechazar la 1, la 2 se guarda |
+| T36 | `Base_DosEnviadasDelMismoMedico_ElIndiceRechazaLaSegunda` | 25,31 | integration | Médico propio M1: agenda 1 `Enviada` guardada; agenda 2 `Enviada` → guardar; médico M2 con su `Enviada`; después agenda 1 → `Rechazada`, guardar, y otra vez agenda 2 | Primer intento de la 2: `DbUpdateException` con `PostgresException` `SqlState = 23505` y `ConstraintName = ux_agendas_medico_una_enviada`; M2 se guarda; tras rechazar la 1, la 2 se guarda |
 | T37 | `Base_ValoresFueraDeRango_LosRechazanLosControles` | 26 | integration | `[Theory]` `INSERT` a mano con `CadenaApp`: agenda con duración 5; franja con `dia = 7`; franja 12:00–08:00 | `PostgresException` `23514` con `ConstraintName` `ck_agendas_medico_duracion` / `ck_franjas_agenda_dia` / `ck_franjas_agenda_horas` |
 | T38 | `Guardar_DosCambiosSobreLaMismaAgenda_ElSegundoFallaPorConcurrencia` | 27 | integration | Médico propio; `Enviada` guardada; contextos 1 y 2 la cargan; 1 `Aprobar` + guardar; 2 `Rechazar` + guardar | El segundo lanza `DbUpdateConcurrencyException`; en la base `estado = 'Aprobada'` y `motivo_rechazo` nulo |
-| T39 | `AgendaQueRigeAsync_SegunFecha_DevuelveLaQueRigeConSusFranjas` | 29,20,21 | integration | Médico propio con A, B, C y D del T29 guardadas; `[Theory]` 02/11, 15/11, 16/11 | A, A, B (por `Id`), con sus franjas cargadas |
+| T39 | `AgendaQueRigeAsync_SegunFecha_DevuelveLaQueRigeConSusFranjas` | 29,20,21,31 | integration | Médico propio con A, B, C y D del T29 guardadas; `[Theory]` 02/11, 15/11, 16/11 | A, A, B (por `Id`), con sus franjas cargadas |
 | T40 | `AgendaQueRigeAsync_SinAgendaQueRija_DevuelveNull` | 29 | integration | `[Theory]`: médico propio sin agendas; el del T39 el 01/11; médico propio con sólo una `Enviada`; un id que no existe | `null` en los cuatro |
 | T41 | `EstadosDeAgendaAsync_VariosMedicos_DevuelveUnaSituacionPorCadaId` | 29,22 | integration | `new ConsultaAgendasEnBase(contexto, reloj)` con el reloj en 03/11/2026; 4 médicos propios: sin agendas; con una aprobada desde 02/11; con una aprobada desde 02/11 y una enviada; con sólo una aprobada desde 16/11. Más un id que no existe. Comandos SQL de EF capturados en una `List<string>` con `LogTo` | 5 entradas: SinAgenda, Vigente, PropuestaPendiente, SinAgenda con `RigeDesde` 16/11/2026, SinAgenda; **un** solo `SELECT` sobre `agendas_medico` en la lista |
 | T42 | `AgregarInfraestructura_ResuelveLaConsultaYLaGestionDeMedicos` | 29,30 | integration | `ServiceProvider` con `AgregarInfraestructura` y `AddIdentidadPersonal` (como T1 de la 2.1: `IGestionMedicos` también necesita `IActorVigente` de la 2.2); un scope | `IConsultaAgendas` se resuelve como `ConsultaAgendasEnBase`, e `IGestionMedicos` (que ahora la recibe) también se resuelve |
-| T43 | `ListarYObtener_MedicosConAgendas_MuestranElEstadoReal` | 30 | integration | `IGestionMedicos` resuelto del contenedor (como en las pruebas de la 3.2), con un `FakeTimeProvider` en 03/11/2026 y los comandos SQL capturados con `ConfigureDbContext` + `LogTo`; 4 médicos propios con apellido `Agenda<marca>`: sin agendas, con una aprobada desde 02/11, con una aprobada y una enviada, con sólo una aprobada desde 16/11; `ListarAsync("Agenda<marca>")` y `ObtenerAsync(id)` de cada uno | Listado y fichas: `SinAgenda`, `Vigente`, `PropuestaPendiente`, `SinAgenda` con `RigeDesde` 16/11/2026; el listado hace **un** solo `SELECT` sobre `agendas_medico` |
+| T43 | `ListarYObtener_MedicosConAgendas_MuestranElEstadoReal` | 30,31 | integration | `IGestionMedicos` resuelto del contenedor (como en las pruebas de la 3.2), con un `FakeTimeProvider` en 03/11/2026 y los comandos SQL capturados con `ConfigureDbContext` + `LogTo`; 4 médicos propios con apellido `Agenda<marca>`: sin agendas, con una aprobada desde 02/11, con una aprobada y una enviada, con sólo una aprobada desde 16/11; `ListarAsync("Agenda<marca>")` y `ObtenerAsync(id)` de cada uno | Listado y fichas: `SinAgenda`, `Vigente`, `PropuestaPendiente`, `SinAgenda` con `RigeDesde` 16/11/2026; el listado hace **un** solo `SELECT` sobre `agendas_medico` |
 | T44 | `GetMedicos_AgendasReales_MuestranVigentePendienteYSinAgendaConFecha` | 22,30 | integration | `PersonalWebApplicationFactory` (2.1) e ingreso de `admin1`; 3 médicos propios `Prueba<marca>, A/B/C` con `DatosDeCatalogo` de Web.Tests (3.2); agendas guardadas desde `app.Services`: A con una aprobada que rige hoy, B con una enviada, C con una aprobada que empieza dentro de 30 días (`VigenteDesde` = hoy del hospital + 30, con `app.Reloj`); GET `/personal/admin/medicos?buscar=<marca>` | `200`; la fila de A dice `Vigente`; la de B, `Propuesta pendiente`; la de C, `Sin agenda (rige desde dd/MM)` con la fecha de su agenda (decisión 8: la aprobada que todavía no rige se ve con su fecha) |
 
 Todas llevan `[Trait("Story", "4.1")]` y un `[Trait("AC", "n")]` por AC de su columna.
@@ -408,7 +412,17 @@ JavaScript), y T44 lo verifica con `HttpClient` sobre la aplicación real. El pr
   con `CadenaApp` (`turnos_app`), así que prueban los permisos reales.
 - **Datos propios por prueba** (base compartida): cada prueba crea **su** médico con
   `DatosDeCatalogo.CrearMedicoAsync(...)` de la 3.2 (`tests/HospitalTurnos.Aplicacion.Tests/Catalogo/DatosDeCatalogo.cs`;
-  no se escribe otra ayuda para lo mismo) y filtra por él: no hace falta limpiar tablas, y no se
+  no se escribe otra ayuda para lo mismo) y filtra por él. **Firmas reales** (verificadas contra el
+  código): en Aplicacion.Tests son extensiones sobre `ServiceProvider` —
+  `CrearEspecialidadAsync(this ServiceProvider, ActorAuditoria administrador, bool activa = true, string? nombre = null)`
+  y `CrearMedicoAsync(this ServiceProvider, string nombre, string apellido, string matricula, long especialidadId, Guid? usuarioPersonalId = null)`;
+  por eso las pruebas de integración arman el mismo `ServiceProvider` que `GestionMedicosEnBaseTests`
+  (`AgregarInfraestructura` + `AddIdentidadPersonal` con `ConnectionStrings:App` y `:Migraciones`) y
+  un administrador propio con `UsuariosDePrueba.CrearAsync(proveedor, [Roles.Administrador])` +
+  `UsuariosDePrueba.ActorDe(...)` para la especialidad. En Web.Tests son extensiones sobre
+  `WebApplicationFactory<Program>` — `CrearEspecialidadAsync(this app, bool activa = true, string? nombre = null)`
+  (usa el actor de `admin1`) y `CrearMedicoAsync(this app, nombre, apellido, matricula, especialidadId, usuarioPersonalId = null)`.
+  Así: no hace falta limpiar tablas, y no se
   toca `registros_auditoria`. `DatosDeAgenda` (método de extensión sobre `PostgresFixture`, como
   `LimpiezaDeBandeja` de la 1.4) sólo arma y guarda agendas: `GuardarAgendaAsync(medicoId, estado, vigenteDesde, reloj, franjas)`
   llega a cada estado con los métodos públicos (`Enviar`, `Aprobar`, `Rechazar`), igual que el
@@ -444,51 +458,51 @@ JavaScript), y T44 lo verifica con `HttpClient` sobre la aplicación real. El pr
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
-  - [ ] Confirmar que 2.2, 3.1 y 3.2 están en `main` tal como las describe el contrato único del
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos)
+  - [x] Confirmar que 2.2, 3.1 y 3.2 están en `main` tal como las describe el contrato único del
         AC 23 de la 3.2: `Medico` en `Dominio/Catalogo/` con `long Id`, tabla `medicos`, `DbSet`
         `Medicos`; `EstadoAgendaMedico { SinAgenda, Vigente, PropuestaPendiente }` y
         `SituacionDeAgenda(EstadoAgendaMedico Estado, DateOnly? RigeDesde = null)` en
         `src/HospitalTurnos.Dominio/Agendas/`; `GestionMedicosEnBase(contexto, auditoria, catalogo, actorVigente)`
-        con la línea `Agenda = SituacionDeAgenda.SinAgenda` marcada para la 4.1 en `ListarAsync` y
+        con el argumento `SituacionDeAgenda.SinAgenda` marcado para la 4.1 en `ListarAsync` y
         `ObtenerAsync`; las pruebas de la 3.2 resuelven `IGestionMedicos` del contenedor;
         `DatosDeCatalogo.CrearMedicoAsync` en Aplicacion.Tests y en Web.Tests; `IActorVigente` de la
         2.2. Anotar en el Debug Log lo que difiera; si algo no coincide → DETENERSE: **no** crear un
         segundo enum ni otra carpeta para "arreglarlo".
-  - [ ] Confirmar que `AccionesAuditoria` ya tiene `PropuestaAgendaEnviada`, `PropuestaAgendaAprobada`,
+  - [x] Confirmar que `AccionesAuditoria` ya tiene `PropuestaAgendaEnviada`, `PropuestaAgendaAprobada`,
         `PropuestaAgendaRechazada` y `AgendaCorregida` (AC 31), que `ContextoDePrueba` y la
         `PostgresFixture` de Aplicacion.Tests existen, y que
         `HospitalTurnos.Dominio.Tests` referencia `Microsoft.Extensions.TimeProvider.Testing`.
-  - [ ] `bash scripts/ci/local.sh` en verde antes de empezar.
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio, con las pruebas primero (AC: 1–21)
-  - [ ] `RelojDePrueba`, `AgendaBuilder` y T1–T31, viéndolas fallar (no compilan).
-  - [ ] `EstadoPropuesta` (`Borrador`, `Enviada`, `Aprobada`, `Rechazada`), con un comentario por
+  - [x] `bash scripts/ci/local.sh` en verde antes de empezar.
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio, con las pruebas primero (AC: 1–21)
+  - [x] `RelojDePrueba`, `AgendaBuilder` y T1–T31, viéndolas fallar (no compilan).
+  - [x] `EstadoPropuesta` (`Borrador`, `Enviada`, `Aprobada`, `Rechazada`), con un comentario por
         valor (como `EstadoVenta` del proyecto guía). El enum de A1 **no** se crea: es el
         `EstadoAgendaMedico` de la 3.2, en la misma carpeta.
-  - [ ] `Franja` (AC 1–3) y `AgendaMedico` (AC 4–21), con la forma de "Implementación concreta".
-  - [ ] `EstadoDeAgenda.Calcular` (AC 22) en `Dominio/Agendas/`, con T32 en rojo primero.
-  - [ ] T1–T32 en verde.
-- [ ] [SEQ] Task 3: Aplicacion — el puerto (AC: 29)
-  - [ ] `IConsultaAgendas` con las dos operaciones del AC 29 y un comentario de quién la usa.
-- [ ] [SEQ] Task 4: Infraestructura — mapeo y migración (AC: 23–28)
-  - [ ] `AgendaMedicoConfiguracion` y `FranjaConfiguracion` (ver "Implementación concreta").
-  - [ ] `HospitalDbContext`: `DbSet<AgendaMedico> AgendasMedico` y las dos `ApplyConfiguration`
+  - [x] `Franja` (AC 1–3) y `AgendaMedico` (AC 4–21), con la forma de "Implementación concreta".
+  - [x] `EstadoDeAgenda.Calcular` (AC 22) en `Dominio/Agendas/`, con T32 en rojo primero.
+  - [x] T1–T32 en verde.
+- [x] [SEQ] Task 3: Aplicacion — el puerto (AC: 29)
+  - [x] `IConsultaAgendas` con las dos operaciones del AC 29 y un comentario de quién la usa.
+- [x] [SEQ] Task 4: Infraestructura — mapeo y migración (AC: 23–28)
+  - [x] `AgendaMedicoConfiguracion` y `FranjaConfiguracion` (ver "Implementación concreta").
+  - [x] `HospitalDbContext`: `DbSet<AgendaMedico> AgendasMedico` y las dos `ApplyConfiguration`
         **antes** de `ConvencionSnakeCase.Aplicar`.
-  - [ ] `dotnet ef migrations add AgregarAgendas` (ver Como verificar) y, al final de su `Up`, el
+  - [x] `dotnet ef migrations add AgregarAgendas` (ver Como verificar) y, al final de su `Up`, el
         `migrationBuilder.Sql(...)` de permisos. Revisar el código generado: nombres en
         `snake_case`, filtro del índice, los tres `CHECK`, `xmin` **sin** columna nueva.
-  - [ ] Correr la Salvaguarda de BD (abajo).
-- [ ] [SEQ] Task 5: Infraestructura — la consulta y el estado real en A1 (AC: 29, 30)
-  - [ ] `ConsultaAgendasEnBase` (recibe `HospitalDbContext` y `TimeProvider`) y su registro `Scoped`
+  - [x] Correr la Salvaguarda de BD (abajo).
+- [x] [SEQ] Task 5: Infraestructura — la consulta y el estado real en A1 (AC: 29, 30)
+  - [x] `ConsultaAgendasEnBase` (recibe `HospitalDbContext` y `TimeProvider`) y su registro `Scoped`
         en `AgregarInfraestructura`.
-  - [ ] `GestionMedicosEnBase`: quinto parámetro `IConsultaAgendas` (al final) y el reemplazo del
+  - [x] `GestionMedicosEnBase`: quinto parámetro `IConsultaAgendas` (al final) y el reemplazo del
         AC 30. Las pruebas de la 3.2 no se tocan (resuelven del contenedor).
-- [ ] [SEQ] Task 6: Pruebas de integración (AC: 22–30, 32)
-  - [ ] `DatosDeAgenda` y T33–T43 en verde.
-  - [ ] T44 (Web.Tests) en verde: el estado real llega a la pantalla A1.
-- [ ] [SEQ] Task 7: Cierre (AC: 32)
-  - [ ] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` en verde; anotar la cobertura de
+- [x] [SEQ] Task 6: Pruebas de integración (AC: 22–30, 32)
+  - [x] `DatosDeAgenda` y T33–T43 en verde.
+  - [x] T44 (Web.Tests) en verde: el estado real llega a la pantalla A1.
+- [x] [SEQ] Task 7: Cierre (AC: 32)
+  - [x] Suite completa (`dotnet test`) y `bash scripts/ci/local.sh` en verde; anotar la cobertura de
         líneas de Dominio y Aplicacion en el Dev Agent Record.
 
 ### Task Dependencies
@@ -500,18 +514,25 @@ antes de tocar la base.
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-16 contra `main`, commit `c3413cc`, con 1.1 a 2.1 en done)
+#### En hospital-turnos (re-verificado 2026-10-16 contra `main`, commit `69580a0`, con 1.1 a 3.2 en done)
 
-- **No existe nada de agendas**: no hay carpeta `src/HospitalTurnos.Dominio/Agendas/`, ni tablas, ni
-  puertos. `src/HospitalTurnos.Dominio/` tiene hoy `Auditoria/`, `Excepciones/` y `Personal/`.
-- **Todavía no existen `Medico` ni `Especialidad`**: los crean la 3.1 y la 3.2, que se implementan
-  antes (orden del sprint: 2.2 → 3.1 → 3.2 → 4.1). Sus stories ya están escritas
-  (`docs/stories/3-1-especialidades.md`, `docs/stories/3-2-medicos.md`) y la 3.2 fija en su AC 23
-  el **contrato único** con esta: `Medico` en `Dominio/Catalogo/` con `long Id` y tabla `medicos`;
-  `EstadoAgendaMedico` y `SituacionDeAgenda` en `Dominio/Agendas/`; `GestionMedicosEnBase` con
-  cuatro parámetros y la línea `Agenda = SituacionDeAgenda.SinAgenda` marcada para la 4.1; la regla
-  del estado (decisión 8) la escribe esta story en `EstadoDeAgenda.Calcular`. La Task 1 confirma que
-  el código quedó así.
+- **De agendas existe sólo lo que dejó la 3.2** (AC 23 de la 3.2, confirmado en el código):
+  `src/HospitalTurnos.Dominio/Agendas/` con `EstadoAgendaMedico.cs` (`SinAgenda`, `Vigente`,
+  `PropuestaPendiente`) y `SituacionDeAgenda.cs` (`sealed record SituacionDeAgenda(EstadoAgendaMedico Estado,
+  DateOnly? RigeDesde = null)` con la constante `SituacionDeAgenda.SinAgenda`). No hay tablas de agendas
+  ni puertos. `src/HospitalTurnos.Dominio/` tiene hoy `Agendas/`, `Auditoria/`, `Catalogo/`,
+  `Excepciones/` y `Personal/`.
+- **`Medico` y `Especialidad` existen** (3.1 y 3.2, en `Dominio/Catalogo/`, `long Id`, tablas
+  `especialidades` y `medicos`; configuraciones `EspecialidadConfiguracion` y `MedicoConfiguracion`).
+- **`GestionMedicosEnBase(contexto, auditoria, catalogo, actorVigente)`** — cuatro parámetros. Las dos
+  marcas para la 4.1 **no** son una asignación `Agenda = ...`: son el último argumento posicional
+  `SituacionDeAgenda.SinAgenda` del constructor de `MedicoListado` (en `ListarAsync`, dentro del
+  `Select` en memoria) y de `DatosFichaMedico` (en `ObtenerAsync`), cada una con el comentario
+  "La 4.1 (su AC 30) reemplaza esta asignación por IConsultaAgendas.EstadosDeAgendaAsync". La regla
+  del estado (decisión 8) la escribe esta story en `EstadoDeAgenda.Calcular`.
+- Las pruebas de la 3.2 (`GestionMedicosEnBaseTests`) arman el `ServiceProvider` con
+  `AgregarInfraestructura` + `AddIdentidadPersonal` + `reemplazos` al final, y resuelven
+  `IGestionMedicos` del contenedor: el quinto parámetro no las toca.
 - `HospitalDbContext` (`Infraestructura/Persistencia/`): hereda de
   `IdentityDbContext<UsuarioPersonal, IdentityRole<Guid>, Guid>`; cada configuración se aplica **a
   mano** con `modelBuilder.ApplyConfiguration(new ...())` (no hay `ApplyConfigurationsFromAssembly`)
@@ -519,12 +540,13 @@ antes de tocar la base.
   salen del nombre del `DbSet` pasado a `snake_case` (`RegistrosAuditoria` → `registros_auditoria`).
   La convención renombra tablas, columnas, claves, FK e índices; **no** renombra los `CHECK`, por eso
   sus nombres se escriben ya en `snake_case`.
-- Configuraciones existentes en `Persistencia/Configuraciones/`: `RegistroAuditoriaConfiguracion`
+- Configuraciones existentes en `Persistencia/Configuraciones/`: `EspecialidadConfiguracion`,
+  `MedicoConfiguracion`, `RegistroAuditoriaConfiguracion`
   (enum guardado como texto con `HasConversion<string>().HasMaxLength(20)`) y
   `MensajeSalienteConfiguracion` (índice parcial con `HasFilter("enviado_el IS NULL AND ...")`
   escrito con los nombres ya en `snake_case`). Ids propios: `long` identity.
 - Migraciones en `Persistencia/Migraciones/`, nombre `<marca>_Nombre` (la última,
-  `20261016180914_IdentidadPersonal`). `20261016020303_AgregarBandejaDeSalida` termina con
+  `20261017014314_AgregarMedicos`). `20261016020303_AgregarBandejaDeSalida` termina con
   `REVOKE ALL ON TABLE ... FROM turnos_app; GRANT SELECT, INSERT, UPDATE ...` y el `GRANT USAGE` de
   la secuencia: es el modelo de permisos que copia esta story.
 - `docker/postgres/initdb/01-roles.sh` da por defecto `SELECT, INSERT, UPDATE, DELETE` a toda tabla
@@ -785,7 +807,7 @@ mismo orden: estado → validar → cambiar → corregir.
 agenda.HasKey(a => a.Id);                                                   // long → identity
 agenda.Property(a => a.Estado).HasConversion<string>().HasMaxLength(20);    // como Canal (1.3)
 agenda.Property(a => a.MotivoRechazo).HasMaxLength(AgendaMedico.LargoMaximoMotivo);
-agenda.Property<uint>("Version").IsRowVersion();                            // xmin, AC 27
+agenda.Property<uint>("Version").IsRowVersion().HasColumnName("xmin");      // xmin, AC 27 (nombre explícito: ver Change Log)
 agenda.HasOne<Medico>().WithMany().HasForeignKey(a => a.MedicoId).OnDelete(DeleteBehavior.Restrict);
 agenda.HasMany(a => a.Franjas).WithOne().HasForeignKey("AgendaMedicoId")
       .IsRequired()                                                         // NOT NULL: sin franjas huérfanas (M-1)
@@ -959,11 +981,40 @@ cargarla sin la 4.2/4.3, alcanza con T44 y se anota en el Dev Agent Record.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (sesión 12, 2026-10-16/17).
+
 ### Debug Log References
+
+- Task 1: contrato del AC 23 de la 3.2 confirmado contra `main` `69580a0`; difería sólo la forma de
+  las marcas (argumento posicional, no asignación) y las firmas de `DatosDeCatalogo`: corregido en la
+  story antes de implementar. CI local de base en verde.
+- `dotnet ef migrations add` generó primero una columna `version xid`: la convención snake_case
+  renombraba la propiedad sombra. Se quitó la migración y se fijó `HasColumnName("xmin")`.
+- La primera corrida de integración falló por la ayuda de pruebas: el reloj falso se armaba con
+  offset −03:00 y Npgsql sólo acepta UTC en `timestamptz`. El reloj real (`RelojHospital`) da UTC.
+- Salvaguarda de BD contra Compose: `\d` coincide con el AC 23; permisos `f | t | t`; auditoría sin
+  UPDATE (`.advisors/dod-runtime/4.1-salvaguarda-bd.txt`, local).
 
 ### Completion Notes List
 
+- 44 verificaciones de la tabla, en verde: T1–T32 (92 casos, Dominio.Tests), T33–T43 (18 casos,
+  Aplicacion.Tests), T44 (Web.Tests). Suite completa: 481 pruebas (138 + 169 + 174), antes 370.
+- `bash scripts/ci/local.sh` en verde: cobertura de líneas 97 % (umbral 80 %), ramas 87,7 %.
+- Las pruebas de la 3.2 no se tocaron: resuelven `GestionMedicosEnBase` del contenedor.
+
 ### File List
+
+Nuevos: `src/HospitalTurnos.Dominio/Agendas/{EstadoPropuesta,Franja,AgendaMedico,EstadoDeAgenda}.cs`,
+`src/HospitalTurnos.Aplicacion/Agendas/IConsultaAgendas.cs`,
+`src/HospitalTurnos.Infraestructura/Agendas/ConsultaAgendasEnBase.cs`,
+`src/HospitalTurnos.Infraestructura/Persistencia/Configuraciones/{AgendaMedico,Franja}Configuracion.cs`,
+`src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261017025538_AgregarAgendas{,.Designer}.cs`,
+`tests/HospitalTurnos.Dominio.Tests/Ayudas/{RelojDePrueba,AgendaBuilder}.cs`,
+`tests/HospitalTurnos.Dominio.Tests/Agendas/{Franja,EdicionDeAgenda,EstadosDeAgenda,HorariosDelDia,Vigencia,EstadoDeAgenda}Tests.cs`,
+`tests/HospitalTurnos.Aplicacion.Tests/Agendas/{DatosDeAgenda,PersistenciaAgendasTests,ConsultaAgendasTests}.cs`,
+`tests/HospitalTurnos.Web.Tests/Catalogo/EstadoDeAgendaEnA1HttpTests.cs`.
+Modificados: `HospitalDbContext.cs`, `HospitalDbContextModelSnapshot.cs`, `ServiciosDeInfraestructura.cs`,
+`Catalogo/GestionMedicosEnBase.cs`, esta story.
 
 ### Change Log
 
@@ -979,3 +1030,29 @@ cargarla sin la 4.2/4.3, alcanza con T44 y se anota en el Dev Agent Record.
   FK de franjas `NOT NULL` (M-1); `LogTo` con una lista (M-2); `depends_on` con la 2.2 (M-3); AC 31
   declarativo (M-4). Decisiones 11–14 tomadas, con los avisos de la 4.3 en el contrato. 32 AC,
   44 verificaciones; ninguna decisión abierta.
+- 2026-10-16 (sesión 12): Re-verificada contra `main` (`69580a0`, 1.1 a 3.2 en done) antes de
+  implementar. El contrato del AC 23 de la 3.2 coincide (tipos en `Dominio/Agendas/`, cuatro
+  parámetros, dos marcas para la 4.1). Se corrige: (1) las marcas no son una asignación
+  `Agenda = ...` sino el último argumento posicional de `MedicoListado` y `DatosFichaMedico` (AC 30,
+  Task 1); (2) "Qué existe hoy" describía el repo antes de la 3.1/3.2; (3) las firmas reales de
+  `DatosDeCatalogo` (extensiones sobre `ServiceProvider` en Aplicacion.Tests, con un administrador
+  propio para la especialidad; sobre `WebApplicationFactory<Program>` en Web.Tests).
+- 2026-10-16 (sesión 12): decisión del docente sobre el AC 31 (VAL-W11): se le asignan las pruebas
+  que ya lo cubren, como en la 3.1 y la 3.2 — T36 (una sola enviada, para la 4.2), T39 (la agenda que
+  rige, para la 5.2) y T43 (estado real en A1, para la 3.2). Siguen siendo 44 verificaciones.
+- 2026-10-16 (sesión 12, implementación): `IsRowVersion()` solo no alcanza en este repo: la
+  convención snake_case renombra la propiedad sombra `Version` a `version` y la migración crea una
+  columna `xid` nueva. Se agrega `.HasColumnName("xmin")` (la convención lo deja igual); verificado con
+  `dotnet ef migrations script`: la tabla no tiene columna de versión, y T38 prueba la concurrencia.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[WARNING]** VAL-W15 — `docs/stories/4-1-dominio-agenda.md` — Tasks tildadas (implementación completa y verificada) <!-- fkey:VAL-W15|docs/stories/4-1-dominio-agenda.md -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/4-1-dominio-agenda.md#dev-agent-record` — Dev Agent Record completo: modelo, debug log, notas, archivos, cobertura 97% <!-- fkey:VAL-W15|docs/stories/4-1-dominio-agenda.md#dev-agent-record -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/4-1-dominio-agenda.md#files_to_create` — Placeholder <marca> reemplazado por 20261017025538_AgregarAgendas <!-- fkey:VAL-W15|docs/stories/4-1-dominio-agenda.md#files_to_create -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/4-1-dominio-agenda.md#ac-27` — AC 27 alineado con HasColumnName("xmin") <!-- fkey:VAL-W15|docs/stories/4-1-dominio-agenda.md#ac-27 -->
+- [x] **[WARNING]** TEST-W2 — `.advisors/tests-result.json` — scripts/ci/local.sh en verde: 97% de líneas (umbral 80%), ramas 87,7% <!-- fkey:TEST-W2|.advisors/tests-result.json -->
+- [x] **[WARNING]** TEST-W2 — `.advisors/tests-result.json:22` — declared_not_found por placeholders <marca> y la ruta del gate; los archivos existen (confirmado por el propio revisor y por el validador) <!-- fkey:TEST-W2|.advisors/tests-result.json:22 -->
