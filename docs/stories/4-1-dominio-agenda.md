@@ -2,7 +2,7 @@
 epic: 4
 story: "4.1"
 title: "Dominio de agenda: franjas, duración, estados de la propuesta, horarios del día y vigencia"
-status: review
+status: done
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -39,7 +39,7 @@ files_to_modify:
 
 # Story 4.1: Dominio de agenda: franjas, duración, estados de la propuesta, horarios del día y vigencia
 
-Status: review
+Status: done
 
 ## Story
 
