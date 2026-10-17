@@ -8,6 +8,7 @@
 @using HospitalTurnos.Dominio.Personal
 @using HospitalTurnos.Web.Errores
 @inject IGestionUsuariosPersonal Gestion
+@inject IGestionMedicos GestionMedicos
 @inject TimeProvider Reloj
 
 @* A4 (UX §7), renderizado estático como S0. La página atrapa SÓLO las excepciones del dominio y muestra
@@ -65,7 +66,7 @@ else if (confirmacion is not null)
     <AntiforgeryToken />
     <table class="table align-middle">
         <thead>
-            <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Estado</th><th>Acciones</th></tr>
+            <tr><th>Usuario</th><th>Nombre</th><th>Rol</th><th>Médico vinculado</th><th>Estado</th><th>Acciones</th></tr>
         </thead>
         <tbody>
             @foreach (var fila in filas)
@@ -75,6 +76,7 @@ else if (confirmacion is not null)
                     <td>@fila.Usuario</td>
                     <td>@fila.NombreCompleto</td>
                     <td>@EtiquetaDe(fila.Rol)</td>
+                    <td>@MedicoVinculadoDe(fila)</td>
                     <td>
                         @(fila.Activo ? "Activo" : "Desactivado")
                         @if (bloqueado)
@@ -123,6 +125,7 @@ else if (confirmacion is not null)
     private EditContext contextoAlta = default!;
     private ValidationMessageStore mensajesAlta = default!;
     private IReadOnlyList<UsuarioPersonalFila> filas = [];
+    private IReadOnlyDictionary<Guid, string> vinculados = new Dictionary<Guid, string>();
     private Guid? idPropio;
     private AltaUsuarioPersonal? alta;
     private string? confirmacion;
@@ -145,7 +148,17 @@ else if (confirmacion is not null)
         mensajesAlta = new ValidationMessageStore(contextoAlta);
     }
 
-    private async Task CargarAsync() => filas = await Gestion.ListarAsync(HttpContext.RequestAborted);
+    private async Task CargarAsync()
+    {
+        filas = await Gestion.ListarAsync(HttpContext.RequestAborted);
+        vinculados = await GestionMedicos.MedicosVinculadosAsync(HttpContext.RequestAborted);   // story 3.2, AC 14
+    }
+
+    // Story 3.2 (AC 14, decisión 17): el médico vinculado; "Sin vincular" a un usuario médico que no lo tiene.
+    private string MedicoVinculadoDe(UsuarioPersonalFila fila) =>
+        vinculados.TryGetValue(fila.Id, out var medico) ? medico
+        : fila.Rol == Roles.Medico ? "Sin vincular"
+        : "";
 
     private async Task CrearAsync()
     {

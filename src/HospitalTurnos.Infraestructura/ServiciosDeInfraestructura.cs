@@ -27,6 +27,8 @@ public static class ServiciosDeInfraestructura
         servicios.AddScoped<IAuditoria, AuditoriaEnBase>();
         // Story 3.1: mismo alcance que el contexto y la auditoría (necesita el IActorVigente de la identidad).
         servicios.AddScoped<ICatalogoEspecialidades, CatalogoEspecialidadesEnBase>();
+        // Story 3.2: igual que la 3.1; además usa el catálogo para validar la especialidad elegida.
+        servicios.AddScoped<IGestionMedicos, GestionMedicosEnBase>();
         return servicios;
     }
 

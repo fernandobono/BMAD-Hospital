@@ -21,6 +21,9 @@ public static class RutasPersonal
     public const string MiAgenda = "/personal/medico/mi-agenda";
     public const string MiPropuesta = "/personal/medico/mi-propuesta";
     public const string Medicos = "/personal/admin/medicos";
+    // Story 3.2: dentro de A1, fuera del menú. "Nuevo…" y no "MedicoNuevo": así se llama la página (I-5).
+    public const string NuevoMedico = "/personal/admin/medicos/nuevo";
+    public static string FichaMedico(long id) => $"/personal/admin/medicos/{id}";
     public const string Propuestas = "/personal/admin/propuestas";
     public const string Especialidades = "/personal/admin/especialidades";
     public const string Bloqueos = "/personal/admin/bloqueos";

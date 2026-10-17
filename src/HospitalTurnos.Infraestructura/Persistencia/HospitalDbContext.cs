@@ -11,8 +11,8 @@ namespace HospitalTurnos.Infraestructura.Persistencia;
 
 /// <summary>
 /// Contexto único de la aplicación. Las entidades las agregan las stories: 1.3 (auditoría),
-/// 1.4 (bandeja de salida), 2.1 (usuarios y roles del personal, con Identity), 3.1 (especialidades)
-/// y las siguientes.
+/// 1.4 (bandeja de salida), 2.1 (usuarios y roles del personal, con Identity), 3.1 (especialidades),
+/// 3.2 (médicos) y las siguientes.
 /// La convención snake_case ya queda aplicada, también a las tablas de Identity.
 /// </summary>
 public class HospitalDbContext(DbContextOptions<HospitalDbContext> opciones)
@@ -21,6 +21,7 @@ public class HospitalDbContext(DbContextOptions<HospitalDbContext> opciones)
     public DbSet<RegistroAuditoria> RegistrosAuditoria => Set<RegistroAuditoria>();
     public DbSet<MensajeSaliente> MensajesSalientes => Set<MensajeSaliente>();
     public DbSet<Especialidad> Especialidades => Set<Especialidad>();
+    public DbSet<Medico> Medicos => Set<Medico>();
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
@@ -33,6 +34,7 @@ public class HospitalDbContext(DbContextOptions<HospitalDbContext> opciones)
         modelBuilder.ApplyConfiguration(new RegistroAuditoriaConfiguracion());
         modelBuilder.ApplyConfiguration(new MensajeSalienteConfiguracion());
         modelBuilder.ApplyConfiguration(new EspecialidadConfiguracion());
+        modelBuilder.ApplyConfiguration(new MedicoConfiguracion());
         // Al final: así también renombra lo que configuren las entidades.
         ConvencionSnakeCase.Aplicar(modelBuilder);
     }

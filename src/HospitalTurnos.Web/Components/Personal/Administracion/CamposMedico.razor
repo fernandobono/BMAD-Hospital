@@ -1,0 +1,49 @@
+@* Los campos del formulario de A1 (story 3.2), comunes al alta y a la ficha. Cada uno con su etiqueta visible
+   (NFR-05) y su mensaje debajo (AC 7). Las listas las carga la página en cada pedido. *@
+<div class="mb-3">
+    <label for="nombre" class="form-label">Nombre</label>
+    <InputText id="nombre" class="form-control" @bind-Value="Input.Nombre" autocomplete="off" />
+    <ValidationMessage For="() => Input.Nombre" class="text-danger" />
+</div>
+<div class="mb-3">
+    <label for="apellido" class="form-label">Apellido</label>
+    <InputText id="apellido" class="form-control" @bind-Value="Input.Apellido" autocomplete="off" />
+    <ValidationMessage For="() => Input.Apellido" class="text-danger" />
+</div>
+<div class="mb-3">
+    <label for="matricula" class="form-label">Matrícula</label>
+    <InputText id="matricula" class="form-control" @bind-Value="Input.Matricula" autocomplete="off" />
+    <ValidationMessage For="() => Input.Matricula" class="text-danger" />
+</div>
+<div class="mb-3">
+    <label for="especialidad" class="form-label">Especialidad</label>
+    <InputSelect id="especialidad" class="form-select" @bind-Value="Input.EspecialidadId">
+        <option value="">Elegí una especialidad</option>
+        @foreach (var especialidad in Especialidades)
+        {
+            <option value="@especialidad.Id">@(especialidad.Activa ? especialidad.Nombre : $"{especialidad.Nombre} (desactivada)")</option>
+        }
+    </InputSelect>
+    <ValidationMessage For="() => Input.EspecialidadId" class="text-danger" />
+</div>
+<div class="mb-3">
+    <label for="usuario" class="form-label">Usuario del sistema</label>
+    <InputSelect id="usuario" class="form-select" @bind-Value="Input.UsuarioPersonalId">
+        <option value="">Sin usuario</option>
+        @foreach (var usuario in Usuarios)
+        {
+            <option value="@usuario.Id">@usuario.NombreCompleto (@usuario.Usuario)</option>
+        }
+    </InputSelect>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public FormularioMedico Input { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<EspecialidadResumen> Especialidades { get; set; } = [];
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<OpcionUsuarioMedico> Usuarios { get; set; } = [];
+}

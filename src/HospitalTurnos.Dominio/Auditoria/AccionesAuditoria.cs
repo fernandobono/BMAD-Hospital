@@ -31,4 +31,8 @@ public static class AccionesAuditoria
     public const string EspecialidadCreada = "especialidad.creada";
     public const string EspecialidadDesactivada = "especialidad.desactivada";
     public const string EspecialidadReactivada = "especialidad.reactivada";
+
+    // Story 3.2: los médicos (A1, canal Personal).
+    public const string MedicoCreado = "medico.creado";
+    public const string MedicoEditado = "medico.editado";
 }
