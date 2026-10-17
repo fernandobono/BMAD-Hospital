@@ -33,6 +33,8 @@ public static class ServiciosDeInfraestructura
         servicios.AddScoped<IGestionMedicos, GestionMedicosEnBase>();
         // Story 4.1: lectura de agendas; la usa GestionMedicosEnBase para el estado de A1.
         servicios.AddScoped<IConsultaAgendas, ConsultaAgendasEnBase>();
+        // Story 4.2: la propuesta del médico (M2); usa el contexto, la auditoría y el IActorVigente del alcance.
+        servicios.AddScoped<IPropuestaAgenda, PropuestaAgendaEnBase>();
         return servicios;
     }
 

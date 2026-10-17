@@ -1,0 +1,178 @@
+@page "/personal/medico/mi-propuesta"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Medico)]
+@using System.Globalization
+@using HospitalTurnos.Dominio.Excepciones
+@using HospitalTurnos.Web.Errores
+@inject IPropuestaAgenda Propuesta
+@inject TimeProvider Reloj
+@inject NavigationManager Navegacion
+
+@* M2 (UX §6, story 4.2), renderizado estático: el servidor arma la página entera en cada pedido. Arriba siempre la
+   agenda vigente; abajo la propuesta en curso, editable o, si está enviada, en sólo lectura. Mismo manejo de errores
+   que A1 (3.2): el cartel con la regla y su código, lo escrito conservado. *@
+<PageTitle>Mi propuesta de agenda · Las Acacias</PageTitle>
+<h1>Mi propuesta de agenda</h1>
+
+@if (estado is not null)
+{
+    <div class="alert alert-success" role="status">@estado</div>
+}
+@if (error is not null)
+{
+    <div class="alert alert-danger" role="alert">@error</div>
+}
+
+@if (vista is { SinVinculo: true })
+{
+    <p>@SinVinculo</p>
+    @* Un envío igual (armado a mano o de una pestaña vieja) necesita el formulario con su nombre para que Blazor lo
+       despache: vacío, sin campos a la vista, y el caso de uso responde con el cartel y el 403 (AC 21). *@
+    @if (HttpMethods.IsPost(HttpContext.Request.Method) && Input is not null)
+    {
+        <EditForm Model="Input" method="post" FormName="propuesta" OnSubmit="AlEnviarAsync" />
+    }
+}
+else if (vista is not null)
+{
+    <section class="mb-4">
+        @if (vista.Vigente is { } vigente)
+        {
+            <p class="mb-1"><strong>Mi agenda vigente:</strong></p>
+            <ResumenDeAgenda Agenda="vigente" />
+        }
+        else
+        {
+            <p>Todavía no tenés una agenda vigente.</p>
+        }
+        @if (vista.ProximaAprobada is { } proxima)
+        {
+            <p class="mt-3 mb-1">Tu agenda nueva ya está aprobada y rige desde el @Fecha(proxima.VigenteDesde).</p>
+            <ResumenDeAgenda Agenda="proxima" />
+        }
+    </section>
+
+    @if (Enviada is { } enviada)
+    {
+        <h2 class="h4">Tu propuesta</h2>
+        <p class="mb-1">Estado: Enviada</p>
+        <p class="mb-1">Esperando aprobación desde el @Fecha(Local(enviada.EnviadaEl!.Value)).</p>
+        <p>Rige desde el @Fecha(enviada.VigenteDesde).</p>
+        <ResumenDeAgenda Agenda="enviada" />
+    }
+    else if (Input is not null)
+    {
+        @* Con una enviada en la base (POST de una pestaña vieja) no es una propuesta nueva. *@
+        <h2 class="h4">@(vista.EnCurso is null ? "Nueva propuesta" : "Tu propuesta")</h2>
+        @if (Editable is { } editable)
+        {
+            <p class="mb-1">Estado: @(editable.Estado == EstadoPropuesta.Rechazada ? "Rechazada" : "Borrador")</p>
+            @if (editable.MotivoRechazo is { } motivo && editable.RechazadaEl is { } rechazadaEl)
+            {
+                <p class="mb-1">Motivo del rechazo: «@motivo»</p>
+                <p>Rechazada el @Fecha(Local(rechazadaEl)) a las @Local(rechazadaEl).ToString("HH:mm", CultureInfo.InvariantCulture).</p>
+            }
+        }
+        <EditForm Model="Input" method="post" FormName="propuesta" OnSubmit="AlEnviarAsync">
+            <DataAnnotationsValidator />
+            <EditorDeAgenda Input="Input" TurnosPorSemanaAntes="@vista.Vigente?.TurnosPorSemana()"
+                            MinimoVigenteDesde="@vista.MinimoVigenteDesde" />
+            <div class="d-flex gap-2">
+                <button type="submit" name="Input.Accion" value="guardar" class="btn btn-outline-primary">Guardar borrador</button>
+                <button type="submit" name="Input.Accion" value="enviar" class="btn btn-primary"
+                        style="background-color: #1F5FA8;">Enviar para aprobación</button>
+            </div>
+        </EditForm>
+    }
+}
+
+@code {
+    private const string SinVinculo = "Tu usuario no está vinculado a un médico. Pedíselo al administrador.";
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromForm(FormName = "propuesta")]
+    private FormularioAgenda? Input { get; set; }
+
+    [SupplyParameterFromQuery(Name = "resultado")]
+    private string? Resultado { get; set; }
+
+    private VistaPropuesta? vista;
+    private string? estado;
+    private string? error;
+
+    // Una enviada se muestra en sólo lectura. En un POST el formulario se dibuja igual (Blazor necesita el formulario
+    // con su nombre para despachar el envío): el de una pestaña vieja lo frena el caso de uso con su cartel (AC 18).
+    private AgendaMedico? Enviada =>
+        vista?.EnCurso is { Estado: EstadoPropuesta.Enviada } enviada && !HttpMethods.IsPost(HttpContext.Request.Method) ? enviada : null;
+
+    private AgendaMedico? Editable => vista?.EnCurso is { Estado: EstadoPropuesta.Borrador or EstadoPropuesta.Rechazada } e ? e : null;
+
+    protected override async Task OnInitializedAsync()
+    {
+        vista = await Propuesta.ObtenerAsync(ActorDeSesion.Desde(HttpContext.User), HttpContext.RequestAborted);
+        if (vista.SinVinculo)
+        {
+            Input ??= FormularioAgenda.Nueva(vista.MinimoVigenteDesde);   // sólo lo usa el formulario vacío de un POST
+            return;
+        }
+        // Decisión 4: una propuesta nueva arranca con la última aprobada (o 20 minutos y sin franjas), desde el mínimo.
+        Input ??= Editable is { } editable ? FormularioAgenda.Desde(editable)
+            : vista.ParaCopiar is { } copiar ? Copia(copiar, vista.MinimoVigenteDesde)
+            : FormularioAgenda.Nueva(vista.MinimoVigenteDesde);
+        // Sólo los tres textos fijos: nunca se muestra lo que venga en la consulta.
+        estado = Resultado switch
+        {
+            "borrador" => "Borrador guardado.",
+            "sin-cambios" => "No había cambios para guardar.",
+            "enviada" => "Propuesta enviada para aprobación.",
+            _ => null,
+        };
+    }
+
+    private async Task AlEnviarAsync(EditContext contexto)
+    {
+        string destino;
+        try
+        {
+            if (Input!.AplicarAccionDeEdicion())
+                return;                                                  // AC 8: se vuelve a dibujar, nada se guarda
+            if (Input.Accion is not ("guardar" or "enviar"))
+                throw new ReglaDeNegocioException(FormularioAgenda.AccionDesconocida);
+            if (!contexto.Validate())
+                return;                                                  // AC 11: 200 con los mensajes
+            var actor = ActorDeSesion.Desde(HttpContext.User);
+            if (Input.Accion == "enviar")
+            {
+                await Propuesta.EnviarAsync(Input.ADatos(), actor, HttpContext.RequestAborted);
+                destino = "enviada";
+            }
+            else
+                destino = await Propuesta.GuardarBorradorAsync(Input.ADatos(), actor, HttpContext.RequestAborted)
+                    is ResultadoGuardado.SinCambios ? "sin-cambios" : "borrador";
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            // UX §8: el cartel arriba con la regla; el código es el del manejador (400/403/409).
+            ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+            estado = null;
+            error = e.Message;
+            return;
+        }
+        Navegacion.NavigateTo($"{RutasPersonal.MiPropuesta}?resultado={destino}");   // fuera del try (SSR)
+    }
+
+    private static FormularioAgenda Copia(AgendaMedico aprobada, DateOnly minimo)
+    {
+        var copia = FormularioAgenda.Desde(aprobada);
+        copia.VigenteDesde = minimo;
+        return copia;
+    }
+
+    private DateTimeOffset Local(DateTimeOffset marca) => TimeZoneInfo.ConvertTime(marca, Reloj.LocalTimeZone);
+
+    private static string Fecha(DateOnly fecha) => fecha.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+
+    private static string Fecha(DateTimeOffset marca) => marca.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+}

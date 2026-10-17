@@ -2,7 +2,7 @@
 epic: 4
 story: "4.2"
 title: "El médico arma, guarda y envía su propuesta de agenda"
-status: ready-for-dev
+status: review
 sprint: 3
 priority: "P0"
 approach: "[CREATE]"
@@ -25,6 +25,9 @@ files_to_create:
   - "tests/HospitalTurnos.Aplicacion.Tests/Agendas/PropuestaAgendaTests.cs"
   - "tests/HospitalTurnos.Aplicacion.Tests/Agendas/DatosDePropuesta.cs"
   - "tests/HospitalTurnos.Aplicacion.Tests/Personal/ActorVigenteIdentityTests.cs"
+  - "docs/qa/4.2-pasos.md"
+  - "docs/qa/4.2-legibilidad.md"
+  - "docs/qa/4.2-legibilidad-ui.md"
 files_to_modify:
   - "src/HospitalTurnos.Aplicacion/Personal/IActorVigente.cs"
   - "src/HospitalTurnos.Infraestructura/Identidad/ActorVigenteIdentity.cs"
@@ -34,11 +37,12 @@ files_to_modify:
   - "src/HospitalTurnos.Web/Components/Personal/Secciones/SeccionesMedico.razor"
   - "src/HospitalTurnos.Web/Components/_Imports.razor"
   - "tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs"
+  - "tests/HospitalTurnos.Aplicacion.Tests/Agendas/DatosDeAgenda.cs"
 ---
 
 # Story 4.2: El médico arma, guarda y envía su propuesta de agenda
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -145,7 +149,8 @@ corregirla y reenviarla (RU-07b).
     agenda vigente (sin vigente, sin el paréntesis). El cálculo es **uno solo**, en el dominio: el
     editor, el resumen y la A6 de la 4.3 usan ese método. **Given** alguna fila con problema o una
     duración fuera de 10–60 **Then** `Corregí lo marcado para ver cuántos turnos ofrecés.`; **Given**
-    ninguna franja **Then** `Agregá franjas para ver cuántos turnos ofrecés por semana.` En SSR el
+    ninguna franja (y una duración válida: si la duración está fuera de rango, manda el cartel anterior)
+    **Then** `Agregá franjas para ver cuántos turnos ofrecés por semana.` En SSR el
     número se actualiza con cada botón del formulario, no mientras se escribe (decisión 3).
 11. **Validación de campos** (sólo con `Guardar borrador` y `Enviar para aprobación`): **Given** un
     campo inválido **Then** `200` con el mensaje debajo del campo, lo escrito conservado, y no se
@@ -212,7 +217,8 @@ corregirla y reenviarla (RU-07b).
 
     **Formato de franja en la auditoría — contrato** (I-6 de la revisión): el día como el número de la
     base (`(int)DayOfWeek`: 0 = domingo … 6 = sábado), `desde` y `hasta` en `HH:mm` con
-    `CultureInfo.InvariantCulture`, y la medianoche final como `00:00` (igual que en la base). Todo
+    `CultureInfo.InvariantCulture`, y la medianoche final como `00:00` (igual que en la base). Las franjas
+    van ordenadas por ese número de día y, en cada día, por `desde` (el domingo primero). Todo
     registro de auditoría que describa franjas de una `AgendaMedico` usa este formato: la 4.4 lo copia en
     `agenda.corregida` y la 9.1 (A5) lo lee igual en los dos. Lo prueba T23.
 
@@ -336,7 +342,7 @@ corregirla y reenviarla (RU-07b).
 
 ### No-regresión
 
-25. Siguen en verde las pruebas de las stories 1.1 a 4.1 (y la 2.3 si ya está en `main`). Cambios
+25. Siguen en verde las pruebas de las stories 1.1 a 4.1 y la 2.3 (ya en `main`). Cambios
     **esperados** en lo existente, y sólo éstos: `SeccionesMedico.razor` pierde
     `@page "/personal/medico/mi-propuesta"` (dos páginas con la misma ruta dan un error interno, L-6);
     en la T19 de la 2.1 (`SesionYPermisosHttpTests`), `/personal/medico/mi-propuesta` se suma a
@@ -362,10 +368,10 @@ corregirla y reenviarla (RU-07b).
 | T5 | `Revisar_DuracionInvalidaOSinFranjas_NoDaElCalculo` | 10 | unit | `[Theory]`: duración 5 con una franja válida; duración vacía; 20 min sin filas | `TurnosPorSemana = null` en los tres; el tercero con `SinFranjas = true` |
 | T6 | `AplicarAccionDeEdicion_SegunElBoton_CambiaLasFilasOLaDejaALaPagina` | 8, 24 | unit | 2 filas; `[Theory]` `Accion`: `agregar-franja`; `quitar-franja:1`; `actualizar`; `guardar`; `enviar`; `quitar-franja:9`; `quitar-franja:x` | `true` y 3 filas (la nueva `Monday`, sin horas) / `true` y queda la fila 0 / `true` sin cambios / `false` / `false` / `ReglaDeNegocioException` con `No reconocemos esa acción. Recargá la página.` (dos casos) |
 | T7 | `DesdeYADatos_AgendaGuardada_IdaYVueltaConMedianoche` | 4, 5, 24 | unit | `FormularioAgenda.Desde(agenda)` de una agenda de 30 min desde 02/11/2026 con viernes 20:00–00:00 y lunes 14:00–18:00 cargadas en ese orden; después `ADatos()`. Y `Nueva(23/10/2026)` | Filas ordenadas lunes, viernes; `Hasta = 00:00`; `ADatos()` devuelve los mismos valores; `Nueva` trae 20 min, sin filas y esa fecha |
-| T8 | `Validar_CamposFaltantesOFueraDeRango_DevuelveLosMensajes` | 11 | unit | `Validator.TryValidateObject(…, validateAllProperties: true)`; `[Theory]`: duración `null`; 61; `VigenteDesde` `null`; una fila sin `Hasta` | Los mensajes de la tabla del AC 11, con el nombre del campo (`DuracionTurnoMinutos`, `VigenteDesde`, `Franjas`) |
+| T8 | `Validar_CamposFaltantesOFueraDeRango_DevuelveLosMensajes` | 11 | unit | `Validator.TryValidateObject(…, validateAllProperties: true)`; `[Theory]`: duración `null`; 61; `VigenteDesde` `null`; una fila sin `Hasta`; duración `null` y una fila sin `Hasta` a la vez | Los mensajes de la tabla del AC 11, con el nombre del campo (`DuracionTurnoMinutos`, `VigenteDesde`, `Franjas`); en el último caso, los dos |
 | T9 | `EditorDeAgenda_ConFranjas_DibujaCamposConEtiquetaYBotones` | 7, 22, 24 | unit | bUnit: `EditorDeAgenda` dentro de un `EditForm` con 2 filas | Etiquetas `Duración del turno (minutos)`, `Rige desde`, `Día`, `Desde`, `Hasta`; un `Quitar` por fila con `name="Input.Accion"` y `value="quitar-franja:<i>"`; `+ Agregar franja` (`agregar-franja`) y `Actualizar el cálculo` (`actualizar`); el **primer** `button[type=submit]` del marcado tiene `value="actualizar"`; los botones de edición llevan `formnovalidate`; ningún campo tiene un nombre con `MedicoId` ni `AgendaId`; el texto `Para terminar a medianoche, poné 00:00.` |
 | T10 | `EditorDeAgenda_FilaConProblema_LaMarcaConColorYTexto` | 9, 24 | unit | bUnit; filas lunes 08–12 y lunes 10–14; y otro caso con lunes 08:00–10:50 de 20 min | La segunda fila (`<tr>`) tiene la clase `table-danger` y contiene el texto del dominio; la primera no tiene la clase; el aviso de los 10 minutos aparece en su fila **sin** `table-danger` |
-| T11 | `EditorDeAgenda_SegunLaRevision_MuestraElCalculoYLaFechaMinima` | 7, 10, 24 | unit | bUnit; `[Theory]`: válido con `TurnosPorSemanaAntes = 36`; válido sin antes; con superposición; sin filas. `MinimoVigenteDesde = 23/10/2026` | `Con esta agenda ofrecés 20 turnos por semana (antes: 36).` / `…por semana.` / `Corregí lo marcado para ver cuántos turnos ofrecés.` / `Agregá franjas para ver cuántos turnos ofrecés por semana.`; en todos `(mín. 23/10/2026)` |
+| T11 | `EditorDeAgenda_SegunLaRevision_MuestraElCalculoYLaFechaMinima` | 7, 10, 24 | unit | bUnit; `[Theory]`: válido con `TurnosPorSemanaAntes = 36`; válido sin antes; con superposición; sin filas; duración 5 sin filas. `MinimoVigenteDesde = 23/10/2026` | `Con esta agenda ofrecés 20 turnos por semana (antes: 36).` / `…por semana.` / `Corregí lo marcado para ver cuántos turnos ofrecés.` / `Agregá franjas para ver cuántos turnos ofrecés por semana.` / `Corregí lo marcado…`; en todos `(mín. 23/10/2026)` |
 | T12 | `ResumenDeAgenda_EnLinea_MuestraDuracionFranjasYTurnosPorSemana` | 3, 24 | unit | bUnit; agenda de 20 min con viernes 20:00–00:00, lunes 08:00–12:00 y miércoles 08:30–12:00 cargadas en ese orden; y otra de 60 min con lunes 08:00–09:00 | `turnos de 20 min · Lun 8–12 · Mié 8:30–12 · Vie 20–24` y `34 turnos/semana` (12 + 10 + 12); la segunda, `1 turno/semana` |
 | T13 | `ResumenDeAgenda_EnLista_UnaFranjaPorRenglonDeLunesADomingo` | 24 | unit | bUnit con `Forma = EnLista`; domingo 08–12 y lunes 08–12; y una agenda sin franjas | `<li>` en orden `Lun 8–12`, `Dom 8–12`; `TextoDeFranja` devuelve lo mismo; sin franjas: `Sin franjas` |
 | T14 | `ComponentesCompartidos_Contrato_NombresParametrosYUbicacionFijos` | 24 | unit | Reflexión sobre `EditorDeAgenda`, `ResumenDeAgenda`, `FormularioAgenda`, `AgendaMedico` | Espacio de nombres `HospitalTurnos.Web.Components.Personal.Agendas`; propiedades `[Parameter]` exactamente las del AC 24 con su tipo y `[EditorRequired]` donde corresponde (en `ResumenDeAgenda`: `Agenda`, `Forma` y `CompararCon`); `FormularioAgenda` no es `sealed` y tiene `AplicarAccionDeEdicion`, `Revisar`, `ADatos`, `Desde` y `Nueva`; `AgendaMedico.TurnosPorSemana()` público, sin parámetros, devuelve `int` |
@@ -387,11 +393,11 @@ corregirla y reenviarla (RU-07b).
 | T30 | `EscriturasDePropuesta_ActorNoMedicoActivoOSinVinculo_LanzaAccesoDenegadoSinGuardar` | 21 | integration | `[Theory]` (`GuardarBorradorAsync`, `EnviarAsync`) × (recepcionista propio; médico propio desactivado con su vínculo; médico propio activo sin vínculo): 6 casos con datos válidos | `AccesoDenegadoException` con `Sólo un médico activo…` (los dos primeros actores) / el texto del AC 2 (el tercero); ninguna agenda nueva; 0 registros |
 | T31 | `EscriturasDePropuesta_SoloTocanLaDelMedicoDeLaSesion` | 22 | integration | Médicos propios M1 y M2, cada uno con su borrador; M1 guarda y después envía | El de M1 cambia y queda `Enviada`; el de M2, idéntico (duración, franjas, estado) |
 | T32 | `Migracion_UnaPropuestaEditable_CreaElIndiceYConservaLosDeLa41` | 19, 24, 25 | integration | `pg_indexes` con `CadenaDuenio`; después, con `CadenaApp`, dos `INSERT` a mano de un `Borrador` y una `Rechazada` del mismo médico | `ux_agendas_medico_una_editable` único con `WHERE` sobre `Borrador` y `Rechazada`; `ux_agendas_medico_una_enviada` sigue igual; el segundo `INSERT` falla con `23505` y ese nombre; `registros_auditoria` sigue sin `UPDATE` para `turnos_app` |
-| T33 | `GetMiPropuesta_SinVinculo_MuestraElAvisoSinFormulario` | 1, 2 | integration | Usuario médico propio sin vínculo; GET | `200`; `<h1>Mi propuesta de agenda</h1>`; el texto del AC 2; no hay `<form` con `_handler` `propuesta`; no contiene `Esta sección se habilita` |
+| T33 | `GetMiPropuesta_SinVinculo_MuestraElAvisoSinFormulario` | 1, 2, 21 | integration | Usuario médico propio sin vínculo; GET | `200`; `<h1>Mi propuesta de agenda</h1>`; el texto del AC 2; no hay `<form` con `_handler` `propuesta`; no contiene `Esta sección se habilita`; un POST `guardar` igual (armado a mano) → `403` con el texto del AC 2 en `role="alert"`, no un `400` en blanco |
 | T34 | `GetMiPropuesta_SinAgendas_OfreceUnaPropuestaNuevaVacia` | 1, 3, 4, 7 | integration | Médico propio vinculado, sin agendas; GET | `Todavía no tenés una agenda vigente.`; `Nueva propuesta`; duración `20`; `Rige desde` = hoy + 7 (de `app.Reloj`) y `(mín. dd/MM/yyyy)`; ninguna fila; botones `Guardar borrador` y `Enviar para aprobación`; 0 agendas del médico en la base |
 | T35 | `GetMiPropuesta_ConVigente_LaMuestraArribaYCopiaSusFranjas` | 3, 4, 10 | integration | Médico con una aprobada que rige hoy (20 min, lunes 08–12); GET | `Mi agenda vigente:` con `turnos de 20 min · Lun 8–12` y `12 turnos/semana`; el formulario trae `Input.Franjas[0].Desde` = `08:00` (verifica el `name` real que dibuja Blazor) y duración 20; `ofrecés 12 turnos por semana (antes: 12).` |
-| T36 | `PostMiPropuesta_GuardarBorrador_RedirigeYAnuncia` | 12 | integration | Médico sin agendas; POST `guardar` con 20 min, hoy + 30 y lunes 08–12 | `302` a `/personal/medico/mi-propuesta?resultado=borrador`; la página dice `Borrador guardado.` en `role="status"` y `Estado: Borrador`; en la base, un borrador con esa franja |
-| T37 | `PostMiPropuesta_BotonesDeEdicion_CambianLasFilasSinGuardar` | 8, 9 | integration | Médico sin agendas; `[Theory]` POST: `agregar-franja` con 1 fila; `quitar-franja:0` con 2 filas; `actualizar` con lunes 08–12 y lunes 10–14 | `200`; 2 filas / 1 fila (la segunda) / la segunda fila con el texto de superposición; en todos, 0 agendas del médico en la base |
+| T36 | `PostMiPropuesta_GuardarBorrador_RedirigeYAnuncia` | 12, 13 | integration | `[Theory]`: médico sin agendas; POST `guardar` con 20 min, hoy + 30 y lunes 08–12; y el mismo POST sin ninguna fila (el navegador no manda `Input.Franjas`) | `302` a `/personal/medico/mi-propuesta?resultado=borrador`; la página dice `Borrador guardado.` en `role="status"` y `Estado: Borrador`; en la base, un borrador con esa franja; el mismo POST otra vez → `302` a `?resultado=sin-cambios` con `No había cambios para guardar.`; un `?resultado=` desconocido no muestra nada |
+| T37 | `PostMiPropuesta_BotonesDeEdicion_CambianLasFilasSinGuardar` | 8, 9 | integration | Médico sin agendas; `[Theory]` POST: `agregar-franja` con 1 fila; `agregar-franja` sin ninguna fila; `quitar-franja:0` con 2 filas; `actualizar` con lunes 08–12 y lunes 10–14 | `200`; 2 filas / 1 fila / 1 fila (la segunda) / la segunda fila con el texto de superposición; en todos, 0 agendas del médico en la base |
 | T38 | `PostMiPropuesta_Enviar_RedirigeYQuedaEnSoloLectura` | 6, 15 | integration | Borrador guardado; POST `enviar` con `Rige desde` = hoy + 7 | `302` a `?resultado=enviada`; la página: `Propuesta enviada para aprobación.`, `Estado: Enviada`, `Esperando aprobación desde el <hoy>.`, `Rige desde el <hoy+7>.`, el resumen; sin `<input` del editor ni botón `Enviar para aprobación` |
 | T39 | `PostMiPropuesta_ReglaQueFalla_RespondeConElCodigoYElCartel` | 14, 16, 18 | integration | `[Theory]` POST `enviar` o `guardar`: hoy + 6 → `400`; dos franjas superpuestas → `400`; una `Rechazada` reenviada sin cambios → `409`; la página abierta y, antes del POST, una `Enviada` guardada para el médico desde `app.Services` → `409` | Código esperado; `role="alert"` con el texto del AC; la duración escrita sigue en el campo; la base sin cambios |
 | T40 | `PostMiPropuesta_CamposInvalidos_MuestraMensajesSinGuardar` | 11 | integration | `[Theory]` POST `guardar`: duración vacía; duración 61; `Rige desde` vacía; una fila sin `Hasta` | `200`; el mensaje del AC 11 que corresponde; sin `role="alert"`; 0 agendas del médico |
@@ -484,55 +490,55 @@ depende sólo de los datos al dibujar lo prueba bUnit (T9–T13, T46 y T47). La 
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos) — revalidar contra `main` el día que se implementa
-  - [ ] Confirmar lo que esta story usa de la 4.1, con su firma real: `AgendaMedico` (constructor,
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos) — revalidar contra `main` el día que se implementa
+  - [x] Confirmar lo que esta story usa de la 4.1, con su firma real: `AgendaMedico` (constructor,
         `CambiarDuracion`, `CambiarVigenteDesde`, `AgregarFranja`, `QuitarFranja(dia, desde)`,
         `Enviar(reloj)`, `TurnosPorSemana()`, `QueRigeEn`, `DiasMinimosDeAnticipacion`), `Franja` (y
         que `NombreDelDia` y `Tramo` son `internal`: la Web no los usa), `IConsultaAgendas`,
         `AgendaMedicoConfiguracion.IndiceUnaEnviada`, `DbSet AgendasMedico`, `DatosDeAgenda`.
-  - [ ] De la 2.2/3.2: `IActorVigente` con un solo método (`ExigirAdministradorActivoAsync`) y una sola
+  - [x] De la 2.2/3.2: `IActorVigente` con un solo método (`ExigirAdministradorActivoAsync`) y una sola
         implementación (`ActorVigenteIdentity`, sin dobles de prueba que la implementen),
         `ActorDeSesion.Desde`, `ManejadorGlobalDeErrores.EsEsperable`/`FijarEstadoEnPagina`,
         `FormularioHttp.EnviarAsync`, `RutasYaConstruidas`, `InterceptorQueSeAdelanta`,
         `Medico.UsuarioPersonalId` con índice único.
-  - [ ] Que `SeccionesMedico.razor` tiene `@page "/personal/medico/mi-propuesta"` y que
+  - [x] Que `SeccionesMedico.razor` tiene `@page "/personal/medico/mi-propuesta"` y que
         `RutasPersonal.MiPropuesta` y la entrada del menú existen.
-  - [ ] Si la 2.3 ya está en `main`, que no cambió `IActorVigente` ni `ActorVigenteIdentity`, y que
+  - [x] Que la 2.3 (ya en `main`) no cambió `IActorVigente` ni `ActorVigenteIdentity`, y que
         no existe todavía `ExigirActivoConRolAsync` (lo crea esta story; la 5.1 lo reusa).
-  - [ ] `bash scripts/ci/local.sh` en verde. Si algo no coincide → DETENERSE y corregir la story.
-- [ ] [SEQ] Task 2: Permiso del médico en la base (AC: 21)
-  - [ ] `ExigirActivoConRolAsync` **público** en `IActorVigente` y `ActorVigenteIdentity` (el cuerpo
+  - [x] `bash scripts/ci/local.sh` en verde. Si algo no coincide → DETENERSE y corregir la story.
+- [x] [SEQ] Task 2: Permiso del médico en la base (AC: 21)
+  - [x] `ExigirActivoConRolAsync` **público** en `IActorVigente` y `ActorVigenteIdentity` (el cuerpo
         actual del método del administrador, con el rol de parámetro); `ExigirAdministradorActivoAsync`
         pasa a llamarlo. T15 en rojo y después en verde; las de 2.2, 3.1 y 3.2 siguen en verde
         (`dotnet test --filter "Story=2.2|Story=3.1|Story=3.2"`).
-- [ ] [SEQ] Task 3: Índice y migración (AC: 19)
-  - [ ] Salvaguarda de BD, paso 1 (antes de generar la migración).
-  - [ ] `AgendaMedicoConfiguracion`: constante `IndiceUnaEditable` y el índice con **nombre propio**
+- [x] [SEQ] Task 3: Índice y migración (AC: 19)
+  - [x] Salvaguarda de BD, paso 1 (antes de generar la migración).
+  - [x] `AgendaMedicoConfiguracion`: constante `IndiceUnaEditable` y el índice con **nombre propio**
         (ver Implementación concreta: sin nombre, EF reusaría el índice de la 4.1).
-  - [ ] `dotnet ef migrations add UnaPropuestaEditablePorMedico`; leer el código generado: un solo
+  - [x] `dotnet ef migrations add UnaPropuestaEditablePorMedico`; leer el código generado: un solo
         `CreateIndex`, con el filtro; ningún `DropIndex` ni columna nueva.
-- [ ] [SEQ] Task 4: Caso de uso (AC: 2–6, 12–19, 21, 22)
-  - [ ] `DatosAgenda`/`DatosFranja` e `IPropuestaAgenda` (con `VistaPropuesta` y `ResultadoGuardado`)
+- [x] [SEQ] Task 4: Caso de uso (AC: 2–6, 12–19, 21, 22)
+  - [x] `DatosAgenda`/`DatosFranja` e `IPropuestaAgenda` (con `VistaPropuesta` y `ResultadoGuardado`)
         en Aplicacion/Agendas.
-  - [ ] `PropuestaAgendaEnBase` en Infraestructura/Agendas, registrado `Scoped` en
+  - [x] `PropuestaAgendaEnBase` en Infraestructura/Agendas, registrado `Scoped` en
         `AgregarInfraestructura`.
-  - [ ] `DatosDePropuesta` (Aplicacion.Tests) y T16–T32 en verde. Validar T27–T29 rompiendo el código
+  - [x] `DatosDePropuesta` (Aplicacion.Tests) y T16–T32 en verde. Validar T27–T29 rompiendo el código
         (sin la traducción tienen que fallar siempre, L-2).
-- [ ] [SEQ] Task 5: Formulario y componentes compartidos (AC: 7–11, 24)
-  - [ ] `FormularioAgenda` (con `FilaFranja` y `RevisionDeAgenda`) y `FormaDeResumen`; T1–T8.
-  - [ ] `EditorDeAgenda` y `ResumenDeAgenda` (con `CompararCon`); T9–T14, T46 y T47.
-- [ ] [SEQ] Task 6: Pantalla M2 (AC: 1–16, 18, 20–23, 25)
-  - [ ] `MiPropuesta.razor` en `Components/Personal/Agendas/`; quitar el `@page` de
+- [x] [SEQ] Task 5: Formulario y componentes compartidos (AC: 7–11, 24)
+  - [x] `FormularioAgenda` (con `FilaFranja` y `RevisionDeAgenda`) y `FormaDeResumen`; T1–T8.
+  - [x] `EditorDeAgenda` y `ResumenDeAgenda` (con `CompararCon`); T9–T14, T46 y T47.
+- [x] [SEQ] Task 6: Pantalla M2 (AC: 1–16, 18, 20–23, 25)
+  - [x] `MiPropuesta.razor` en `Components/Personal/Agendas/`; quitar el `@page` de
         `SeccionesMedico.razor`; `_Imports.razor` con `@using HospitalTurnos.Aplicacion.Agendas` y
         `@using HospitalTurnos.Web.Components.Personal.Agendas`.
-  - [ ] `/personal/medico/mi-propuesta` en `RutasYaConstruidas` (T19 de la 2.1).
-  - [ ] `DatosDePropuesta` (Web.Tests) y T33–T45 en verde.
-- [ ] [SEQ] Task 7: Verificación y cierre (AC: todos)
-  - [ ] `dotnet test` completo y `bash scripts/ci/local.sh` en verde; cobertura en el Dev Agent Record.
-  - [ ] Salvaguarda de BD, pasos 2 a 4, contra Compose.
-  - [ ] Prueba en el navegador (Cómo verificar, paso 5), con scripts que buscan por texto o rol, nunca
+  - [x] `/personal/medico/mi-propuesta` en `RutasYaConstruidas` (T19 de la 2.1).
+  - [x] `DatosDePropuesta` (Web.Tests) y T33–T45 en verde.
+- [x] [SEQ] Task 7: Verificación y cierre (AC: todos)
+  - [x] `dotnet test` completo y `bash scripts/ci/local.sh` en verde; cobertura en el Dev Agent Record.
+  - [x] Salvaguarda de BD, pasos 2 a 4, contra Compose.
+  - [x] Prueba en el navegador (Cómo verificar, paso 5), con scripts que buscan por texto o rol, nunca
         por clases CSS, y que cuentan con que el menú repite el enlace (L-14).
-  - [ ] Guía `docs/qa/4.2-pasos.md` y **pasada del tester no técnico** sobre la guía y sobre las
+  - [x] Guía `docs/qa/4.2-pasos.md` y **pasada del tester no técnico** sobre la guía y sobre las
         capturas de M2 (B-6), con sus marcas en `docs/qa/4.2-legibilidad.md` y
         `docs/qa/4.2-legibilidad-ui.md`, como en la 3.2.
 
@@ -545,7 +551,10 @@ puede hacer en paralelo con T2–T4, y tiene que estar antes de la T6.
 
 ### Qué existe hoy
 
-#### En hospital-turnos (verificado 2026-10-17 contra `main` en `a8432c3`, con 1.1 a 4.1 en done)
+#### En hospital-turnos (verificado 2026-10-17 contra `main` en `121ff7c`, con 1.1 a 4.1 y la 2.3 en done)
+
+La 2.3 no tocó `IActorVigente` ni `ActorVigenteIdentity`; sumó `ICambioContrasenaPersonal`, registrado en
+`RegistroIdentidad` junto a `IActorVigente`. Nada de lo que sigue cambió con ella.
 
 - **Dominio de agenda (4.1)**, en `src/HospitalTurnos.Dominio/Agendas/`: `AgendaMedico` con
   `DuracionMinima`/`DuracionMaxima` (10/60), `DiasMinimosDeAnticipacion` (7), los cuatro métodos de
@@ -585,7 +594,10 @@ puede hacer en paralelo con T2–T4, y tiene que estar antes de la T6.
   `No reconocemos esa acción. Recargá la página.` `_Imports.razor` ya importa
   `HospitalTurnos.Dominio.Agendas` y `HospitalTurnos.Aplicacion.Catalogo`.
 - **Pruebas**: `DatosDeAgenda` (Aplicacion.Tests/Agendas: `Reloj`, `Proveedor`, `EspecialidadPropiaAsync`,
-  `MedicoPropioAsync`, `GuardarAgendaAsync`, `ArmarAgenda`, `Franja`), `InterceptorQueSeAdelanta`
+  `MedicoPropioAsync`, `GuardarAgendaAsync`, `ArmarAgenda`, `Franja`; ojo: `Franja(string dia, …)` sólo
+  conoce `lunes`, `martes` y `miércoles` y con otro día lanza `ArgumentOutOfRangeException`: esta story
+  le suma los otros cuatro días —`jueves`, `viernes`, `sábado`, `domingo`— sin cambiar los que tiene, porque
+  T19 usa el viernes), `InterceptorQueSeAdelanta`
   (`(string cadena, string sqlQueInserta)`, ejecuta cualquier SQL una vez), `UsuariosDePrueba`
   (`CrearAsync(proveedor, roles, activo, nombre)`, `ActorDe`), `DatosDeCatalogo` en los dos proyectos,
   `PersonalWebApplicationFactory` (`Reloj`, usuarios fijos `medico1`/`admin1`/`recepcion1`),
@@ -849,7 +861,7 @@ filtro; ningún `DropIndex`/`RenameIndex` del índice de la 4.1 y ninguna column
 **Web — `FormularioAgenda.cs`** (espacio de nombres `HospitalTurnos.Web.Components.Personal.Agendas`):
 
 ```csharp
-public class FormularioAgenda : IValidatableObject          // no sealed: la 4.4 lo hereda (FormularioCorreccion)
+public class FormularioAgenda                               // no sealed: la 4.4 lo hereda (FormularioCorreccion)
 {
     [Required(ErrorMessage = "Ingresá la duración del turno.")]
     [Range(AgendaMedico.DuracionMinima, AgendaMedico.DuracionMaxima,
@@ -868,8 +880,9 @@ public class FormularioAgenda : IValidatableObject          // no sealed: la 4.4
     public static FormularioAgenda Desde(AgendaMedico agenda) { ... }   // filas de lunes a domingo, por hora
     public static FormularioAgenda Nueva(DateOnly vigenteDesde) => new() { DuracionTurnoMinutos = 20, VigenteDesde = vigenteDesde };
 
-    // Fila sin Desde o sin Hasta → "Completá la hora desde y la hora hasta de cada franja, o quitá las que sobran." en "Franjas"
-    public IEnumerable<ValidationResult> Validate(ValidationContext contexto) { ... }
+    // [FilasCompletas] sobre Franjas: fila sin Desde o sin Hasta → "Completá la hora desde y la hora hasta de cada
+    // franja, o quitá las que sobran." en "Franjas". Es un control del CAMPO (no IValidatableObject, que sólo corre
+    // con los demás campos bien): así sale junto con el de la duración (AC 11, T8).
 }
 
 public sealed class FilaFranja { public DayOfWeek Dia { get; set; } = DayOfWeek.Monday; public TimeOnly? Desde { get; set; } public TimeOnly? Hasta { get; set; } }
@@ -946,6 +959,14 @@ private async Task AlEnviarAsync(EditContext contexto)
 }
 ```
 
+- **Sin vínculo, un POST igual recibe el cartel.** Con `SinVinculo` la página dibuja, sólo en un POST, el
+  `EditForm` vacío (sin campos a la vista): Blazor lo necesita para despachar el envío, y el caso de uso responde
+  con el `403` y el texto del AC 2 (AC 21, T33). Sin eso, el envío recibe un `400` en blanco.
+- **El sólo lectura del AC 6 es del GET.** En un POST el formulario se dibuja igual aunque la propuesta ya esté
+  `Enviada` (Blazor necesita el formulario con su `FormName` para despachar el envío, como la ficha de la 3.2):
+  `Guardar borrador` y `Enviar` reciben el `409` del AC 18 con lo escrito conservado (T39), y un botón de edición
+  sólo vuelve a dibujar las filas, sin guardar nada. Con una propuesta en curso el título es `Tu propuesta`, nunca
+  `Nueva propuesta`.
 - Textos de `?resultado=`: `borrador` → `Borrador guardado.`; `sin-cambios` →
   `No había cambios para guardar.`; `enviada` → `Propuesta enviada para aprobación.`; otro → nada.
 - Marcas en hora de Córdoba: `TimeZoneInfo.ConvertTime(marca, Reloj.LocalTimeZone)`.
@@ -979,6 +1000,8 @@ Las migraciones las aplica **el arranque** (nunca `dotnet ef database update`).
 | Modificar | `src/HospitalTurnos.Web/Components/Personal/Secciones/SeccionesMedico.razor` (quitar el `@page` de `mi-propuesta`) |
 | Modificar | `src/HospitalTurnos.Web/Components/_Imports.razor` (`@using HospitalTurnos.Aplicacion.Agendas` y `@using HospitalTurnos.Web.Components.Personal.Agendas`) |
 | Modificar | `tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs` (una ruta más en `RutasYaConstruidas`, AC 25) |
+| Modificar | `tests/HospitalTurnos.Aplicacion.Tests/Agendas/DatosDeAgenda.cs` (`Franja` suma jueves a domingo; los tres días de la 4.1 no cambian) |
+| Crear | `docs/qa/4.2-pasos.md`, `docs/qa/4.2-legibilidad.md` y `docs/qa/4.2-legibilidad-ui.md` (Task 7) |
 
 ### Lo que NO hay que hacer
 
@@ -1059,11 +1082,49 @@ capturas de M2 (B-6), con su resultado en el Dev Agent Record.
 
 ### Agent Model Used
 
+Claude Opus 5.5 (Amelia, pipeline del equipo), sesión 15 (2026-10-17).
+
 ### Debug Log References
+
+- Corrida: `.advisors/pipeline-runs/4.2-20261017142946/` (validación, plan, informe, hallazgos, prueba en vivo).
+- Prueba en vivo: `.advisors/dod-runtime/4.2-smoke-ledger.jsonl` y `4.2-smoke-outputs/`; matriz `4.2-runtime-matrix.md`.
+- Salvaguarda de BD, paso 1: la base de Compose tenía 2 médicos de la sonda de la 4.1 con dos editables cada uno
+  (6 agendas `Sonda…`, sin vínculo). Con permiso del docente se borraron con el dueño de la base (la app sigue sin
+  `DELETE`); después, 0 filas. Pasos 2 y 3: los dos índices con su `WHERE`, sin columnas nuevas, `f` para el
+  `UPDATE` de la auditoría.
 
 ### Completion Notes List
 
+- Pruebas primero en los cinco tramos, con rojo legítimo (tipos que la story crea, o la pantalla en construcción).
+  Romper a propósito: sin la traducción de carreras, T27–T29 fallan con el error interno de EF; sin marcar la
+  agenda como modificada, el caso "sólo agrega una franja" de T29 se cuela sobre una propuesta que cambió.
+- `Entry(agenda).State = Modified` alcanzó (no hizo falta el plan B de la story).
+- Blazor SSR: `InputDate` de hora dibuja `HH:mm:ss` (el navegador muestra `HH:mm`); el `name` de las filas sale
+  `Input.Franjas[0].Desde` con la copia local del índice, como preveía la story.
+- La prueba en vivo encontró dos errores que las pruebas no veían, arreglados con su prueba primero: con la tabla
+  vacía el navegador no manda `Input.Franjas` y la lista quedaba nula (`500` al agregar la primera franja o guardar
+  un borrador sin franjas); un POST de un médico sin vínculo daba `400` en blanco (no había formulario que
+  despachar). También la lista de días cortaba "Lunes".
+- Revisores: vuelta 1 con 6 (ningún crítico; 8 avisos arreglados, 2 aceptados), vuelta 2 con 5 (limpia salvo el
+  Change Log). Pase adversarial salteado por `deep_review: off` (decisión del docente).
+- Tester no técnico: guía en 3 pasadas (11 → 14 → 0 marcas); pantalla, 6 marcas aceptadas sin cambios por el
+  docente (`docs/qa/4.2-legibilidad-ui.md`).
+- Resultado: 601 pruebas en verde (138 + 216 + 247; antes 503), CI local 97,1 % de líneas y 87,7 % de ramas;
+  prueba en vivo 78/78 en cinco grupos; matriz 25/25 AC en runtime.
+
 ### File List
+
+- Aplicación: `Agendas/DatosAgenda.cs`, `Agendas/IPropuestaAgenda.cs` (nuevos); `Personal/IActorVigente.cs`.
+- Infraestructura: `Agendas/PropuestaAgendaEnBase.cs` y la migración `20261017145758_UnaPropuestaEditablePorMedico`
+  (nuevos); `Identidad/ActorVigenteIdentity.cs`, `Persistencia/Configuraciones/AgendaMedicoConfiguracion.cs`,
+  `HospitalDbContextModelSnapshot.cs`, `ServiciosDeInfraestructura.cs`.
+- Web: `Components/Personal/Agendas/` con `MiPropuesta.razor`, `EditorDeAgenda.razor`, `ResumenDeAgenda.razor`,
+  `FormularioAgenda.cs` y `FormaDeResumen.cs` (nuevos); `Components/_Imports.razor`, `Secciones/SeccionesMedico.razor`.
+- Pruebas: `Aplicacion.Tests/Agendas/PropuestaAgendaTests.cs`, `Agendas/DatosDePropuesta.cs`,
+  `Personal/ActorVigenteIdentityTests.cs`, `Web.Tests/Agendas/` (`FormularioAgendaTests.cs`,
+  `ComponentesDeAgendaTests.cs`, `MiPropuestaHttpTests.cs`, `DatosDePropuesta.cs`) (nuevos);
+  `Aplicacion.Tests/Agendas/DatosDeAgenda.cs`, `Web.Tests/Personal/SesionYPermisosHttpTests.cs`.
+- QA: `docs/qa/4.2-pasos.md`, `4.2-legibilidad.md`, `4.2-legibilidad-ui.md`.
 
 ### Change Log
 
@@ -1081,3 +1142,38 @@ capturas de M2 (B-6), con su resultado en el Dev Agent Record.
   (`MedicoConUsuarioAsync` con email y `Guid`; `RelojCorridoDias`). I-6: formato de franjas de la
   auditoría como contrato (AC 17, T23). M-2 (regla de fechas), M-8 (no-regresión nombrada), M-9.
   25 AC, 47 verificaciones.
+- 2026-10-17: Revalidada contra `main` en `121ff7c` (la 2.3 ya mergeada): lo citado de la 4.1, la 2.2 y la
+  2.3 coincide con el código. Se corrigió lo desactualizado: base de la verificación, las condiciones "si la
+  2.3 ya está en `main`" (Task 1 y AC 25), la ayuda `DatosDeAgenda.Franja` (suma jueves a domingo para T19) y
+  los tres archivos de `docs/qa/` en `files_to_create`. Sin cambios en AC ni en pruebas.
+- 2026-10-17: Durante la implementación (Amelia), por los revisores y la prueba en vivo; sigue con 25 AC y 47
+  verificaciones, con casos nuevos dentro de las mismas pruebas. AC 10: si la duración está fuera de rango, manda
+  `Corregí lo marcado…` aunque no haya franjas (T11). AC 11: el control de filas incompletas es del campo, así sale
+  junto con el de la duración (T8). AC 17: el orden de las franjas del detalle (día numérico, el domingo primero).
+  AC 12 y 13: con la tabla vacía el navegador no manda `Input.Franjas`, y la lista quedaba nula → `500` al agregar
+  la primera franja o guardar un borrador sin franjas; lo encontró la prueba en vivo (T36 y T37 con casos sin
+  filas). AC 21: un POST de un médico sin vínculo daba `400` en blanco; ahora el `403` con el cartel (T33). AC 13
+  en pantalla: `sin-cambios` y un `?resultado=` desconocido (T36). Implementación concreta: tres notas (sólo
+  lectura del AC 6 en el GET, POST sin vínculo, título `Tu propuesta`).
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[WARNING]** VAL-W1 — `docs/stories/4-2-propuesta-agenda.md` — Status del cuerpo alineado y docs/qa/4.2-* en files_to_create (paso 1) <!-- fkey:VAL-W1|docs/stories/4-2-propuesta-agenda.md -->
+- [x] **[WARNING]** VAL-W6 — `docs/stories/4-2-propuesta-agenda.md` — Base 121ff7c con la 2.3 en main; DatosDeAgenda.Franja suma jueves a domingo (paso 1) <!-- fkey:VAL-W6|docs/stories/4-2-propuesta-agenda.md -->
+- [x] **[WARNING]** SPEC-W2 — `src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor` — Con una enviada, un POST de pestaña vieja decía Nueva propuesta: título Tu propuesta y nota en la story (sólo lectura del AC 6 en el GET) <!-- fkey:SPEC-W2|src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor -->
+- [x] **[WARNING]** SPEC-W2 — `src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs` — Orden de franjas del detalle de auditoría escrito en el AC 17 <!-- fkey:SPEC-W2|src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs -->
+- [x] **[WARNING]** ACCOV-C1 — `tests/HospitalTurnos.Web.Tests/Agendas/MiPropuestaHttpTests.cs` — T36 prueba sin-cambios y un ?resultado= desconocido en pantalla <!-- fkey:ACCOV-C1|tests/HospitalTurnos.Web.Tests/Agendas/MiPropuestaHttpTests.cs -->
+- [x] **[WARNING]** ACCOV-C2 — `src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor` — AC 10: la duración inválida manda sobre Agregá franjas (T11) <!-- fkey:ACCOV-C2|src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor -->
+- [x] **[WARNING]** ACCOV-C2 — `src/HospitalTurnos.Web/Components/Personal/Agendas/FormularioAgenda.cs` — AC 11: control de filas incompletas como atributo del campo, sale junto con la duración (T8) <!-- fkey:ACCOV-C2|src/HospitalTurnos.Web/Components/Personal/Agendas/FormularioAgenda.cs -->
+- [x] **[WARNING]** ACCOV-W1 — `src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor` — Mismo título de pestaña vieja que SPEC-W2 <!-- fkey:ACCOV-W1|src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor -->
+- [ ] **[WARNING]** SILENT-C3 — `src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs` — Traducción de carreras sin la excepción original: misma convención que GestionMedicosEnBase (3.2); las excepciones del dominio no llevan causa <!-- fkey:SILENT-C3|src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs -->
+- [ ] **[WARNING]** SILENT-W7 — `src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs` — Guid inválido en la sesión tratado como sin vínculo: el id sale de la cookie propia, probabilidad ínfima <!-- fkey:SILENT-W7|src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs -->
+- [ ] **[WARNING]** TEST-W2 — `src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs` — El portón no cruza cobertura por archivo con .slnx; la CI local mide 97,1 % de líneas <!-- fkey:TEST-W2|src/HospitalTurnos.Infraestructura/Agendas/PropuestaAgendaEnBase.cs -->
+- [x] **[WARNING]** TEST-W3 — `docs/stories/4-2-propuesta-agenda.md` — Recuento: mech-check confirma las 47 de la tabla con implementación <!-- fkey:TEST-W3|docs/stories/4-2-propuesta-agenda.md -->
+- [x] **[WARNING]** SPEC-W5 — `docs/stories/4-2-propuesta-agenda.md` — Change Log con los cambios de AC y pruebas de la implementación <!-- fkey:SPEC-W5|docs/stories/4-2-propuesta-agenda.md -->
+- [x] **[CRITICAL]** DODRT-C5 — `src/HospitalTurnos.Web/Components/Personal/Agendas/FormularioAgenda.cs` — Prueba en vivo: con la tabla vacía Franjas llegaba nula y +Agregar franja / guardar sin franjas daban 500 (T36 y T37 con casos sin filas) <!-- fkey:DODRT-C5|src/HospitalTurnos.Web/Components/Personal/Agendas/FormularioAgenda.cs -->
+- [x] **[CRITICAL]** DODRT-C5 — `src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor` — Prueba en vivo: un POST de un médico sin vínculo daba 400 en blanco; ahora 403 con el cartel del AC 21 (T33) <!-- fkey:DODRT-C5|src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor -->
+- [x] **[WARNING]** DODRT-W1 — `src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor` — Prueba en vivo: la lista de días cortaba Lunes en Lun; más ancha <!-- fkey:DODRT-W1|src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor -->

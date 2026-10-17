@@ -1,0 +1,111 @@
+@using System.Globalization
+@* Los campos de una agenda (story 4.2, AC 7, 9 y 10), dibujados DENTRO del EditForm de quien lo usa (M2 y la
+   corrección de la 4.4), como CamposMedico de la 3.2. Renderizado estático: la revisión y el cálculo se rehacen en
+   cada botón, no mientras se escribe (decisión 3). Contrato de parámetros y nombres de campo: AC 24. *@
+
+@* Enter envía con el PRIMER botón del formulario: éste, oculto, sólo actualiza el cálculo (nunca quita ni envía). *@
+<button type="submit" name="Input.Accion" value="actualizar" formnovalidate class="visually-hidden" tabindex="-1"
+        aria-hidden="true">Actualizar el cálculo</button>
+
+<div class="mb-3">
+    <label for="duracion-turno" class="form-label">Duración del turno (minutos)</label>
+    <InputNumber id="duracion-turno" class="form-control" style="max-width: 8rem;" @bind-Value="Input.DuracionTurnoMinutos" />
+    <ValidationMessage For="() => Input.DuracionTurnoMinutos" class="text-danger" />
+</div>
+<div class="mb-3">
+    <label for="vigente-desde" class="form-label">Rige desde</label>
+    <div class="d-flex align-items-center gap-2">
+        <InputDate id="vigente-desde" class="form-control" style="max-width: 12rem;" @bind-Value="Input.VigenteDesde" />
+        @if (MinimoVigenteDesde is { } minimo)
+        {
+            <span>(mín. @Fecha(minimo))</span>
+        }
+    </div>
+    <ValidationMessage For="() => Input.VigenteDesde" class="text-danger" />
+</div>
+
+<table class="table align-middle" style="max-width: 48rem;">
+    <thead>
+        <tr>
+            <th scope="col">Día</th>
+            <th scope="col">Desde</th>
+            <th scope="col">Hasta</th>
+            <th scope="col">Observaciones</th>
+            <th scope="col"><span class="visually-hidden">Quitar</span></th>
+        </tr>
+    </thead>
+    <tbody>
+        @for (var indice = 0; indice < Input.Franjas.Count; indice++)
+        {
+            var i = indice;   // copia local: el nombre del campo sale Input.Franjas[0].Desde
+            var problema = revision.Problemas.GetValueOrDefault(i);
+            var aviso = revision.Avisos.GetValueOrDefault(i);
+            <tr class="@(problema is null ? null : "table-danger")">
+                <td>
+                    <InputSelect class="form-select" style="min-width: 9.5rem;" @bind-Value="Input.Franjas[i].Dia"
+                                 aria-label="@($"Día de la franja {i + 1}")">
+                        @foreach (var dia in Dias)
+                        {
+                            <option value="@dia">@NombreDe(dia)</option>
+                        }
+                    </InputSelect>
+                </td>
+                <td>
+                    <InputDate Type="InputDateType.Time" class="form-control" @bind-Value="Input.Franjas[i].Desde"
+                               aria-label="@($"Desde, franja {i + 1}")" />
+                </td>
+                <td>
+                    <InputDate Type="InputDateType.Time" class="form-control" @bind-Value="Input.Franjas[i].Hasta"
+                               aria-label="@($"Hasta, franja {i + 1}")" />
+                </td>
+                <td>@(problema ?? aviso)</td>
+                <td>
+                    <button type="submit" name="Input.Accion" value="@($"quitar-franja:{i}")" formnovalidate
+                            class="btn btn-sm btn-outline-danger">Quitar</button>
+                </td>
+            </tr>
+        }
+    </tbody>
+</table>
+<ValidationMessage For="() => Input.Franjas" class="text-danger" />
+<p class="text-muted">Para terminar a medianoche, poné 00:00.</p>
+<div class="d-flex gap-2 mb-3">
+    <button type="submit" name="Input.Accion" value="agregar-franja" formnovalidate class="btn btn-outline-secondary">+ Agregar franja</button>
+    <button type="submit" name="Input.Accion" value="actualizar" formnovalidate class="btn btn-outline-secondary">Actualizar el cálculo</button>
+</div>
+<p><strong>@Calculo</strong></p>
+
+@code {
+    // Un arreglo propio y no CultureInfo("es-AR"), que la imagen de Docker puede no traer (misma razón que en Franja).
+    private static readonly DayOfWeek[] Dias =
+        [DayOfWeek.Monday, DayOfWeek.Tuesday, DayOfWeek.Wednesday, DayOfWeek.Thursday, DayOfWeek.Friday, DayOfWeek.Saturday, DayOfWeek.Sunday];
+    private static readonly string[] Nombres = ["Lunes", "Martes", "Miércoles", "Jueves", "Viernes", "Sábado", "Domingo"];
+
+    [Parameter, EditorRequired]
+    public FormularioAgenda Input { get; set; } = default!;
+
+    /// <summary>El "(antes: M)": los turnos de la agenda vigente. null lo oculta.</summary>
+    [Parameter]
+    public int? TurnosPorSemanaAntes { get; set; }
+
+    /// <summary>El "(mín. dd/MM/yyyy)" junto a la fecha. null lo oculta.</summary>
+    [Parameter]
+    public DateOnly? MinimoVigenteDesde { get; set; }
+
+    private RevisionDeAgenda revision = default!;
+
+    protected override void OnParametersSet() => revision = Input.Revisar();   // una vez por dibujo
+
+    private string Calculo =>
+        revision.TurnosPorSemana is { } turnos
+            ? $"Con esta agenda ofrecés {turnos} turnos por semana{(TurnosPorSemanaAntes is { } antes ? $" (antes: {antes})" : "")}."
+            : revision.SinFranjas && DuracionValida   // una duración fuera de rango se corrige primero (AC 10)
+                ? "Agregá franjas para ver cuántos turnos ofrecés por semana."
+                : "Corregí lo marcado para ver cuántos turnos ofrecés.";
+
+    private bool DuracionValida => Input.DuracionTurnoMinutos is >= AgendaMedico.DuracionMinima and <= AgendaMedico.DuracionMaxima;
+
+    private static string NombreDe(DayOfWeek dia) => Nombres[FormularioAgenda.DeLunesADomingo(dia)];
+
+    private static string Fecha(DateOnly fecha) => fecha.ToString("dd/MM/yyyy", CultureInfo.InvariantCulture);
+}

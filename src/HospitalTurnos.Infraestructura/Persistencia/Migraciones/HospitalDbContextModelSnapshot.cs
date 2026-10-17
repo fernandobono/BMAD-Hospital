@@ -83,6 +83,11 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                     b.HasIndex("MedicoId", "Estado", "VigenteDesde")
                         .HasDatabaseName("ix_agendas_medico_medico_id_estado_vigente_desde");
 
+                    b.HasIndex(new[] { "MedicoId" }, "ux_agendas_medico_una_editable")
+                        .IsUnique()
+                        .HasDatabaseName("ux_agendas_medico_una_editable")
+                        .HasFilter("estado IN ('Borrador', 'Rechazada')");
+
                     b.ToTable("agendas_medico", t =>
                         {
                             t.HasCheckConstraint("ck_agendas_medico_duracion", "duracion_turno_minutos BETWEEN 10 AND 60");

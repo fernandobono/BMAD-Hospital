@@ -13,11 +13,16 @@ namespace HospitalTurnos.Infraestructura.Identidad;
 /// </summary>
 public sealed class ActorVigenteIdentity(UserManager<UsuarioPersonal> usuarios) : IActorVigente
 {
-    public async Task<ActorAuditoria> ExigirAdministradorActivoAsync(ActorAuditoria actor, string mensajeSiNoLoEs, CancellationToken ct)
+    public async Task<ActorAuditoria> ExigirActivoConRolAsync(ActorAuditoria actor, string rol, string mensajeSiNoLoEs,
+        CancellationToken ct)
     {
-        var admin = Guid.TryParse(actor.UsuarioId, out var id) ? await usuarios.FindByIdAsync(id.ToString()) : null;
-        if (admin is null || !admin.Activo || await usuarios.GetRolesAsync(admin) is not [Roles.Administrador])
+        var usuario = Guid.TryParse(actor.UsuarioId, out var id) ? await usuarios.FindByIdAsync(id.ToString()) : null;
+        // Un rol por usuario (FR-09): con dos roles tampoco pasa.
+        if (usuario is null || !usuario.Activo || await usuarios.GetRolesAsync(usuario) is not [var unico] || unico != rol)
             throw new AccesoDenegadoException(mensajeSiNoLoEs);
-        return new(admin.Id.ToString(), admin.NombreCompleto, Roles.Administrador, CanalAuditoria.Personal);
+        return new(usuario.Id.ToString(), usuario.NombreCompleto, rol, CanalAuditoria.Personal);
     }
+
+    public Task<ActorAuditoria> ExigirAdministradorActivoAsync(ActorAuditoria actor, string mensajeSiNoLoEs, CancellationToken ct) =>
+        ExigirActivoConRolAsync(actor, Roles.Administrador, mensajeSiNoLoEs, ct);
 }

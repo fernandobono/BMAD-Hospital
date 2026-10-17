@@ -19,7 +19,7 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
 
     // Las secciones que ya dejaron de estar "en construcción" (las suma la story que las construye).
     private static readonly string[] RutasYaConstruidas =
-        ["/personal/admin/usuarios", "/personal/admin/especialidades", "/personal/admin/medicos"];
+        ["/personal/admin/usuarios", "/personal/admin/especialidades", "/personal/admin/medicos", "/personal/medico/mi-propuesta"];
 
     // La tabla del AC 13, escrita acá a mano (no se lee de RutasPersonal: la prueba no copia al código).
     // ruta, título, roles con permiso
