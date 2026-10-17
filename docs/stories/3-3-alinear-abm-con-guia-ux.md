@@ -154,8 +154,8 @@ quedan como están.
     con antifalsificación a `RutasPersonal.Salir`, igual que el botón de hoy); el botón "Salir" suelto ya no
     existe (B-1.2).
 13. **Given** cada rol **When** ve el menú lateral **Then** las opciones aparecen agrupadas con un rótulo por
-    grupo, en este orden **[SUPUESTO S-36: los grupos de recepción y médico no los define la guía; el docente
-    los valida al aprobar esta story]** (B-1.4):
+    grupo, en este orden (**S-36**: los grupos de recepción y médico no los define la guía; el docente los
+    aprobó con la story el 2026-10-17) (B-1.4):
     - Administrador: **Agenda** (Agendas · Propuestas de agenda · Bloqueos de agenda · Pacientes para
       avisar) · **Catálogos** (Médicos · Especialidades) · **Administración** (Usuarios del personal ·
       Auditoría).
