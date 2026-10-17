@@ -2,7 +2,7 @@
 epic: 2
 story: "2.3"
 title: "Contraseña olvidada: el administrador genera otra contraseña temporal desde A4"
-status: review
+status: done
 sprint: 3
 priority: "P0"
 approach: "[ADAPT]"
@@ -27,7 +27,7 @@ files_to_modify:
 
 # Story 2.3: Contraseña olvidada: el administrador genera otra contraseña temporal desde A4
 
-Status: review
+Status: done
 
 ## Story
 
@@ -703,6 +703,7 @@ técnico como subagentes.
   de un bloqueo ya vencido (`desbloqueado` falso) queda sin prueba propia: la story no lo pide.
   `docs/qa/2.3-legibilidad.md` declarado en `files_to_create` y en la tabla de archivos; subtareas
   hechas de la Task 6 tildadas.
+- 2026-10-17: PR #13 con la CI en verde (6 de 6) y mergeado a `main` (`43e6fe4`). Estado `done`.
 
 
 ## Review Follow-ups (Advisors)
