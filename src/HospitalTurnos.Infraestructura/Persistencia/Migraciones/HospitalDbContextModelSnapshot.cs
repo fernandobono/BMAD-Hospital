@@ -121,6 +121,58 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                     b.ToTable("especialidades");
                 });
 
+            modelBuilder.Entity("HospitalTurnos.Dominio.Catalogo.Medico", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<string>("Apellido")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("apellido");
+
+                    b.Property<long>("EspecialidadId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("especialidad_id");
+
+                    b.Property<string>("Matricula")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("matricula");
+
+                    b.Property<string>("Nombre")
+                        .IsRequired()
+                        .HasMaxLength(100)
+                        .HasColumnType("character varying(100)")
+                        .HasColumnName("nombre");
+
+                    b.Property<Guid?>("UsuarioPersonalId")
+                        .HasColumnType("uuid")
+                        .HasColumnName("usuario_personal_id");
+
+                    b.HasKey("Id")
+                        .HasName("pk_medicos");
+
+                    b.HasIndex("EspecialidadId")
+                        .HasDatabaseName("ix_medicos_especialidad_id");
+
+                    b.HasIndex("Matricula")
+                        .IsUnique()
+                        .HasDatabaseName("ix_medicos_matricula");
+
+                    b.HasIndex("UsuarioPersonalId")
+                        .IsUnique()
+                        .HasDatabaseName("ix_medicos_usuario_personal_id");
+
+                    b.ToTable("medicos");
+                });
+
             modelBuilder.Entity("HospitalTurnos.Infraestructura.Email.MensajeSaliente", b =>
                 {
                     b.Property<long>("Id")
@@ -457,6 +509,22 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                         .HasName("pk_asp_net_user_tokens");
 
                     b.ToTable("asp_net_user_tokens", (string)null);
+                });
+
+            modelBuilder.Entity("HospitalTurnos.Dominio.Catalogo.Medico", b =>
+                {
+                    b.HasOne("HospitalTurnos.Dominio.Catalogo.Especialidad", null)
+                        .WithMany()
+                        .HasForeignKey("EspecialidadId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_medicos_especialidades_especialidad_id");
+
+                    b.HasOne("HospitalTurnos.Infraestructura.Identidad.UsuarioPersonal", null)
+                        .WithMany()
+                        .HasForeignKey("UsuarioPersonalId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .HasConstraintName("fk_medicos_asp_net_users_usuario_personal_id");
                 });
 
             modelBuilder.Entity("Microsoft.AspNetCore.Identity.IdentityRoleClaim<System.Guid>", b =>

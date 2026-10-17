@@ -18,7 +18,8 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
     private const string TextoEnConstruccion = "Esta sección se habilita en una próxima versión.";
 
     // Las secciones que ya dejaron de estar "en construcción" (las suma la story que las construye).
-    private static readonly string[] RutasYaConstruidas = ["/personal/admin/usuarios", "/personal/admin/especialidades"];
+    private static readonly string[] RutasYaConstruidas =
+        ["/personal/admin/usuarios", "/personal/admin/especialidades", "/personal/admin/medicos"];
 
     // La tabla del AC 13, escrita acá a mano (no se lee de RutasPersonal: la prueba no copia al código).
     // ruta, título, roles con permiso

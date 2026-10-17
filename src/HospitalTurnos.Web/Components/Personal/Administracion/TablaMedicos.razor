@@ -1,0 +1,50 @@
+@using System.Globalization
+@* La tabla de A1 (story 3.2). Traduce una SituacionDeAgenda completa a su texto (AC 4, siempre texto, nunca
+   sólo color): la 4.1 cambia el cálculo, no esta tabla. También los dos vacíos del AC 3. *@
+@if (Medicos.Count == 0)
+{
+    @if (string.IsNullOrWhiteSpace(Buscado))
+    {
+        <p>Todavía no hay médicos cargados. Usá «Nuevo médico» para dar de alta el primero.</p>
+    }
+    else
+    {
+        <p>No hay médicos que coincidan con «@Buscado». Probá con otro apellido o matrícula.</p>
+    }
+}
+else
+{
+    <table class="table align-middle">
+        <thead>
+            <tr><th>Médico</th><th>Matrícula</th><th>Especialidad</th><th>Estado de agenda</th></tr>
+        </thead>
+        <tbody>
+            @foreach (var medico in Medicos)
+            {
+                <tr>
+                    <td><a href="@RutasPersonal.FichaMedico(medico.Id)">@medico.Apellido, @medico.Nombre</a></td>
+                    <td>@medico.Matricula</td>
+                    <td>@medico.Especialidad</td>
+                    <td>@TextoDe(medico.Agenda)</td>
+                </tr>
+            }
+        </tbody>
+    </table>
+}
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<MedicoListado> Medicos { get; set; } = [];
+
+    [Parameter]
+    public string? Buscado { get; set; }
+
+    public static string TextoDe(SituacionDeAgenda agenda) => agenda switch
+    {
+        { Estado: EstadoAgendaMedico.SinAgenda, RigeDesde: { } desde } =>
+            $"Sin agenda (rige desde {desde.ToString("dd/MM", CultureInfo.InvariantCulture)})",
+        { Estado: EstadoAgendaMedico.Vigente } => "Vigente",
+        { Estado: EstadoAgendaMedico.PropuestaPendiente } => "Propuesta pendiente",
+        _ => "Sin agenda",
+    };
+}

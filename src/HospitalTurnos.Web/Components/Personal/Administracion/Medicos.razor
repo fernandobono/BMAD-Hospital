@@ -1,0 +1,43 @@
+@page "/personal/admin/medicos"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@inject IGestionMedicos Gestion
+
+@* A1, el listado (UX §7, story 3.2), renderizado estático. El buscador es un GET común: no necesita token. *@
+<PageTitle>Médicos · Las Acacias</PageTitle>
+
+<h1>Médicos</h1>
+
+<p><a href="@RutasPersonal.NuevoMedico" class="btn btn-primary" style="background-color: #1F5FA8;">Nuevo médico</a></p>
+
+<form method="get" class="mb-3" style="max-width: 32rem;">
+    <label for="buscar" class="form-label">Buscar</label>
+    <div class="d-flex gap-2">
+        <input id="buscar" name="buscar" class="form-control" value="@Buscar" aria-describedby="@(busquedaLarga ? "buscar-mensaje" : null)" />
+        <button type="submit" class="btn btn-outline-primary">Buscar</button>
+    </div>
+    @if (busquedaLarga)
+    {
+        <div id="buscar-mensaje" class="text-danger">La búsqueda tiene como máximo 100 caracteres.</div>
+    }
+</form>
+
+<TablaMedicos Medicos="medicos" Buscado="@(busquedaLarga ? null : Buscar?.Trim())" />
+
+@code {
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [SupplyParameterFromQuery(Name = "buscar")]
+    private string? Buscar { get; set; }
+
+    private IReadOnlyList<MedicoListado> medicos = [];
+    private bool busquedaLarga;
+
+    protected override async Task OnInitializedAsync()
+    {
+        // Más de 100 no filtra y avisa (AC 2): el caso de uso aplica el mismo límite.
+        busquedaLarga = (Buscar?.Trim().Length ?? 0) > IGestionMedicos.LargoMaximoBusqueda;
+        medicos = await Gestion.ListarAsync(Buscar, HttpContext.RequestAborted);
+    }
+}

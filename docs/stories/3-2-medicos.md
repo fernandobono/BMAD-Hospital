@@ -2,7 +2,7 @@
 epic: 3
 story: "3.2"
 title: "Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico"
-status: ready-for-dev
+status: review
 sprint: 2
 priority: "P0"
 approach: "[CREATE]"
@@ -43,7 +43,7 @@ files_to_modify:
 
 # Story 3.2: Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico
 
-Status: ready-for-dev
+Status: review
 
 ## Story
 
@@ -215,8 +215,9 @@ usuario (RU-07) y yo vea de un vistazo quién tiene agenda y quién no.
 
 ### Contrato con otras stories
 
-23. **(Declarativo: no tiene prueba propia; lo cumplen los AC citados y la Task 1 de cada story
-    siguiente, M-4 de la revisión.)** Lo que esta story **fija** para las demás:
+23. **(Declarativo: lo cumplen los AC citados y la Task 1 de cada story siguiente, M-4 de la revisión;
+    T18 y T22 fijan la parte que la 4.1 usa: `SituacionDeAgenda.SinAgenda` en la ficha y los cuatro
+    textos de la tabla.)** Lo que esta story **fija** para las demás:
     - **3.1 (Especialidades)** — se cumple su contrato (su AC 16): el selector de A1 sale de
       `ICatalogoEspecialidades.ListarActivasAsync` y la validación en el servidor, de `BuscarAsync`
       (existe y `Activa`). `Medico.EspecialidadId` es `long`, como `Especialidad.Id`, con FK a
@@ -227,7 +228,7 @@ usuario (RU-07) y yo vea de un vistazo quién tiene agenda y quién no.
       `asp_net_users.id` con FK `RESTRICT` e índice único. La 2.2 no vincula (contrato del brief);
       esta story suma la columna **Médico vinculado** a A4 (AC 14) con
       `IGestionMedicos.MedicosVinculadosAsync`. Se reusan, con la firma de la 2.2 (su AC 26), y no se
-      crean: `ActorDeSesion.Desde(ClaimsPrincipal)`, `ManejadorGlobalDeErrores.EsEsperable`/`EstadoPara`,
+      crean: `ActorDeSesion.Desde(ClaimsPrincipal)`, `ManejadorGlobalDeErrores.EsEsperable`/`EstadoPara`/`FijarEstadoEnPagina`,
       `IActorVigente.ExigirAdministradorActivoAsync`, la carpeta `Components/Personal/Administracion/`,
       `FormularioHttp.EnviarAsync`/`Estado`, `RutasYaConstruidas` y `UsuariosDePrueba`.
     - **4.1 (Dominio de agenda) — contrato único del estado de agenda (C-1 de la revisión).** La 4.1
@@ -301,11 +302,11 @@ usuario (RU-07) y yo vea de un vistazo quién tiene agenda y quién no.
 | T15 | `EscriturasDelCatalogo_ActorQueNoEsAdministradorActivo_LanzaAccesoDenegadoSinGuardar` | 20 | integration | `[Theory]` (`CrearAsync`, `EditarAsync`) × actores reales de la base: usuario propio `Recepcionista`; usuario propio `Medico`; administrador propio con `Activo = false` (su actor sigue diciendo `Administrador`, como una sesión atrasada); 6 casos, con datos válidos | `AccesoDenegadoException` con el texto del AC 20; ni el alta ni el cambio quedan; 0 registros nuevos |
 | T16 | `ListarAsync_Buscar_FiltraSinTratarComodines` | 2 | integration | Médicos propios `Prueba<marca>, Ana` (`T-<MARCA>-1`) y `Prueba<marca>, Beto` (`T-<MARCA>-2`). `[Theory]`: `prueba<marca>` (minúsculas); `beto`; `t-<marca>-2`; `%`; `_`; `"   "` (las aserciones miran sólo los resultados con la marca) | Ana y Beto en ese orden; sólo Beto; sólo Beto; ninguno de los dos (`%` y `_` no son comodines); los dos (no filtra) |
 | T17 | `UsuariosParaVincularAsync_SoloMedicosActivosLibresMasElPropio` | 5, 13 | integration | Usuarios propios: médico libre, médico desactivado, recepcionista, médico vinculado al médico M | Con `null`: aparece sólo el libre (de los 4); con `M.Id`: el libre y el vinculado a M |
-| T18 | `ObtenerAsync_EspecialidadDesactivadaDespues_DevuelveLaFichaConLaEspecialidadInactiva` | 15, 17 | integration | Médico propio en una especialidad propia; después se desactiva con `ICatalogoEspecialidades.DesactivarAsync` (3.1) | `DatosFichaMedico` con el nombre de la especialidad, `EspecialidadActiva = false`, `Agenda = SituacionDeAgenda.SinAgenda`; `ListarActivasAsync` ya no la trae (por eso la ficha la agrega marcada, AC 15) |
+| T18 | `ObtenerAsync_EspecialidadDesactivadaDespues_DevuelveLaFichaConLaEspecialidadInactiva` | 15, 17, 23 | integration | Médico propio en una especialidad propia; después se desactiva con `ICatalogoEspecialidades.DesactivarAsync` (3.1) | `DatosFichaMedico` con el nombre de la especialidad, `EspecialidadActiva = false`, `Agenda = SituacionDeAgenda.SinAgenda`; `ListarActivasAsync` ya no la trae (por eso la ficha la agrega marcada, AC 15) |
 | T19 | `MigracionMedicos_PermisosEIndices_ComoLosDeclaraLaStory` | 12, 24 | integration | Consultas a `pg_indexes` y `has_table_privilege` con `CadenaDuenio` | Índices únicos `ix_medicos_matricula` e `ix_medicos_usuario_personal_id`; `turnos_app` con `SELECT`, `INSERT`, `UPDATE` y **sin** `DELETE` sobre `medicos`; `registros_auditoria` sigue sin `UPDATE` |
 | T20 | `GetMedicos_Administrador_MuestraListadoOrdenadoConSinAgenda` | 1, 4, 24 | integration | Ingreso de `admin1`; dos médicos propios `Prueba<marca>, Beto` y `Prueba<marca>, Ana`; GET con `buscar=<marca>` | `200`; `<h1>Médicos</h1>`; enlace a `/personal/admin/medicos/nuevo`; Ana antes que Beto, cada una con enlace a su ficha y `Sin agenda`; el cuerpo no contiene `Esta sección se habilita` |
 | T21 | `GetMedicos_BusquedaSinResultadosOLarga_MuestraMensajeYConservaElTexto` | 2, 3 | integration | `[Theory]`: `buscar=nadie-<guid>`; `buscar` de 101 caracteres | (a) texto de "sin resultados" del AC 3 con el texto buscado y el campo con ese valor; (b) `La búsqueda tiene como máximo 100 caracteres.` y la tabla presente |
-| T22 | `TablaMedicos_SegunEstadoDeAgendaYVacio_MuestraElTextoQueCorresponde` | 3, 4 | unit | bUnit con `TablaMedicos`: (a) cuatro filas: `SinAgenda`; `SinAgenda` con `RigeDesde = 01/12/2026`; `Vigente`; `PropuestaPendiente`; (b) lista vacía sin búsqueda | (a) `Sin agenda`, `Sin agenda (rige desde 01/12)`, `Vigente`, `Propuesta pendiente` como texto en la celda de cada fila; (b) el texto "todavía no hay médicos" del AC 3 y ninguna `<table>` |
+| T22 | `TablaMedicos_SegunEstadoDeAgendaYVacio_MuestraElTextoQueCorresponde` | 3, 4, 23 | unit | bUnit con `TablaMedicos`: (a) cuatro filas: `SinAgenda`; `SinAgenda` con `RigeDesde = 01/12/2026`; `Vigente`; `PropuestaPendiente`; (b) lista vacía sin búsqueda | (a) `Sin agenda`, `Sin agenda (rige desde 01/12)`, `Vigente`, `Propuesta pendiente` como texto en la celda de cada fila; (b) el texto "todavía no hay médicos" del AC 3 y ninguna `<table>` |
 | T23 | `PostNuevo_DatosValidos_RedirigeALaFichaYAnunciaElAlta` | 5, 6 | integration | Especialidad activa y otra desactivada propias; usuario médico libre y otro vinculado propios. GET `/nuevo`: se miran las opciones; POST con el libre | Las listas tienen la activa y no la desactivada, el libre y no el vinculado; POST → `302` a `/personal/admin/medicos/{id}?resultado=alta`; la ficha tiene `role="status"` con `Médico dado de alta.` y `<h1>Apellido, Nombre</h1>` |
 | T24 | `PostNuevo_CamposInvalidos_MuestraMensajePorCampoSinGuardar` | 7 | integration | `[Theory]`: todo vacío; nombre de 101; matrícula `MP#12` | `200`; los mensajes del AC 7 que corresponden; los valores escritos vuelven en los campos; 0 médicos nuevos con la marca |
 | T25 | `PostNuevo_ReglaQueFalla_RespondeConElCodigoYElCartelConservandoLosDatos` | 8, 9, 11, 12 | integration | `[Theory]` (POST armado a mano): matrícula repetida → `409`; especialidad desactivada → `400`; usuario Recepcionista → `400`; usuario ya vinculado → `409` | Código esperado; `role="alert"` con el texto del AC; nombre y apellido escritos siguen en los campos; nada guardado |
@@ -391,59 +392,59 @@ verificación en el navegador queda en "Como verificar" y su resultado va al Dev
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado (AC: todos) — **revalidar contra el código el día que se
+- [x] [SEQ] Task 1: Salvaguarda de estado (AC: todos) — **revalidar contra el código el día que se
       implementa** (acción A-1 de la retrospectiva: esta story se escribió antes de la 2.2 y la 3.1)
-  - [ ] Confirmar que 2.2 y 3.1 están en `main` con su CI en verde (`bash scripts/ci/local.sh`).
-  - [ ] De la **3.1**, confirmar lo que su story fija (AC 16 de la 3.1) y anotarlo en el Debug Log:
+  - [x] Confirmar que 2.2 y 3.1 están en `main` con su CI en verde (`bash scripts/ci/local.sh`).
+  - [x] De la **3.1**, confirmar lo que su story fija (AC 16 de la 3.1) y anotarlo en el Debug Log:
         `ICatalogoEspecialidades` con `ListarActivasAsync` y `BuscarAsync(long id, ct)`,
         `EspecialidadResumen(long Id, string Nombre, bool Activa)`, `Especialidad.Id` `long`,
         `DbSet<Especialidad> Especialidades`, la página A2 en `Components/Personal/Administracion/`,
         `CatalogoEspecialidadesEnBase(contexto, auditoria, actorVigente)`, `InterceptorQueSeAdelanta`
         en Aplicacion.Tests/Ayudas y si siembra especialidades (T26). Si algo cambió al implementarla,
         ajustar esta story antes de programar.
-  - [ ] De la **2.2**, confirmar las piezas compartidas con su firma real (su AC 26):
-        `ActorDeSesion.Desde(ClaimsPrincipal)`, `ManejadorGlobalDeErrores.EsEsperable`/`EstadoPara`,
+  - [x] De la **2.2**, confirmar las piezas compartidas con su firma real (su AC 26):
+        `ActorDeSesion.Desde(ClaimsPrincipal)`, `ManejadorGlobalDeErrores.EsEsperable`/`EstadoPara`/`FijarEstadoEnPagina`,
         `IActorVigente.ExigirAdministradorActivoAsync(actor, mensajeSiNoLoEs, ct)`,
         `FormularioHttp.EnviarAsync`/`Estado`, `RutasYaConstruidas` en la 2.1 T19 y
         `UsuariosDePrueba`; que A4 es `Components/Personal/Administracion/UsuariosPersonal.razor` y
         **no** tiene la columna "Médico vinculado". Esta story **no** crea ninguna de esas piezas: si
         falta una, DETENERSE.
-  - [ ] Confirmar que **no** existe `src/HospitalTurnos.Dominio/Agendas/` (esta story crea ahí
+  - [x] Confirmar que **no** existe `src/HospitalTurnos.Dominio/Agendas/` (esta story crea ahí
         `EstadoAgendaMedico` y `SituacionDeAgenda`; la 4.1 se implementa después y los reutiliza,
         AC 23).
-  - [ ] Confirmar que `SeccionesAdministracion.razor` todavía tiene `@page "/personal/admin/medicos"`
+  - [x] Confirmar que `SeccionesAdministracion.razor` todavía tiene `@page "/personal/admin/medicos"`
         y que `RutasPersonal.Medicos` sigue siendo `/personal/admin/medicos`.
-  - [ ] Confirmar que no existen `medicos` ni nada de `files_to_create`.
-  - [ ] Si algo no coincide → DETENERSE y corregir la story primero.
-- [ ] [SEQ] Task 2: Dominio (AC: 6, 7, 16, 22)
-  - [ ] `Medico` y `CambioDeDato` en `Dominio/Catalogo/`; `EstadoAgendaMedico` y `SituacionDeAgenda`
+  - [x] Confirmar que no existen `medicos` ni nada de `files_to_create`.
+  - [x] Si algo no coincide → DETENERSE y corregir la story primero.
+- [x] [SEQ] Task 2: Dominio (AC: 6, 7, 16, 22)
+  - [x] `Medico` y `CambioDeDato` en `Dominio/Catalogo/`; `EstadoAgendaMedico` y `SituacionDeAgenda`
         en `Dominio/Agendas/` (ver Implementación concreta).
-  - [ ] `MedicoCreado` y `MedicoEditado` en `AccionesAuditoria` (AC 22).
-  - [ ] T1–T3 en verde.
-- [ ] [SEQ] Task 3: Persistencia y migración (AC: 8, 12, 23)
-  - [ ] `MedicoConfiguracion` y `DbSet<Medico> Medicos` en `HospitalDbContext`, con
+  - [x] `MedicoCreado` y `MedicoEditado` en `AccionesAuditoria` (AC 22).
+  - [x] T1–T3 en verde.
+- [x] [SEQ] Task 3: Persistencia y migración (AC: 8, 12, 23)
+  - [x] `MedicoConfiguracion` y `DbSet<Medico> Medicos` en `HospitalDbContext`, con
         `ApplyConfiguration` **antes** de `ConvencionSnakeCase.Aplicar`.
-  - [ ] Migración `AgregarMedicos` con `dotnet ef migrations add` y, al final de su `Up`, el bloque de
+  - [x] Migración `AgregarMedicos` con `dotnet ef migrations add` y, al final de su `Up`, el bloque de
         permisos (Implementación concreta). El snapshot se actualiza solo con el comando.
-  - [ ] Correr la Salvaguarda de BD.
-- [ ] [SEQ] Task 4: Caso de uso (AC: 2, 5, 6, 8, 9, 11–13, 16–18, 20, 22)
-  - [ ] `IGestionMedicos` y sus tipos en `Aplicacion/Catalogo/`.
-  - [ ] `GestionMedicosEnBase` en `Infraestructura/Catalogo/`, registrado en `AgregarInfraestructura`.
-  - [ ] `DatosDeCatalogo` y T4–T19 en verde (el interceptor es el de la 3.1).
-- [ ] [SEQ] Task 5: Web (AC: 1–5, 7–10, 13–19, 21, 24)
-  - [ ] `RutasPersonal`: `NuevoMedico` y `FichaMedico(long id)`.
-  - [ ] `FormularioMedico`, `CamposMedico`, `TablaMedicos`, `Medicos`, `MedicoNuevo`, `FichaMedico`,
+  - [x] Correr la Salvaguarda de BD.
+- [x] [SEQ] Task 4: Caso de uso (AC: 2, 5, 6, 8, 9, 11–13, 16–18, 20, 22)
+  - [x] `IGestionMedicos` y sus tipos en `Aplicacion/Catalogo/`.
+  - [x] `GestionMedicosEnBase` en `Infraestructura/Catalogo/`, registrado en `AgregarInfraestructura`.
+  - [x] `DatosDeCatalogo` y T4–T19 en verde (el interceptor es el de la 3.1).
+- [x] [SEQ] Task 5: Web (AC: 1–5, 7–10, 13–19, 21, 24)
+  - [x] `RutasPersonal`: `NuevoMedico` y `FichaMedico(long id)`.
+  - [x] `FormularioMedico`, `CamposMedico`, `TablaMedicos`, `Medicos`, `MedicoNuevo`, `FichaMedico`,
         en `Components/Personal/Administracion/` (la carpeta de A4 y A2).
-  - [ ] Quitar `@page "/personal/admin/medicos"` de `SeccionesAdministracion.razor`.
-  - [ ] Columna **Médico vinculado** en la página A4 de la 2.2, con `Sin vincular` (AC 14).
-  - [ ] `_Imports.razor`: `@using HospitalTurnos.Aplicacion.Catalogo` y
+  - [x] Quitar `@page "/personal/admin/medicos"` de `SeccionesAdministracion.razor`.
+  - [x] Columna **Médico vinculado** en la página A4 de la 2.2, con `Sin vincular` (AC 14).
+  - [x] `_Imports.razor`: `@using HospitalTurnos.Aplicacion.Catalogo` y
         `@using HospitalTurnos.Dominio.Agendas` (las páginas de la carpeta comparten espacio de nombres:
         no hace falta un `@using` de la carpeta).
-- [ ] [SEQ] Task 6: Pruebas de Web y verificación (AC: todos)
-  - [ ] `DatosDeCatalogo` de Web.Tests y T20–T31 en verde.
-  - [ ] `/personal/admin/medicos` en `RutasYaConstruidas` de la T19 de la 2.1 (AC 24).
-  - [ ] `dotnet test` completo y `bash scripts/ci/local.sh` sin regresiones.
-  - [ ] Verificación manual en el navegador (Como verificar, paso 4) con su resultado en el Dev Agent Record.
+- [x] [SEQ] Task 6: Pruebas de Web y verificación (AC: todos)
+  - [x] `DatosDeCatalogo` de Web.Tests y T20–T31 en verde.
+  - [x] `/personal/admin/medicos` en `RutasYaConstruidas` de la T19 de la 2.1 (AC 24).
+  - [x] `dotnet test` completo y `bash scripts/ci/local.sh` sin regresiones.
+  - [x] Verificación manual en el navegador (Como verificar, paso 4) con su resultado en el Dev Agent Record.
 
 ### Task Dependencies
 
@@ -454,11 +455,11 @@ hacerse en paralelo con el resto de las páginas.
 
 ### Que existe hoy
 
-#### En hospital-turnos (verificado 2026-10-16 contra `main` en `c3413cc`, con 1.1 a 2.1 en done; 2.2 y 3.1 todavía no están implementadas; sus stories y la de la 4.1 se escribieron en paralelo con ésta y sus contratos están leídos)
+#### En hospital-turnos (verificado 2026-10-16 contra `main` en `9a21b7f`, con 1.1 a 2.2 y 3.1 en done; la story de la 4.1 se escribió en paralelo con ésta y su contrato está leído)
 
-- **No existe** nada de `files_to_create`, ni ninguna carpeta `Catalogo` en `src/` o `tests/`, ni la
-  tabla `medicos`. La 2.2 y la 3.1 se implementan **antes** que ésta (orden del sprint: 2.2 → 3.1 →
-  3.2 → 4.1); por eso la Task 1 las revisa.
+- **No existe** ninguno de los archivos de `files_to_create` (las carpetas `Catalogo` de `src/` y
+  `tests/` ya existen: son de la 3.1) ni la tabla `medicos`. La 2.2 y la 3.1 ya están en `main` (orden del sprint: 2.2 → 3.1 → 3.2 → 4.1); la
+  Task 1 confirma sus piezas con la firma real.
 - `HospitalDbContext` (`Infraestructura/Persistencia/`) hereda de
   `IdentityDbContext<UsuarioPersonal, IdentityRole<Guid>, Guid>`; expone `RegistrosAuditoria` y
   `MensajesSalientes` como `DbSet => Set<T>()`; aplica cada configuración **a mano**
@@ -468,7 +469,8 @@ hacerse en paralelo con el resto de las páginas.
   `ix_medicos_matricula`).
 - Migraciones en `Persistencia/Migraciones/`: `20261015225443_Inicial`,
   `20261016010013_AgregarRegistroAuditoria`, `20261016020303_AgregarBandejaDeSalida`,
-  `20261016180914_IdentidadPersonal` (más las de 2.2 y 3.1 cuando existan). Las aplica el arranque con
+  `20261016180914_IdentidadPersonal`, `20261016212111_GestionUsuariosPersonal` (2.2) y
+  `20261017000841_AgregarEspecialidades` (3.1); `AgregarMedicos` va después de esta última. Las aplica el arranque con
   `AplicadorDeMigraciones` y el rol dueño; **nunca** `dotnet ef database update`.
   `AgregarBandejaDeSalida.cs:47-55` es el modelo de permisos por tabla (`REVOKE ALL` + `GRANT` de lo que
   se usa), porque `01-roles.sh` le da a `turnos_app` `SELECT, INSERT, UPDATE, DELETE` por defecto en
@@ -478,8 +480,9 @@ hacerse en paralelo con el resto de las páginas.
   `AuditoriaEnBase` pone `Cuando` con el `TimeProvider` y serializa `detalle` con
   `JsonSerializerOptions.Web` (propiedades en camelCase; las **claves de un diccionario no** se
   convierten: por eso `CambioDeDato.Campo` ya viene en camelCase). `CanalAuditoria.Personal` existe.
-  `AccionesAuditoria` hoy: 9 constantes de turnos y agendas (`turno.reservado`, …) y las 3 de la 2.1 en
-  kebab-case (`ingreso-personal`, …). `IAuditoria` se registra en `ServiciosDeInfraestructura.AgregarInfraestructura`.
+  `AccionesAuditoria` hoy: 20 constantes: 9 de turnos y agendas (`turno.reservado`, …), las 3 de la 2.1
+  en kebab-case (`ingreso-personal`, …), las 5 `usuario-personal.*` de la 2.2 y las 3 `especialidad.*`
+  de la 3.1. `IAuditoria` se registra en `ServiciosDeInfraestructura.AgregarInfraestructura`.
 - Errores (1.2): `ReglaDeNegocioException` (400), `ConflictoException : ReglaDeNegocioException` (409),
   `NoEncontradoException` (404), `AccesoDenegadoException` (403) en `Dominio/Excepciones/`.
   `ManejadorGlobalDeErrores`, ante un pedido de navegador (`Accept: text/html`), deja que se dibuje
@@ -487,24 +490,30 @@ hacerse en paralelo con el resto de las páginas.
   escrito (línea 261): "mostrar el mensaje de la regla dentro de cada pantalla es trabajo de cada story
   de pantalla (validan antes y atrapan la excepción del caso de uso en el formulario)". Por eso las
   páginas de esta story atrapan **sólo** las excepciones del dominio, con
-  `when (ManejadorGlobalDeErrores.EsEsperable(e))` y el código de `EstadoPara(e)`, que agrega la 2.2
-  (decisión 1).
+  `when (ManejadorGlobalDeErrores.EsEsperable(e))` y fijan el código con
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)` (2.2, decisión 1): toma el código de
+  `EstadoPara(e)` y, si es `404`, lo fija recién al empezar a enviar la respuesta, porque Blazor (.NET 10)
+  no escribe el cuerpo de una página SSR que terminó de dibujarse en `404` y el cartel no llegaría.
 - Personal (2.1): `RutasPersonal` (`Web/Personal/`) ya define `Medicos = "/personal/admin/medicos"`,
-  título `Médicos`, y es el inicio del administrador. `SeccionesAdministracion.razor` tiene 6 `@page`
-  (médicos, propuestas, especialidades, bloqueos, usuarios, auditoría) con
+  título `Médicos`, y es el inicio del administrador. `SeccionesAdministracion.razor` tiene 4 `@page`
+  (médicos, propuestas, bloqueos, auditoría; usuarios y especialidades salieron con la 2.2 y la 3.1) con
   `[Authorize(Roles = Roles.Administrador)]` y `@layout LayoutPersonal`, y dibuja
-  `SeccionEnConstruccion`. `AccesoDenegado.razor:21` muestra cómo una página SSR fija su código
-  (`HttpContext.Response.StatusCode = ...`) y conserva su cuerpo. `Ingreso.razor:22-45` es el modelo de
+  `SeccionEnConstruccion`. `AccesoDenegado.razor:21` fija su `403` a mano
+  (`HttpContext.Response.StatusCode = ...`) y conserva su cuerpo; con un `404` eso **no** sirve (la
+  página saldría sin cuerpo): por eso esta story nunca fija un código a mano y usa siempre
+  `FijarEstadoEnPagina`. `Ingreso.razor:22-45` es el modelo de
   formulario SSR: `EditForm` con `method="post"`, `FormName` y `[SupplyParameterFromForm]`.
   `ClaimsPersonal.NombreCompleto = "nombre_completo"` (en `Aplicacion/Personal/IIngresoPersonal.cs`).
   `Roles.Medico = "Medico"` (sin acento: es el texto que guarda Identity).
 - `UsuarioPersonal : IdentityUser<Guid>` (`Infraestructura/Identidad/`) con `NombreCompleto` (120) y
   `Activo`. Los roles se leen con los `DbSet` de Identity (`Users`, `UserRoles`, `Roles`) del mismo
   contexto: tablas `asp_net_users`, `asp_net_user_roles`, `asp_net_roles`.
-- Pruebas de Web (2.1): `PersonalWebApplicationFactory`, `FormularioHttp` (`Cliente`, `ValorDe`,
-  `TokenDeAsync`, `IngresarAsync`, `Destino`, `Alerta`, `CrearUsuarioAsync`), `SinParalelismo.cs`. La
-  T19 (`SesionYPermisosHttpTests.Secciones_SegunRol_...`) exige hoy, para cada sección permitida,
-  `<h1>{Titulo}</h1>` **y** el texto de construcción: con esta story la fila de médicos cambia (AC 24).
+- Pruebas de Web (2.1 y 2.2): `PersonalWebApplicationFactory`, `FormularioHttp` (`Cliente`, `ValorDe`,
+  `TokenDeAsync`, `IngresarAsync`, `Destino`, `Alerta`, `Estado`, `EnviarAsync`, `CrearUsuarioAsync`),
+  `SinParalelismo.cs`. La T19 (`SesionYPermisosHttpTests.Secciones_SegunRol_...`) exige, para cada
+  sección permitida, `<h1>{Titulo}</h1>`, y el texto de construcción salvo en las rutas de
+  `RutasYaConstruidas` (hoy `/personal/admin/usuarios` y `/personal/admin/especialidades`): esta story
+  suma `/personal/admin/medicos` (AC 24).
 - Código descartable del arranque (`git show 48f29a1:src/HospitalTurnos.Api/Dominio/Medico.cs`): ya
   usaba `int Id` (**no** se toma: el código descartable no es contrato, decisión 15), `long EspecialidadId`, invariantes en el constructor con `ReglaDeNegocioException` y
   `NombreCompleto => $"{Apellido}, {Nombre}"`. Se toma la forma; **no** la duración del turno ni los
@@ -526,9 +535,9 @@ hacerse en paralelo con el resto de las páginas.
 |---|---|---|
 | changomas-testing-csharp (guía) | `src/ChangoMas.Dominio/ItemVenta.cs:8-15` | Entidad que valida en el constructor y no nace inválida, con setters privados (`:18`). `Medico` igual, con `ReglaDeNegocioException` (contrato §Errores) en vez de `ArgumentOutOfRangeException`. |
 | changomas-testing-csharp (guía) | `src/ChangoMas.Dominio/Puertos/IRepositorioVentas.cs:4-8` | Puerto con `Task` y `CancellationToken`. Acá el puerto vive en Aplicacion (como `IIngresoPersonal` de la 2.1) porque el caso de uso usa la base y la auditoría. |
-| hospital-turnos (2.1) | `src/HospitalTurnos.Infraestructura/Identidad/IngresoPersonalIdentity.cs:16`, `:108-113` | Adaptador en Infraestructura que implementa un puerto de Aplicacion, recibe `IAuditoria` y `HospitalDbContext` y cierra con **un** `SaveChangesAsync` que guarda cambio y auditoría juntos. Se toma igual. |
+| hospital-turnos (2.1) | `src/HospitalTurnos.Infraestructura/Identidad/IngresoPersonalIdentity.cs` (la clase y `AuditarAsync`) | Adaptador en Infraestructura que implementa un puerto de Aplicacion, recibe `IAuditoria` y `HospitalDbContext` y cierra con **un** `SaveChangesAsync` que guarda cambio y auditoría juntos. Se toma igual. |
 | hospital-turnos (1.4) | `src/HospitalTurnos.Infraestructura/Persistencia/Migraciones/20261016020303_AgregarBandejaDeSalida.cs:47-55` | `REVOKE ALL` + `GRANT` sólo de lo que se usa + `GRANT USAGE` de la secuencia. Se copia para `medicos` (sin `DELETE`). |
-| hospital-turnos (1.3/1.4) | `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs:29-33` | Configuración por clase `IEntityTypeConfiguration<T>` aplicada a mano antes de la convención. |
+| hospital-turnos (1.3/1.4) | `src/HospitalTurnos.Infraestructura/Persistencia/HospitalDbContext.cs` (`OnModelCreating`) | Configuración por clase `IEntityTypeConfiguration<T>` aplicada a mano antes de la convención. |
 | hospital-turnos (2.1) | `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor:22`, `:45`, `:75` | Formulario SSR (`EditForm` + `FormName` + `[SupplyParameterFromForm]`) y `NavigateTo` fuera de todo `try` (en SSR se implementa con una excepción). |
 
 El guía no tiene índices únicos ni traducción de errores de la base (`grep -rn -E "IsUnique|HasIndex|23505|DbUpdateException"`
@@ -564,8 +573,9 @@ API de Npgsql descrita arriba.
   (mismo criterio que NFR-02 para los turnos).
 - **Los errores de regla se muestran en la pantalla con su código** (`409`/`400`/`404`/`403`) y el texto
   de la regla, como pide UX §8, porque el camino HTML del manejador global siempre muestra el mensaje
-  genérico (1.2, línea 261). El código lo da `ManejadorGlobalDeErrores.EstadoPara` (2.2): el mismo que
-  daría el manejador para JSON, escrito en un solo lugar.
+  genérico (1.2, línea 261). El código lo fija `ManejadorGlobalDeErrores.FijarEstadoEnPagina` (2.2) con
+  el de `EstadoPara`: el mismo que daría el manejador para JSON, escrito en un solo lugar, y con el `404`
+  diferido para que el cartel llegue en el cuerpo.
 - **Éxito con redirección (`302` a la ficha con `?resultado=`)**: evita que "Atrás" o "Actualizar"
   reenvíe el alta (patrón POST-redirección-GET); SSR no tiene un lugar donde guardar el mensaje entre
   pedidos, así que viaja en la consulta y la página lo traduce a un texto fijo (nunca se muestra lo
@@ -620,7 +630,7 @@ Numeradas como en `revision-sprint-2.md` ("Decisiones abiertas consolidadas").
   un usuario `Medico` sin vínculo (AC 14, T31), y el contrato fija el texto que muestran la 4.2 y la
   8.1: `Tu usuario no está vinculado a un médico. Pedíselo al administrador.` (AC 23).
 - **Decisión 1 — Error de regla en pantalla.** **Elegido:** cartel en la página con el mecanismo de la
-  2.2 (`EsEsperable`/`EstadoPara`).
+  2.2 (`EsEsperable` + `FijarEstadoEnPagina`, que usa `EstadoPara`).
 
 ### Implementacion concreta
 
@@ -854,7 +864,8 @@ private async Task GuardarAsync()
     catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
     {
         // UX §8: el cartel arriba del formulario con la regla; el código es el del manejador (409/400/404/403).
-        HttpContext.Response.StatusCode = ManejadorGlobalDeErrores.EstadoPara(e);
+        // FijarEstadoEnPagina difiere el 404: con Blazor .NET 10 una página SSR en 404 sale sin cuerpo.
+        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
         error = e.Message;
         return;
     }
@@ -862,9 +873,12 @@ private async Task GuardarAsync()
 }
 ```
 
-  En `FichaMedico.razor`, `ObtenerAsync` devuelve `null` → `HttpContext.Response.StatusCode = 404` y
-  el texto del AC 18 (en GET y en POST; en POST, `EditarAsync` lanza `NoEncontradoException` y se
-  atrapa igual, con `EstadoPara` = 404). `?resultado=` se traduce con un `switch` de tres valores conocidos a los textos de los
+  En `FichaMedico.razor`, `ObtenerAsync` devuelve `null` →
+  `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, new NoEncontradoException(MedicoInexistente))`
+  y el texto del AC 18 (`MedicoInexistente = "No existe el médico pedido."`). **Nunca**
+  `HttpContext.Response.StatusCode = 404` a mano: con Blazor .NET 10 la página saldría en `404` sin
+  cuerpo, sin el texto ni el enlace (T28 lo detecta). En GET y en POST; en POST, `EditarAsync` lanza
+  `NoEncontradoException` y se atrapa igual, por el mismo `FijarEstadoEnPagina`. `?resultado=` se traduce con un `switch` de tres valores conocidos a los textos de los
   AC 6 y 16; cualquier otro valor no muestra nada.
 - A4 (2.2): la página inyecta `IGestionMedicos`, llama una vez a `MedicosVinculadosAsync` y, en la
   columna **Médico vinculado** de cada fila: si el usuario está en el diccionario, `Apellido, Nombre`;
@@ -976,11 +990,51 @@ docker compose exec db psql -U postgres -d hospital_turnos \
 
 ### Agent Model Used
 
+Claude Opus 5.5 (Amelia, pipeline TYCON), sesión 11 de BMAD-Hospital (2026-10-16).
+
 ### Debug Log References
+
+- Task 1: piezas de la 2.2 y la 3.1 confirmadas por el validador contra `main` en `9a21b7f` (firmas de
+  `ICatalogoEspecialidades`, `CatalogoEspecialidadesEnBase`, `InterceptorQueSeAdelanta`,
+  `UsuariosDePrueba`, `IActorVigente`, `FormularioHttp.EnviarAsync`/`Estado`, `RutasYaConstruidas`).
+  La 3.1 no siembra especialidades (T26 sólo necesita la base nueva).
+- Línea de base: 300 pruebas en verde (Dominio 33, Aplicación 119, Web 148).
+- Salvaguarda de BD (Compose): `medicos` con las columnas e índices únicos de la story; FK
+  `fk_medicos_especialidades_especialidad_id` y `fk_medicos_asp_net_users_usuario_personal_id`
+  (`RESTRICT`); `turnos_app` con `INSERT`, `SELECT`, `UPDATE`; `registros_auditoria` sigue sin `UPDATE`.
+- Rojo por la razón correcta en cada capa: Dominio y Web no compilaban (faltaban `Medico` y
+  `TablaMedicos`); Aplicación fallaba por el modelo con cambios sin migración.
+- La ficha se dibuja una primera vez antes de leer el médico: el `EditForm` se dibuja sólo con el
+  modelo listo (si no, `EditForm requires either a Model…` y el 500 genérico).
+- Blazor dibuja la opción vacía de un `<select>` como `<option value>`: la prueba lo acepta (el
+  navegador lo toma como valor vacío).
 
 ### Completion Notes List
 
+- 31 pruebas de la story (los mismos 31 nombres de la tabla) en verde.
+- Cartel de error con `FijarEstadoEnPagina` en las tres situaciones (regla del alta, regla de la
+  ficha, médico inexistente en GET y POST); ningún `StatusCode` fijado a mano.
+- La ficha dibuja su formulario también en un POST de un id inexistente, para que el envío llegue al
+  caso de uso y responda el `404` del AC 18; el alta, también en un POST sin especialidades activas
+  (cae en el `400` del AC 9, como dice el AC 10).
+- En la ficha, la lista de usuarios incluye al vinculado hoy aunque ya no cumpla (desactivado
+  después): así guardar sin tocarlo no lo desvincula (AC 17).
+- Verificación en el navegador (Como verificar, paso 4): un script de Playwright maneja Chrome contra
+  la app del Compose en cuatro grupos (pantalla, errores, carrera, base), registrados con
+  `smoke-run.sh`: 0 fallas y la matriz por AC en 24 de 24 corridos en vivo. Incluye el 404 de la
+  ficha con su cartel dentro de la pantalla y dos carreras de diez pedidos a la vez desde dos
+  sesiones (matrícula y vínculo): un 302, nueve 409 y una sola fila en cada una. Capturas en
+  `Sesiones/img/11-*.png`.
+- Legibilidad (tester no técnico): la guía `docs/qa/3.2-pasos.md` se corrigió con sus marcas. En
+  las pantallas marcó tres cosas que el docente aceptó sin cambios: los carteles 400 y 409 del
+  vínculo tomados de pedidos armados a mano (la lista no ofrece ese valor, así que el campo no lo
+  muestra) y el cartel 403 del administrador recién desactivado (el formulario conserva lo escrito y
+  el texto lo fija el AC 20, como en la 3.1).
+
 ### File List
+
+- Crear: los 21 de `files_to_create` (migración `20261017014314_AgregarMedicos`).
+- Modificar: los 9 de `files_to_modify`.
 
 ### Change Log
 
@@ -998,3 +1052,24 @@ docker compose exec db psql -U postgres -d hospital_turnos \
   3.1 (I-8). AC 23 declarativo (M-4); T30 suma la ficha (M-5); M-6 y M-10 aceptados en
   "Decisiones"; cita de T26 corregida (M-12). Siguen 24 AC y 31 verificaciones; ninguna decisión
   abierta.
+- 2026-10-16 (sesión 11): revalidada contra `main` en `9a21b7f` antes de implementar. El cartel de error
+  usa `ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e)` (pieza de la 2.2) y la ficha
+  inexistente le pasa una `NoEncontradoException`: nunca un `Response.StatusCode` a mano, porque con
+  Blazor .NET 10 una página SSR en `404` sale sin cuerpo. "Que existe hoy" al día con la 2.2 y la 3.1
+  (migraciones, constantes de auditoría, secciones en construcción, ayudas de prueba) y anclas por
+  nombre de método en vez de número de línea.
+- 2026-10-16 (sesión 11): implementada. Tres piezas chicas que la story no nombraba, sin regla nueva:
+  `Medico.MensajeMatricula` y `Medico.MatriculaValida` (el formulario muestra el error de la matrícula
+  debajo del campo, AC 7, con la expresión del dominio; por eso la matrícula del formulario no lleva
+  `[StringLength]`, que mediría lo escrito sin normalizar) e `IGestionMedicos.LargoMaximoBusqueda`
+  (el límite de 100 del AC 2, compartido por la pantalla y el caso de uso).
+- 2026-10-16 (sesión 11, revisores): el AC 23 queda asignado a T18 y T22 (decisión del docente, como el
+  contrato de la 3.1), para que el control de cobertura de criterios no lo deje sin prueba.
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** ACCOV-C5 — `docs/stories/3-2-medicos.md` — AC 23 asignado a T18 y T22 (decisión del docente) <!-- fkey:ACCOV-C5|docs/stories/3-2-medicos.md -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/3-2-medicos.md` — tasks tildadas; queda la verificación en vivo <!-- fkey:VAL-W15|docs/stories/3-2-medicos.md -->

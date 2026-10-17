@@ -1,0 +1,134 @@
+@page "/personal/admin/medicos/{Id:long}"
+@layout LayoutPersonal
+@attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@using HospitalTurnos.Dominio.Excepciones
+@using HospitalTurnos.Web.Errores
+@inject IGestionMedicos Gestion
+@inject ICatalogoEspecialidades Catalogo
+@inject NavigationManager Navegacion
+
+@* A1, la ficha y la edición (UX §7, story 3.2), renderizado estática. Mismo manejo de errores que el alta.
+   La agenda vigente y "Corregir agenda" los agrega la 4.4 (decisión 10). *@
+@if (noExiste)
+{
+    <PageTitle>Médicos · Las Acacias</PageTitle>
+    <h1>Médicos</h1>
+    <div class="alert alert-danger" role="alert">@MedicoInexistente</div>
+    <p><a href="@RutasPersonal.Medicos">Volver a Médicos</a></p>
+}
+else
+{
+    <PageTitle>@Titulo · Las Acacias</PageTitle>
+    @if (ficha is not null)
+    {
+        <h1>@ficha.Datos.Apellido, @ficha.Datos.Nombre</h1>
+    }
+
+    <p><a href="@RutasPersonal.Medicos">Volver a Médicos</a></p>
+
+    @if (estado is not null)
+    {
+        <div class="alert alert-success" role="status">@estado</div>
+    }
+    @if (error is not null)
+    {
+        <div class="alert alert-danger" role="alert">@error</div>
+    }
+
+    @if (ficha is not null)
+    {
+        <p>Estado de agenda: <strong>@TablaMedicos.TextoDe(ficha.Agenda)</strong></p>
+    }
+
+    @* Input es null en el primer dibujo de un GET, mientras se lee el médico. *@
+    @if (Input is not null)
+    {
+        <EditForm Model="Input" method="post" OnValidSubmit="GuardarAsync" FormName="medico" style="max-width: 32rem;">
+            <DataAnnotationsValidator />
+            <CamposMedico Input="Input" Especialidades="especialidades" Usuarios="usuarios" />
+            <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Guardar cambios</button>
+        </EditForm>
+    }
+}
+
+@code {
+    private const string MedicoInexistente = "No existe el médico pedido.";
+
+    [CascadingParameter]
+    private HttpContext HttpContext { get; set; } = default!;
+
+    [Parameter]
+    public long Id { get; set; }
+
+    [SupplyParameterFromForm(FormName = "medico")]
+    private FormularioMedico? Input { get; set; }
+
+    [SupplyParameterFromQuery(Name = "resultado")]
+    private string? Resultado { get; set; }
+
+    private DatosFichaMedico? ficha;
+    private IReadOnlyList<EspecialidadResumen> especialidades = [];
+    private IReadOnlyList<OpcionUsuarioMedico> usuarios = [];
+    private string? estado;
+    private string? error;
+    private bool noExiste;
+
+    private string Titulo => ficha is null ? "Médicos" : $"{ficha.Datos.Apellido}, {ficha.Datos.Nombre}";
+
+    protected override async Task OnInitializedAsync()
+    {
+        ficha = await Gestion.ObtenerAsync(Id, HttpContext.RequestAborted);
+        if (ficha is null && !HttpMethods.IsPost(HttpContext.Request.Method))
+        {
+            NoExiste(new NoEncontradoException(MedicoInexistente));   // AC 18 en GET
+            return;
+        }
+        // En un POST el formulario se dibuja igual: el envío lo resuelve el caso de uso (AC 18 en POST).
+        Input ??= ficha is null ? new() : FormularioMedico.Desde(ficha.Datos);
+        especialidades = await Catalogo.ListarActivasAsync(HttpContext.RequestAborted);
+        // La especialidad del médico, aunque hoy esté desactivada: el formulario muestra el valor real (AC 15).
+        if (ficha is { EspecialidadActiva: false })
+            especialidades = [.. especialidades, new EspecialidadResumen(ficha.Datos.EspecialidadId, ficha.Especialidad, false)];
+        usuarios = await Gestion.UsuariosParaVincularAsync(Id, HttpContext.RequestAborted);
+        // Sólo los tres textos fijos: nunca se muestra lo que venga en la consulta.
+        estado = Resultado switch
+        {
+            "alta" => "Médico dado de alta.",
+            "edicion" => "Cambios guardados.",
+            "sin-cambios" => "No había cambios para guardar.",
+            _ => null,
+        };
+    }
+
+    private async Task GuardarAsync()
+    {
+        bool guardo;
+        try
+        {
+            guardo = await Gestion.EditarAsync(Id, Input!.ADatos(), ActorDeSesion.Desde(HttpContext.User),
+                HttpContext.RequestAborted);
+        }
+        catch (NoEncontradoException e)
+        {
+            NoExiste(e);
+            return;
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
+        {
+            // UX §8: el cartel arriba del formulario con la regla; el código es el del manejador (409/400/403).
+            ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+            estado = null;
+            error = e.Message;
+            return;
+        }
+        Navegacion.NavigateTo($"{RutasPersonal.FichaMedico(Id)}?resultado={(guardo ? "edicion" : "sin-cambios")}");   // fuera del try (SSR)
+    }
+
+    // El 404 con su texto y el enlace (AC 18). Nunca StatusCode = 404 a mano: con Blazor .NET 10 la página
+    // saldría sin cuerpo; FijarEstadoEnPagina lo fija al empezar a enviar la respuesta.
+    private void NoExiste(NoEncontradoException e)
+    {
+        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
+        noExiste = true;
+    }
+}
