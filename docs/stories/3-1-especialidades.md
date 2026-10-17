@@ -2,7 +2,7 @@
 epic: 3
 story: "3.1"
 title: "Especialidades: alta, desactivación y reactivación (pantalla A2)"
-status: review
+status: done
 sprint: 2
 priority: "P0"
 approach: "[ADAPT]"
@@ -32,7 +32,7 @@ files_to_modify:
 
 # Story 3.1: Especialidades: alta, desactivación y reactivación (pantalla A2)
 
-Status: review
+Status: done
 
 ## Story
 
