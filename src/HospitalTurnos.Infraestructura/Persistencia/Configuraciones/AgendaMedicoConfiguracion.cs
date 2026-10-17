@@ -10,6 +10,7 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Configuraciones;
 public sealed class AgendaMedicoConfiguracion : IEntityTypeConfiguration<AgendaMedico>
 {
     public const string IndiceUnaEnviada = "ux_agendas_medico_una_enviada";   // la 4.2 traduce su 23505
+    public const string IndiceUnaEditable = "ux_agendas_medico_una_editable"; // la 4.2 traduce su 23505
 
     public void Configure(EntityTypeBuilder<AgendaMedico> agenda)
     {
@@ -26,6 +27,10 @@ public sealed class AgendaMedicoConfiguracion : IEntityTypeConfiguration<AgendaM
         agenda.Navigation(a => a.Franjas).UsePropertyAccessMode(PropertyAccessMode.Field);   // usa _franjas
         // Una sola enviada por médico (FR-14b): la segunda defensa; la primera, con mensaje claro, es de la 4.2.
         agenda.HasIndex(a => a.MedicoId).IsUnique().HasFilter("estado = 'Enviada'").HasDatabaseName(IndiceUnaEnviada);
+        // Una sola propuesta editable por médico (decisión 2 de la 4.2). CON NOMBRE: un HasIndex(a => a.MedicoId) sin
+        // nombre devolvería el índice de la una-enviada y le cambiaría el filtro.
+        agenda.HasIndex(a => a.MedicoId, IndiceUnaEditable).IsUnique().HasFilter("estado IN ('Borrador', 'Rechazada')")
+              .HasDatabaseName(IndiceUnaEditable);
         agenda.HasIndex(a => new { a.MedicoId, a.Estado, a.VigenteDesde });       // la consulta del AC 29
         agenda.ToTable(t => t.HasCheckConstraint("ck_agendas_medico_duracion", "duracion_turno_minutos BETWEEN 10 AND 60"));
     }

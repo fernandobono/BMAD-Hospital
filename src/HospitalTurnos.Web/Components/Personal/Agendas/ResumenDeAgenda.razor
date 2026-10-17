@@ -1,0 +1,63 @@
+@using System.Globalization
+@* Una agenda en sólo lectura (story 4.2, AC 24): M2 arriba ("Mi agenda vigente") y la A6 de la 4.3, lado a lado con
+   CompararCon. El número de turnos es el del dominio (TurnosPorSemana), nunca otro cálculo. *@
+<div class="resumen-agenda">
+    <div class="renglon">@Duracion@(Forma == FormaDeResumen.EnLinea ? $" · {EnUnaLinea}" : "")</div>
+    @if (Forma == FormaDeResumen.EnLista)
+    {
+        @if (ordenadas.Count == 0)
+        {
+            <div class="renglon">Sin franjas</div>
+        }
+        else
+        {
+            <ul class="mb-1">
+                @foreach (var franja in ordenadas)
+                {
+                    <li>@TextoDeFranja(franja)@(Cambia(franja) ? Marca : "")</li>
+                }
+            </ul>
+        }
+    }
+    <div class="renglon">@Turnos</div>
+</div>
+
+@code {
+    private const string Marca = " ← cambia";
+    private static readonly string[] Dias = ["Lun", "Mar", "Mié", "Jue", "Vie", "Sáb", "Dom"];
+
+    [Parameter, EditorRequired]
+    public AgendaMedico Agenda { get; set; } = default!;
+
+    [Parameter]
+    public FormaDeResumen Forma { get; set; } = FormaDeResumen.EnLinea;
+
+    /// <summary>Sólo con EnLista: marca " ← cambia" lo que no está igual en esta otra agenda (la 4.3 pasa la vigente).</summary>
+    [Parameter]
+    public AgendaMedico? CompararCon { get; set; }
+
+    private List<Franja> ordenadas = [];
+
+    protected override void OnParametersSet() =>
+        ordenadas = [.. Agenda.Franjas.OrderBy(f => FormularioAgenda.DeLunesADomingo(f.Dia)).ThenBy(f => f.Desde)];
+
+    /// <summary>"Lun 8–12": el formato de una franja, escrito una sola vez (lo usan M2 y la 4.3).</summary>
+    public static string TextoDeFranja(Franja franja) =>
+        $"{Dias[FormularioAgenda.DeLunesADomingo(franja.Dia)]} {Hora(franja.Desde)}–{(franja.TerminaAMedianoche ? "24" : Hora(franja.Hasta))}";
+
+    private string Duracion =>
+        $"turnos de {Agenda.DuracionTurnoMinutos} min{(Comparando && CompararCon!.DuracionTurnoMinutos != Agenda.DuracionTurnoMinutos ? Marca : "")}";
+
+    private string EnUnaLinea => ordenadas.Count == 0 ? "Sin franjas" : string.Join(" · ", ordenadas.Select(TextoDeFranja));
+
+    private string Turnos => Agenda.TurnosPorSemana() is 1 ? "1 turno/semana" : $"{Agenda.TurnosPorSemana()} turnos/semana";
+
+    private bool Comparando => Forma == FormaDeResumen.EnLista && CompararCon is not null;
+
+    private bool Cambia(Franja franja) =>
+        Comparando && !CompararCon!.Franjas.Any(f => f.Dia == franja.Dia && f.Desde == franja.Desde && f.Hasta == franja.Hasta);
+
+    // Sin minutos si es en punto: 8, 8:30.
+    private static string Hora(TimeOnly hora) =>
+        hora.Minute == 0 ? hora.Hour.ToString(CultureInfo.InvariantCulture) : hora.ToString("H:mm", CultureInfo.InvariantCulture);
+}

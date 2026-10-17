@@ -97,6 +97,10 @@ public static class DatosDeAgenda
             "lunes" => DayOfWeek.Monday,
             "martes" => DayOfWeek.Tuesday,
             "miércoles" => DayOfWeek.Wednesday,
+            "jueves" => DayOfWeek.Thursday,      // de jueves a domingo los suma la 4.2
+            "viernes" => DayOfWeek.Friday,
+            "sábado" => DayOfWeek.Saturday,
+            "domingo" => DayOfWeek.Sunday,
             _ => throw new ArgumentOutOfRangeException(nameof(dia)),
         }, TimeOnly.Parse(desde), TimeOnly.Parse(hasta));
 }
