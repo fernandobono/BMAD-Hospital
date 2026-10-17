@@ -2,7 +2,7 @@
 epic: 3
 story: "3.2"
 title: "Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico"
-status: review
+status: done
 sprint: 2
 priority: "P0"
 approach: "[CREATE]"
@@ -43,7 +43,7 @@ files_to_modify:
 
 # Story 3.2: Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico
 
-Status: review
+Status: done
 
 ## Story
 
