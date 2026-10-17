@@ -22,6 +22,112 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("HospitalTurnos.Dominio.Agendas.AgendaMedico", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<DateTimeOffset?>("AprobadaEl")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("aprobada_el");
+
+                    b.Property<int>("DuracionTurnoMinutos")
+                        .HasColumnType("integer")
+                        .HasColumnName("duracion_turno_minutos");
+
+                    b.Property<DateTimeOffset?>("EnviadaEl")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("enviada_el");
+
+                    b.Property<string>("Estado")
+                        .IsRequired()
+                        .HasMaxLength(20)
+                        .HasColumnType("character varying(20)")
+                        .HasColumnName("estado");
+
+                    b.Property<long>("MedicoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("medico_id");
+
+                    b.Property<string>("MotivoRechazo")
+                        .HasMaxLength(500)
+                        .HasColumnType("character varying(500)")
+                        .HasColumnName("motivo_rechazo");
+
+                    b.Property<DateTimeOffset?>("RechazadaEl")
+                        .HasColumnType("timestamp with time zone")
+                        .HasColumnName("rechazada_el");
+
+                    b.Property<uint>("Version")
+                        .IsConcurrencyToken()
+                        .ValueGeneratedOnAddOrUpdate()
+                        .HasColumnType("xid")
+                        .HasColumnName("xmin");
+
+                    b.Property<DateOnly>("VigenteDesde")
+                        .HasColumnType("date")
+                        .HasColumnName("vigente_desde");
+
+                    b.HasKey("Id")
+                        .HasName("pk_agendas_medico");
+
+                    b.HasIndex("MedicoId")
+                        .IsUnique()
+                        .HasDatabaseName("ux_agendas_medico_una_enviada")
+                        .HasFilter("estado = 'Enviada'");
+
+                    b.HasIndex("MedicoId", "Estado", "VigenteDesde")
+                        .HasDatabaseName("ix_agendas_medico_medico_id_estado_vigente_desde");
+
+                    b.ToTable("agendas_medico", t =>
+                        {
+                            t.HasCheckConstraint("ck_agendas_medico_duracion", "duracion_turno_minutos BETWEEN 10 AND 60");
+                        });
+                });
+
+            modelBuilder.Entity("HospitalTurnos.Dominio.Agendas.Franja", b =>
+                {
+                    b.Property<long>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("bigint")
+                        .HasColumnName("id");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<long>("Id"));
+
+                    b.Property<long>("AgendaMedicoId")
+                        .HasColumnType("bigint")
+                        .HasColumnName("agenda_medico_id");
+
+                    b.Property<TimeOnly>("Desde")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("desde");
+
+                    b.Property<int>("Dia")
+                        .HasColumnType("integer")
+                        .HasColumnName("dia");
+
+                    b.Property<TimeOnly>("Hasta")
+                        .HasColumnType("time without time zone")
+                        .HasColumnName("hasta");
+
+                    b.HasKey("Id")
+                        .HasName("pk_franjas_agenda");
+
+                    b.HasIndex("AgendaMedicoId")
+                        .HasDatabaseName("ix_franjas_agenda_agenda_medico_id");
+
+                    b.ToTable("franjas_agenda", null, t =>
+                        {
+                            t.HasCheckConstraint("ck_franjas_agenda_dia", "dia BETWEEN 0 AND 6");
+
+                            t.HasCheckConstraint("ck_franjas_agenda_horas", "hasta > desde OR hasta = '00:00'");
+                        });
+                });
+
             modelBuilder.Entity("HospitalTurnos.Dominio.Auditoria.RegistroAuditoria", b =>
                 {
                     b.Property<long>("Id")
@@ -511,6 +617,26 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                     b.ToTable("asp_net_user_tokens", (string)null);
                 });
 
+            modelBuilder.Entity("HospitalTurnos.Dominio.Agendas.AgendaMedico", b =>
+                {
+                    b.HasOne("HospitalTurnos.Dominio.Catalogo.Medico", null)
+                        .WithMany()
+                        .HasForeignKey("MedicoId")
+                        .OnDelete(DeleteBehavior.Restrict)
+                        .IsRequired()
+                        .HasConstraintName("fk_agendas_medico_medicos_medico_id");
+                });
+
+            modelBuilder.Entity("HospitalTurnos.Dominio.Agendas.Franja", b =>
+                {
+                    b.HasOne("HospitalTurnos.Dominio.Agendas.AgendaMedico", null)
+                        .WithMany("Franjas")
+                        .HasForeignKey("AgendaMedicoId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired()
+                        .HasConstraintName("fk_franjas_agenda_agendas_medico_agenda_medico_id");
+                });
+
             modelBuilder.Entity("HospitalTurnos.Dominio.Catalogo.Medico", b =>
                 {
                     b.HasOne("HospitalTurnos.Dominio.Catalogo.Especialidad", null)
@@ -582,6 +708,11 @@ namespace HospitalTurnos.Infraestructura.Persistencia.Migraciones
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired()
                         .HasConstraintName("fk_asp_net_user_tokens_asp_net_users_user_id");
+                });
+
+            modelBuilder.Entity("HospitalTurnos.Dominio.Agendas.AgendaMedico", b =>
+                {
+                    b.Navigation("Franjas");
                 });
 #pragma warning restore 612, 618
         }
