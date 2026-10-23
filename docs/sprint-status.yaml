@@ -31,11 +31,14 @@ development_status:
   # S3 en curso. La 3.3 entra primera por el cambio de rumbo de la guía UX/UI (2026-10-17).
   2-3-contrasena-olvidada: done
   4-2-propuesta-agenda: done
-  3-3-alinear-abm-con-guia-ux: ready-for-dev
+  3-3-alinear-abm-con-guia-ux: done   # PR #18 mergeado (7951d55)
   4-3-aprobacion-propuestas: ready-for-dev
   4-4-correccion-urgencia: ready-for-dev
   epic-5: in-progress
   5-1-pacientes: ready-for-dev
+  # Del análisis de brechas de la guía UX/UI (decisión D3); entran al S3 por decisión del docente (sesión 17).
+  3-4-renombrar-especialidad: backlog
+  3-5-desactivar-medico: backlog
 
   # S4
   2-4-email-personal: backlog
@@ -65,6 +68,7 @@ development_status:
   8-2-agenda-recepcion: backlog
   epic-9: backlog
   9-1-consulta-auditoria: backlog
+  9-2-historial-por-registro: backlog   # depende de la 9.1; entra al S6 por decisión del docente (sesión 17)
 
   # S7
   epic-10: backlog
@@ -72,8 +76,3 @@ development_status:
   10-2-prueba-de-carga: backlog
   10-3-respaldo: backlog
 
-  # Sin sprint: salen del análisis de brechas de la guía UX/UI (decisión D3, 2026-10-17).
-  # El docente los ubica en un sprint al planificar.
-  3-4-renombrar-especialidad: backlog
-  3-5-desactivar-medico: backlog
-  9-2-historial-por-registro: backlog
