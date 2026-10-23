@@ -21,6 +21,10 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
     private static readonly string[] RutasYaConstruidas =
         ["/personal/admin/usuarios", "/personal/admin/especialidades", "/personal/admin/medicos", "/personal/medico/mi-propuesta"];
 
+    // Story 3.3 (ADR-08): las que se dibujan en el circuito, sin prerender.
+    private static readonly string[] InteractivasSinPrerender =
+        ["/personal/admin/usuarios", "/personal/admin/especialidades", "/personal/admin/medicos"];
+
     // La tabla del AC 13, escrita acá a mano (no se lee de RutasPersonal: la prueba no copia al código).
     // ruta, título, roles con permiso
     private static readonly (string Ruta, string Titulo, string[] Roles)[] Secciones =
@@ -134,7 +138,12 @@ public class SesionYPermisosHttpTests(PostgresFixture fixture)
         if (seccion.Roles.Contains(fijo.Rol))
         {
             Assert.Equal(HttpStatusCode.OK, respuesta.StatusCode);
-            Assert.Contains($"<h1>{seccion.Titulo}</h1>", html);
+            // Story 3.3: A1, A2 y A4 son interactivas sin prerender; el pedido trae el marco y el marcador del circuito,
+            // y el título lo dibuja la página ya conectada (MarcoPersonalTests, AC 19).
+            if (InteractivasSinPrerender.Contains(ruta))
+                Assert.Contains("<!--Blazor:{\"type\":\"server\"", html);
+            else
+                Assert.Contains($"<h1>{seccion.Titulo}</h1>", html);
             // Cada story que construye una sección suma su ruta a RutasYaConstruidas (story 2.2, AC 27).
             if (RutasYaConstruidas.Contains(ruta))
                 Assert.DoesNotContain(TextoEnConstruccion, html);

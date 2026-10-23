@@ -1,0 +1,71 @@
+@implements IAsyncDisposable
+
+@* El diálogo modal (guía, Accesibilidad; AC 38): role="dialog", aria-modal y título enlazado. El foco no se escapa:
+   dos centinelas en los bordes lo devuelven adentro (Tab desde el último vuelve al principio y Mayús+Tab desde el
+   primero va al final). Esc cierra, y al cerrarse el foco vuelve al control que lo abrió. Sin JavaScript propio. *@
+<div class="dialogo-velo">
+    <div class="dialogo" role="dialog" aria-modal="true" aria-labelledby="@idTitulo" @onkeydown="AlPulsarAsync">
+        <span class="dialogo__centinela" tabindex="0" @onfocus="IrAlFinAsync"></span>
+        <div class="dialogo__contenido" tabindex="-1" @ref="contenido">
+            <h2 id="@idTitulo" class="dialogo__titulo">@Titulo</h2>
+            @ChildContent
+        </div>
+        <span class="dialogo__fin" tabindex="-1" @ref="fin"></span>
+        <span class="dialogo__centinela" tabindex="0" @onfocus="IrAlPrincipioAsync"></span>
+    </div>
+</div>
+
+@code {
+    [Parameter, EditorRequired]
+    public string Titulo { get; set; } = "";
+
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    /// <summary>Esc. Quien lo abrió decide cerrarlo (lo saca del árbol).</summary>
+    [Parameter]
+    public EventCallback AlCerrar { get; set; }
+
+    /// <summary>El control que lo abrió: recibe el foco cuando el diálogo se cierra.</summary>
+    [Parameter]
+    public ElementReference? Origen { get; set; }
+
+    /// <summary>Para los diálogos sin campos (la contraseña temporal): el foco entra al diálogo al abrirlo.</summary>
+    [Parameter]
+    public bool EnfocarAlAbrir { get; set; }
+
+    private readonly string idTitulo = $"dialogo-{Guid.NewGuid():N}";
+    private ElementReference contenido;
+    private ElementReference fin;
+
+    private async Task AlPulsarAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Escape")
+            await AlCerrar.InvokeAsync();
+    }
+
+    private async Task IrAlFinAsync() => await fin.FocusAsync();
+
+    private async Task IrAlPrincipioAsync() => await contenido.FocusAsync();
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (firstRender && EnfocarAlAbrir)
+            await contenido.FocusAsync();
+    }
+
+    public async ValueTask DisposeAsync()
+    {
+        if (Origen is not { } origen)
+            return;
+        try
+        {
+            await origen.FocusAsync();
+        }
+        catch (Exception e) when (e is JSDisconnectedException or JSException or InvalidOperationException or TaskCanceledException)
+        {
+            // El circuito se cerró o el control ya no está (p. ej. la fila del "⋯" se redibujó al recargar la tabla): no
+            // hay a dónde devolver el foco. Sin capturar JSException, ese caso tumbaba el circuito (prueba en vivo).
+        }
+    }
+}

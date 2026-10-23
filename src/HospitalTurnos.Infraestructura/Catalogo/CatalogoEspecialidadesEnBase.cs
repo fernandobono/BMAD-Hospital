@@ -1,6 +1,7 @@
 using System.Globalization;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Catalogo;
+using HospitalTurnos.Aplicacion.Comun;
 using HospitalTurnos.Aplicacion.Personal;
 using HospitalTurnos.Dominio.Auditoria;
 using HospitalTurnos.Dominio.Catalogo;
@@ -31,6 +32,47 @@ public sealed class CatalogoEspecialidadesEnBase(
 
     public Task<IReadOnlyList<EspecialidadResumen>> ListarActivasAsync(CancellationToken ct) =>
         ListarDondeAsync(contexto.Especialidades.Where(e => e.Activa), ct);
+
+    public async Task<PaginaDeResultados<EspecialidadFila>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct)
+    {
+        var especialidades = contexto.Especialidades.AsNoTracking();
+        if (!string.IsNullOrWhiteSpace(consulta.Buscar))
+        {
+            // Más largo que cualquier nombre posible no coincide con ninguno (y Normalizar lo rechazaría como regla).
+            var palabras = consulta.Buscar.Split(' ', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
+            if (string.Join(' ', palabras).Length > Especialidad.LargoMaximo)
+                return new PaginaDeResultados<EspecialidadFila>([], 0);
+            // La misma clave que impide duplicados: "cardiologia" encuentra "Cardiología" (AC 43).
+            var buscado = Especialidad.Normalizar(consulta.Buscar);
+            especialidades = especialidades.Where(e => e.NombreNormalizado.Contains(buscado));
+        }
+        especialidades = consulta.Filtro("estado") switch
+        {
+            "activos" => especialidades.Where(e => e.Activa),
+            "inactivos" => especialidades.Where(e => !e.Activa),
+            _ => especialidades,
+        };
+        var filas = especialidades.Select(e => new
+        {
+            e.Id, e.Nombre, e.NombreNormalizado, e.Activa,
+            Medicos = contexto.Medicos.Count(m => m.EspecialidadId == e.Id),
+        });
+        var total = await filas.CountAsync(ct);
+        var ordenadas = (consulta.CampoDeOrden, consulta.Descendente) switch
+        {
+            ("medicos", false) => filas.OrderBy(f => f.Medicos).ThenBy(f => f.NombreNormalizado),
+            ("medicos", true) => filas.OrderByDescending(f => f.Medicos).ThenBy(f => f.NombreNormalizado),
+            (_, true) => filas.OrderByDescending(f => f.NombreNormalizado),
+            _ => filas.OrderBy(f => f.NombreNormalizado),
+        };
+        var items = await ordenadas.Skip(consulta.Saltear(total)).Take(consulta.Tamano)
+            .Select(f => new EspecialidadFila(f.Id, f.Nombre, f.Activa, f.Medicos))
+            .ToListAsync(ct);
+        return new PaginaDeResultados<EspecialidadFila>(items, total);
+    }
+
+    public Task<int> ContarMedicosAsync(long id, CancellationToken ct) =>
+        contexto.Medicos.CountAsync(m => m.EspecialidadId == id, ct);
 
     public Task<EspecialidadResumen?> BuscarAsync(long id, CancellationToken ct) =>
         contexto.Especialidades.AsNoTracking()

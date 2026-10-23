@@ -1,0 +1,23 @@
+@* Migas de pan (B-1.3): todos los niveles menos el último son enlace; reemplazan a "Volver a …". *@
+<nav class="migas" aria-label="Migas de pan">
+    <ol>
+        @for (var i = 0; i < Migas.Count; i++)
+        {
+            var miga = Migas[i];
+            @if (i < Migas.Count - 1)
+            {
+                @* Recarga la página: el navegador avisa si hay cambios sin guardar (AC 36). *@
+                <li><a href="@miga.Ruta" data-enhance-nav="false">@miga.Texto</a></li>
+            }
+            else
+            {
+                <li aria-current="page">@miga.Texto</li>
+            }
+        }
+    </ol>
+</nav>
+
+@code {
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Miga> Migas { get; set; } = [];
+}

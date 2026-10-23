@@ -1,6 +1,8 @@
 using System.Net;
 using System.Text.RegularExpressions;
+using HospitalTurnos.Aplicacion.Personal;
 using HospitalTurnos.Dominio.Personal;
+using Microsoft.Extensions.DependencyInjection;
 using static HospitalTurnos.Web.Tests.Personal.FormularioHttp;
 
 namespace HospitalTurnos.Web.Tests.Personal;
@@ -14,22 +16,17 @@ public class CambioContrasenaHttpTests(PostgresFixture fixture)
     private const string Turnos = "/personal/recepcion/turnos";
     private const string Nueva = "Nueva-Clave-2026";
 
+    // Story 3.3: A4 es interactiva y su alta ya no es un formulario SSR; el alta va por el mismo caso de uso que usa la
+    // pantalla, con admin1 como actor.
     private static async Task<(string Usuario, string Temporal)> AltaPorA4Async(PersonalWebApplicationFactory app)
     {
-        var admin = Cliente(app);
-        await IngresarAsync(admin, PersonalWebApplicationFactory.Admin.Usuario, PersonalWebApplicationFactory.Admin.Contrasena);
+        var actor = await Catalogo.DatosDeCatalogo.ActorDeAdmin1Async(app);
         var usuario = $"p-{Guid.NewGuid().ToString("N")[..8]}";
-        var alta = await EnviarAsync(admin, "/personal/admin/usuarios", "alta-usuario", new Dictionary<string, string>
-        {
-            ["Alta.NombreCompleto"] = "Persona Nueva",
-            ["Alta.Usuario"] = usuario,
-            ["Alta.Rol"] = Roles.Recepcionista,
-        });
-        Assert.Equal(HttpStatusCode.OK, alta.StatusCode);
-        var html = await alta.Content.ReadAsStringAsync();
-        var temporal = WebUtility.HtmlDecode(Regex.Match(html, "<code id=\"contrasena-temporal\">(.*?)</code>").Groups[1].Value);
-        Assert.Equal(12, temporal.Length);
-        return (usuario, temporal);
+        using var alcance = app.Services.CreateScope();
+        var alta = await alcance.ServiceProvider.GetRequiredService<IGestionUsuariosPersonal>()
+            .CrearAsync(new NuevoUsuarioPersonal("Persona Nueva", usuario, Roles.Recepcionista), actor, CancellationToken.None);
+        Assert.Equal(12, alta.ContrasenaTemporal.Length);
+        return (usuario, alta.ContrasenaTemporal);
     }
 
     private static Task<HttpResponseMessage> CambiarAsync(HttpClient cliente, string ruta, string actual, string nueva, string repetida) =>

@@ -1,0 +1,93 @@
+@using HospitalTurnos.Web.Errores
+
+@* La confirmación de una acción deliberada (guía, "Baja, desactivación y acciones destructivas"; AC 39 y 85): nombra
+   el registro y la consecuencia, rotula el botón con el verbo (rojo sólo si es destructivo: el único rojo de la
+   vista) y deja el foco en "Cancelar". Si el dominio rechaza la acción, pasa a "no se puede": el motivo y "Entendido". *@
+<DialogoModal Titulo="@Titulo" AlCerrar="CancelarAsync" Origen="Origen">
+    @if (motivo is null)
+    {
+        <p>@Consecuencia</p>
+        <div class="dialogo__botones">
+            <button type="button" class="btn btn-outline-secondary" @ref="cancelar" @onclick="CancelarAsync">Cancelar</button>
+            <button type="button" class="btn @(Peligro ? "btn-danger" : "btn-primary")" disabled="@ejecutando"
+                    @onclick="ConfirmarAsync">@TextoConfirmar</button>
+        </div>
+    }
+    else
+    {
+        <p role="alert">@motivo</p>
+        <div class="dialogo__botones">
+            <button type="button" class="btn btn-primary" @ref="entendido" @onclick="CancelarAsync">Entendido</button>
+        </div>
+    }
+</DialogoModal>
+
+@code {
+    /// <summary>"¿Desactivar Cardiología?"</summary>
+    [Parameter, EditorRequired]
+    public string Titulo { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string Consecuencia { get; set; } = "";
+
+    /// <summary>El verbo: "Desactivar especialidad", "Generar contraseña". Nunca Sí/No.</summary>
+    [Parameter, EditorRequired]
+    public string TextoConfirmar { get; set; } = "";
+
+    /// <summary>Rojo sólo para lo destructivo; "Reactivar" no lo es.</summary>
+    [Parameter]
+    public bool Peligro { get; set; } = true;
+
+    /// <summary>EventCallback: al terminar, la página se vuelve a dibujar (cierra el diálogo, recarga la tabla).</summary>
+    [Parameter, EditorRequired]
+    public EventCallback AlConfirmar { get; set; }
+
+    [Parameter]
+    public EventCallback AlCancelar { get; set; }
+
+    [Parameter]
+    public ElementReference? Origen { get; set; }
+
+    private string? motivo;
+    private bool ejecutando;
+    private bool enfocarCancelar = true;
+    private bool enfocarEntendido;
+    private ElementReference cancelar;
+    private ElementReference entendido;
+
+    private Task CancelarAsync() => AlCancelar.InvokeAsync();
+
+    private async Task ConfirmarAsync()
+    {
+        if (ejecutando)
+            return;
+        ejecutando = true;
+        try
+        {
+            await AlConfirmar.InvokeAsync();
+        }
+        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))
+        {
+            motivo = e.Message;   // el texto del dominio, tal cual (AC 3); la fila no cambia
+            enfocarEntendido = true;
+        }
+        finally
+        {
+            ejecutando = false;
+        }
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (enfocarCancelar && motivo is null)
+        {
+            enfocarCancelar = false;
+            await cancelar.FocusAsync();
+        }
+        if (enfocarEntendido)
+        {
+            enfocarEntendido = false;
+            await entendido.FocusAsync();
+        }
+    }
+}

@@ -1,0 +1,201 @@
+@implements IDisposable
+
+@* El menú "⋯" de una fila (guía: las acciones menos frecuentes y las destructivas, nunca como botón en cada fila;
+   AC 30). Operable con teclado sin JavaScript propio: Enter o flecha abajo abre y enfoca la primera opción, las
+   flechas recorren, Esc cierra y devuelve el foco al botón. *@
+<div class="menu-de-acciones">
+    <button type="button" class="menu-de-acciones__boton" aria-label="Más acciones para @Registro" aria-haspopup="menu"
+            aria-expanded="@(abierto ? "true" : "false")" @ref="Boton" @onclick="AlHacerClic" @onkeydown="AlPulsarBoton">⋯</button>
+    @if (abierto)
+    {
+        <ul class="menu-de-acciones__lista" role="menu" aria-label="Acciones para @Registro" @onkeydown="AlPulsarMenu">
+            @for (var i = 0; i < Opciones.Count; i++)
+            {
+                var indice = i;
+                var opcion = Opciones[indice];
+                <li role="none">
+                    <button type="button" role="menuitem" tabindex="-1" class="menu-de-acciones__opcion"
+                            @ref="referencias[indice]" @onclick="() => ElegirAsync(opcion)">@opcion.Texto</button>
+                </li>
+            }
+        </ul>
+    }
+</div>
+
+@code {
+    /// <summary>Una opción del menú. EventCallback: al terminar, la página que la creó se vuelve a dibujar.</summary>
+    public sealed record Opcion(string Texto, EventCallback Accion);
+
+    /// <summary>Un solo menú "⋯" abierto por pantalla: abrir uno cierra el que estaba abierto (uno por circuito).</summary>
+    public sealed class UnoAbierto
+    {
+        public event Action<MenuDeAcciones>? Abrio;
+
+        public void Avisar(MenuDeAcciones menu) => Abrio?.Invoke(menu);
+    }
+
+    [Inject]
+    private IServiceProvider Servicios { get; set; } = default!;
+
+    private UnoAbierto? coordinador;
+
+    protected override void OnInitialized()
+    {
+        // Opcional: sin el servicio (una prueba del componente solo) cada menú se maneja por su cuenta.
+        coordinador = Servicios.GetService<UnoAbierto>();
+        if (coordinador is not null)
+            coordinador.Abrio += AlAbrirOtro;
+    }
+
+    private void AlAbrirOtro(MenuDeAcciones otro)
+    {
+        if (ReferenceEquals(otro, this) || !abierto)
+            return;
+        abierto = false;
+        ignorarClic = false;
+        // Nadie espera la tarea: si el menú ya se descartó no hay nada que dibujar; otro error se entrega a Blazor.
+        _ = InvokeAsync(async () =>
+        {
+            try
+            {
+                StateHasChanged();
+            }
+            catch (ObjectDisposedException)
+            {
+            }
+            catch (Exception e)
+            {
+                await DispatchExceptionAsync(e);
+            }
+        });
+    }
+
+    public void Dispose()
+    {
+        if (coordinador is not null)
+            coordinador.Abrio -= AlAbrirOtro;
+    }
+
+    /// <summary>El registro de la fila, para el nombre accesible: "Más acciones para Ríos, Pablo".</summary>
+    [Parameter, EditorRequired]
+    public string Registro { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public IReadOnlyList<Opcion> Opciones { get; set; } = [];
+
+    /// <summary>Antes de ejecutar la opción: el botón "⋯", para devolverle el foco al cerrar el diálogo que abra.</summary>
+    [Parameter]
+    public EventCallback<ElementReference> AlElegirDesde { get; set; }
+
+    public ElementReference Boton { get; private set; }
+
+    private bool abierto;
+    private int actual;
+    private int? enfocar;
+    private bool enfocarBoton;
+    private bool ignorarClic;
+    private ElementReference[] referencias = [];
+
+    private void Abrir(int indice)
+    {
+        coordinador?.Avisar(this);
+        // Un segundo Enter antes de que llegue el foco reabre el menú ya dibujado: sus opciones no se vuelven a capturar,
+        // así que las referencias se conservan (rehacerlas las dejaba vacías y el foco fallaba).
+        if (!abierto || referencias.Length != Opciones.Count)
+            referencias = new ElementReference[Opciones.Count];
+        abierto = true;
+        actual = indice;
+        enfocar = indice;
+    }
+
+    private void Cerrar(bool devolverFoco)
+    {
+        abierto = false;
+        ignorarClic = false;
+        enfocarBoton = devolverFoco;
+    }
+
+    // Enter y Espacio también disparan el clic del botón: el teclado ya lo abrió, ese clic no lo vuelve a cerrar.
+    private void AlPulsarBoton(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "Enter" or " ":
+                ignorarClic = true;
+                Abrir(0);
+                break;
+            case "ArrowDown":
+                Abrir(0);
+                break;
+            case "ArrowUp":
+                Abrir(Opciones.Count - 1);
+                break;
+        }
+    }
+
+    private void AlHacerClic()
+    {
+        if (ignorarClic)
+        {
+            ignorarClic = false;
+            return;
+        }
+        if (abierto)
+            Cerrar(devolverFoco: false);
+        else
+            Abrir(0);
+    }
+
+    private void AlPulsarMenu(KeyboardEventArgs e)
+    {
+        switch (e.Key)
+        {
+            case "ArrowDown":
+                Mover((actual + 1) % Opciones.Count);
+                break;
+            case "ArrowUp":
+                Mover((actual - 1 + Opciones.Count) % Opciones.Count);
+                break;
+            case "Home":
+                Mover(0);
+                break;
+            case "End":
+                Mover(Opciones.Count - 1);
+                break;
+            case "Escape":
+                Cerrar(devolverFoco: true);
+                break;
+            case "Tab":
+                Cerrar(devolverFoco: false);
+                break;
+        }
+    }
+
+    private void Mover(int indice)
+    {
+        actual = indice;
+        enfocar = indice;
+    }
+
+    private async Task ElegirAsync(Opcion opcion)
+    {
+        Cerrar(devolverFoco: false);
+        await AlElegirDesde.InvokeAsync(Boton);
+        await opcion.Accion.InvokeAsync();   // lo inesperado sigue al LimiteDeErrores de la página
+    }
+
+    protected override async Task OnAfterRenderAsync(bool firstRender)
+    {
+        if (enfocar is { } indice && abierto && indice < referencias.Length)
+        {
+            enfocar = null;
+            if (referencias[indice].Id is not null)   // todavía sin capturar: no hay a dónde mover el foco
+                await referencias[indice].FocusAsync();
+        }
+        if (enfocarBoton)
+        {
+            enfocarBoton = false;
+            await Boton.FocusAsync();
+        }
+    }
+}

@@ -1,37 +1,38 @@
 using Bunit;
-using HospitalTurnos.Aplicacion.Catalogo;
 using HospitalTurnos.Dominio.Agendas;
 using HospitalTurnos.Web.Components.Personal.Administracion;
 
 namespace HospitalTurnos.Web.Tests.Catalogo;
 
-// Lo que depende sólo de los datos al dibujar: los cuatro textos del estado de agenda (la 4.1 conecta el
-// cálculo real sin tocar la tabla) y el vacío, que por HTTP no se ve en una base compartida.
+// El estado de agenda de A1 como badge (story 3.3, AC 61; guía "Estados de negocio como badges"): cada SituacionDeAgenda
+// del cálculo de la 4.1 tiene su texto y su color; "Sin agenda (rige desde dd/MM)" ya no aparece. Antes era texto
+// plano (story 3.2, AC 4 y 23): el contrato con la 4.1 sigue siendo la SituacionDeAgenda completa.
 public class TablaMedicosTests : BunitContext
 {
-    [Fact]
+    public static TheoryData<SituacionDeAgenda, string, string, string?> Situaciones => new()
+    {
+        { SituacionDeAgenda.SinAgenda, "Sin agenda", "inactivo", null },
+        { new(EstadoAgendaMedico.SinAgenda, new DateOnly(2026, 11, 16)), "Programada · desde 16/11/2026", "programada", null },
+        { new(EstadoAgendaMedico.Vigente), "Vigente", "vigente", null },
+        { new(EstadoAgendaMedico.Vigente, CambiaEl: new DateOnly(2026, 11, 16)), "Vigente", "vigente", "Cambia el 16/11/2026" },
+        { new(EstadoAgendaMedico.PropuestaPendiente), "Pendiente de aprobación", "pendiente", null },
+    };
+
+    [Theory]
+    [Trait("Story", "3.3")]
+    [Trait("AC", "61")]
     [Trait("Story", "3.2")]
-    [Trait("AC", "3")]
     [Trait("AC", "4")]
     [Trait("AC", "23")]
-    public void TablaMedicos_SegunEstadoDeAgendaYVacio_MuestraElTextoQueCorresponde()
+    [MemberData(nameof(Situaciones))]
+    public void Medicos_BadgeDeAgendaPorSituacion(SituacionDeAgenda situacion, string texto, string clase, string? ayuda)
     {
-        IReadOnlyList<MedicoListado> medicos =
-        [
-            new(1, "Alba", "Ana", "MP 1", "Clínica", SituacionDeAgenda.SinAgenda),
-            new(2, "Bravo", "Beto", "MP 2", "Clínica", new(EstadoAgendaMedico.SinAgenda, new DateOnly(2026, 12, 1))),
-            new(3, "Castro", "Carla", "MP 3", "Clínica", new(EstadoAgendaMedico.Vigente)),
-            new(4, "Díaz", "Dante", "MP 4", "Clínica", new(EstadoAgendaMedico.PropuestaPendiente)),
-        ];
+        var celda = Render(TablaMedicos.Agenda(situacion));
 
-        var tabla = Render<TablaMedicos>(p => p.Add(t => t.Medicos, medicos));
-
-        var celdas = tabla.FindAll("tbody tr").Select(f => f.QuerySelectorAll("td").Last().TextContent.Trim()).ToList();
-        Assert.Equal(["Sin agenda", "Sin agenda (rige desde 01/12)", "Vigente", "Propuesta pendiente"], celdas);
-
-        var vacia = Render<TablaMedicos>(p => p.Add(t => t.Medicos, []));
-
-        Assert.Contains("Todavía no hay médicos cargados. Usá «Nuevo médico» para dar de alta el primero.", vacia.Markup);
-        Assert.Empty(vacia.FindAll("table"));
+        var badge = celda.Find(".badge-estado");
+        Assert.Equal(texto, badge.TextContent.Trim());
+        Assert.Contains($"badge-estado--{clase}", badge.ClassList);
+        Assert.Equal(ayuda, celda.FindAll(".tabla-abm__ayuda").SingleOrDefault()?.TextContent.Trim());
+        Assert.DoesNotContain("rige desde", celda.Markup);
     }
 }

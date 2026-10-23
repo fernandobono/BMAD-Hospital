@@ -1,0 +1,23 @@
+@inherits ErrorBoundary
+@using HospitalTurnos.Web.Errores
+@inject ILogger<LimiteDeErrores> Registro
+
+@* NFR-09 en una página interactiva (story 3.3, AC 4): ahí no corre el manejador global de HTTP. Lo inesperado
+   que ocurre dentro (al dibujar o en una acción de un componente común) se cambia por el mensaje genérico y el
+   detalle va sólo al registro técnico. Las reglas del dominio no llegan acá: las muestran los componentes. *@
+@if (CurrentException is null)
+{
+    @ChildContent
+}
+else
+{
+    <div class="alert alert-danger" role="alert">@ManejadorGlobalDeErrores.MensajeGenerico</div>
+}
+
+@code {
+    protected override Task OnErrorAsync(Exception exception)
+    {
+        Registro.LogError(exception, "Error no previsto en una página interactiva");
+        return Task.CompletedTask;
+    }
+}

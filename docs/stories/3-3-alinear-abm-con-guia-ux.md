@@ -2,7 +2,7 @@
 epic: 3
 story: "3.3"
 title: "Alinear pantallas ABM existentes con la guía UX/UI (A1 Médicos, A2 Especialidades, A4 Usuarios del personal y marco del personal)"
-status: ready-for-dev
+status: review
 sprint: 3
 priority: "P0"
 approach: "[ADAPT]"
@@ -18,6 +18,19 @@ followup_of:
     type: "extension"
     summary: "A4 pasa al estándar: modal de alta, badges, menú de acciones y confirmaciones"
 followup_reason: cambio-de-requisito
+runtime_not_verifiable:
+  - ac: 5
+    reason: "La revalidación corre cada 5 minutos (SesionPersonal.IntervaloRevalidacion). Verlo en vivo obliga a esperar ese tiempo real, y la regla del curso es probar el tiempo siempre con el reloj inyectado. T5 adelanta el reloj falso el intervalo y verifica que el circuito navega al ingreso."
+    covered_by: T5
+  - ac: 90
+    reason: "Habla de las pruebas existentes de Dominio y Aplicación: que pasan y que no se modificaron. No hay nada que mirar en la app en ejecución; lo prueban la corrida de esas suites y el diff."
+    covered_by: R1
+  - ac: 92
+    reason: "Habla de cómo están escritas las pruebas (ninguna hace POST de los formularios viejos). Es una propiedad del código de pruebas, no de la app en ejecución."
+    covered_by: R2
+  - ac: 93
+    reason: "La CI corre en GitHub sobre el PR, que todavía no existe: se verifica con la corrida de la CI del PR antes del merge, que es el paso siguiente del circuito."
+    covered_by: R3
 files_to_create:
   - "src/HospitalTurnos.Web/wwwroot/css/tokens.css"
   - "src/HospitalTurnos.Web/Components/Comunes/MarcoPersonal.razor"
@@ -45,7 +58,10 @@ files_to_create:
   - "src/HospitalTurnos.Web/Components/Comunes/Formatos.cs"
   - "src/HospitalTurnos.Web/Personal/RevalidacionDeCircuito.cs"
   - "src/HospitalTurnos.Web/Personal/ActorDelCircuito.cs"
-  - "src/HospitalTurnos.Aplicacion/Comunes/ConsultaDeListado.cs"
+  - "src/HospitalTurnos.Web/Personal/AlcancePorOperacion.cs"
+  - "src/HospitalTurnos.Web/Components/Comunes/Miga.cs"
+  - "tests/HospitalTurnos.Web.Tests/Ayudas/ContextoDeComponente.cs"
+  - "src/HospitalTurnos.Aplicacion/Comun/ConsultaDeListado.cs"
   - "src/HospitalTurnos.Aplicacion/Auditoria/IConsultaTrazabilidad.cs"
   - "src/HospitalTurnos.Infraestructura/Auditoria/ConsultaTrazabilidadEnBase.cs"
   - "tests/HospitalTurnos.Web.Tests/Comunes/BaseInteractivaTests.cs"
@@ -57,9 +73,13 @@ files_to_create:
   - "tests/HospitalTurnos.Web.Tests/Personal/UsuariosInteractivaTests.cs"
   - "tests/HospitalTurnos.Aplicacion.Tests/Catalogo/ListadosPaginadosTests.cs"
   - "tests/HospitalTurnos.Aplicacion.Tests/Auditoria/ConsultaTrazabilidadTests.cs"
+  - "tests/HospitalTurnos.Dominio.Tests/Agendas/CambioDeAgendaTests.cs"
+  - "tests/HospitalTurnos.Aplicacion.Tests/Catalogo/FiltroDeAgendaEnBaseTests.cs"
 files_to_modify:
   - "src/HospitalTurnos.Web/wwwroot/app.css"
   - "src/HospitalTurnos.Web/Components/App.razor"
+  - "src/HospitalTurnos.Web/Components/_Imports.razor"
+  - "docs/04-arquitectura.md"
   - "src/HospitalTurnos.Web/Components/Personal/LayoutPersonal.razor"
   - "src/HospitalTurnos.Web/Components/Personal/MenuLateral.razor"
   - "src/HospitalTurnos.Web/Personal/RutasPersonal.cs"
@@ -70,6 +90,7 @@ files_to_modify:
   - "src/HospitalTurnos.Web/Components/Personal/Administracion/MedicoNuevo.razor"
   - "src/HospitalTurnos.Web/Components/Personal/Administracion/FichaMedico.razor"
   - "src/HospitalTurnos.Web/Components/Personal/Administracion/CamposMedico.razor"
+  - "src/HospitalTurnos.Web/Components/Personal/Administracion/FormularioMedico.cs"
   - "src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor"
   - "src/HospitalTurnos.Aplicacion/Catalogo/ICatalogoEspecialidades.cs"
   - "src/HospitalTurnos.Aplicacion/Catalogo/IGestionMedicos.cs"
@@ -77,6 +98,17 @@ files_to_modify:
   - "src/HospitalTurnos.Infraestructura/Catalogo/CatalogoEspecialidadesEnBase.cs"
   - "src/HospitalTurnos.Infraestructura/Catalogo/GestionMedicosEnBase.cs"
   - "src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs"
+  - "src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs"
+  - "src/HospitalTurnos.Dominio/Agendas/SituacionDeAgenda.cs"
+  - "src/HospitalTurnos.Dominio/Agendas/EstadoDeAgenda.cs"
+  - "src/HospitalTurnos.Web/Components/Personal/Ingreso.razor"
+  - "src/HospitalTurnos.Web/Components/Personal/CambiarContrasena.razor"
+  - "src/HospitalTurnos.Web/Components/Personal/LayoutIngreso.razor"
+  - "src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor"
+  - "src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor"
+  - "src/HospitalTurnos.Web/Components/Layout/MainLayout.razor.css"
+  - "src/HospitalTurnos.Web/Components/Layout/NavMenu.razor.css"
+  - "src/HospitalTurnos.Web/Components/Layout/ReconnectModal.razor.css"
   - "tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesHttpTests.cs"
   - "tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesPaginaTests.cs"
   - "tests/HospitalTurnos.Web.Tests/Catalogo/MedicosHttpTests.cs"
@@ -84,11 +116,14 @@ files_to_modify:
   - "tests/HospitalTurnos.Web.Tests/Catalogo/TablaMedicosTests.cs"
   - "tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs"
   - "tests/HospitalTurnos.Web.Tests/Personal/MenuLateralTests.cs"
+  - "tests/HospitalTurnos.Web.Tests/Personal/CambioContrasenaHttpTests.cs"
+  - "tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs"
+  - "tests/HospitalTurnos.Web.Tests/Personal/Dobles/GestionUsuariosConBaseCaida.cs"
 ---
 
 # Story 3.3: Alinear pantallas ABM existentes con la guía UX/UI
 
-Status: ready-for-dev
+Status: in-progress
 
 ## Story
 
@@ -121,7 +156,8 @@ quedan como están.
    escribe hoy; el actor sale del `AuthenticationState` en cascada (`ActorDelCircuito`), no de `HttpContext`.
 3. **Given** una excepción esperable del dominio (`ManejadorGlobalDeErrores.EsEsperable` → true) **When**
    ocurre en una acción de una página interactiva **Then** su mensaje aparece, **con el mismo texto que hoy**,
-   en el resumen del formulario o del diálogo, y no se fija ningún código HTTP.
+   en el resumen del formulario o del diálogo (o, en una acción sin confirmación como reactivar o desbloquear en
+   A4, en un aviso arriba de la tabla; **decisión del docente, sesión 17**), y no se fija ningún código HTTP.
 4. **Given** una excepción no esperable en una página interactiva **When** ocurre **Then** `LimiteDeErrores`
    (un `ErrorBoundary`) muestra "Algo falló. Probá de nuevo en unos minutos.", sin detalle técnico, y el
    detalle queda en el registro técnico (NFR-09).
@@ -129,6 +165,10 @@ quedan como están.
    cambia su sello de seguridad) y pasa `SesionPersonal.IntervaloRevalidacion` **Then**
    `RevalidacionDeCircuito` lo detecta con `IIngresoPersonal.SesionVigenteAsync` y la página navega al
    ingreso con recarga completa. (Cierra la nota que la 2.1 dejó para la primera pantalla interactiva.)
+94. **Given** una página interactiva **When** ejecuta una consulta o una acción **Then** pide el caso de uso a
+    `AlcancePorOperacion`, que abre un alcance de servicios propio y lo descarta al terminar (como un pedido
+    HTTP): dos operaciones a la vez no comparten el contexto de la base y un guardado que el dominio rechaza no
+    se cuela en el siguiente. **Decisión del docente (sesión 17)**, arquitectura §5.1.
 
 ### B. Hoja de estilos y tokens — guía "Diseño visual" (B-1.9 a B-1.12)
 
@@ -139,7 +179,10 @@ quedan como están.
 7. `app.css` deja de ser la plantilla de fábrica: define `.page-header`, `.filter-bar`, `.table-actions` y
    `.badge-estado--vigente|programada|pendiente|inactivo|activo|info` sólo con variables; **ningún
    hexadecimal fuera de `tokens.css`** en `wwwroot/`.
-8. Ningún `.razor` bajo `Components/` contiene `style="` ni un color hexadecimal.
+8. Ningún `.razor` bajo `Components/` contiene `style="` ni un color hexadecimal, y ningún `.razor.css` contiene
+   un hexadecimal (**decisión del docente, sesión 17**: alcanza también al ingreso, al cambio de contraseña, al
+   marco del ingreso, a la propuesta de agenda y su editor, y a las hojas aisladas de `Components/Layout/`; en
+   esos archivos sólo cambian los estilos, no el comportamiento ni el modo de dibujo).
 9. No queda ninguna regla `outline: none` sin reemplazo; el foco se ve con un contorno de 3 px del color
    primario en todo control (UX §9).
 10. Cada par texto/fondo declarado (cuerpo, botones, enlaces, cada badge, error) tiene contraste ≥ 4,5:1, y
@@ -217,7 +260,8 @@ quedan como están.
     con el nombre, el badge y el menú "⋯", y el botón de alta queda fijo abajo.
 30. **Given** `MenuDeAcciones` **When** se dibuja **Then** es un botón "⋯" de al menos 24 × 24 px con
     `aria-label="Más acciones para <registro>"`; **When** se pulsa Enter **Then** abre, las flechas recorren
-    las opciones y Esc cierra devolviendo el foco al botón.
+    las opciones y Esc cierra devolviendo el foco al botón. Abrir un menú cierra el que estaba abierto: uno solo
+    por pantalla (**decisión del docente, sesión 17**).
 31. **Given** `Paginador` con 26 o más registros **When** se dibuja **Then** dice "Mostrando 1–25 de N" y
     ofrece 25 / 50 / 100 por página; con 25 o menos no aparece.
 32. `InsigniaDeEstado` siempre muestra el texto y una clase `.badge-estado--*`; nunca sólo color.
@@ -229,10 +273,12 @@ quedan como están.
     aparece debajo sin enviar; **When** envía con errores **Then** se validan todos y el foco va al primero.
 35. **Given** un formulario válido **When** se pulsa "Guardar" **Then** el botón queda deshabilitado y dice
     "Guardando…" hasta que vuelve la respuesta; un segundo clic no envía de nuevo.
-36. **Given** un formulario con cambios **When** el usuario sigue un enlace del sistema o pulsa "Cancelar"
+36. **Given** un formulario con cambios **When** el usuario pulsa "Cancelar" o la página navega por su cuenta
     **Then** se pregunta "Tenés cambios sin guardar. ¿Salir igual?" con "Salir sin guardar" y "Seguir
-    editando"; **When** cierra o recarga la pestaña **Then** el navegador muestra su aviso (`NavigationLock`
-    con `ConfirmExternalNavigation`).
+    editando"; **When** sigue un enlace del menú lateral, del menú de usuario o de las migas, o cierra o recarga
+    la pestaña **Then** el navegador muestra su aviso (`NavigationLock` con `ConfirmExternalNavigation`). Esos
+    enlaces recargan la página completa (`data-enhance-nav="false"`): el marco es estático y la navegación rápida
+    no pasa por el aviso. **Decisión del docente (sesión 17)**, encontrada en la prueba en vivo.
 37. `SelectConBusqueda`: con más de 10 opciones permite escribir para filtrar; con 10 o menos es un select
     común; operable con teclado.
 38. **Given** un `DialogoModal` abierto **When** el usuario pulsa Tab o Mayús+Tab **Then** el foco circula
@@ -257,8 +303,10 @@ quedan como están.
     asociados; cada fila trae `MedicosAsociados`. `ContarMedicosAsync(id)` alimenta la confirmación.
 44. **Given** `IGestionMedicos.ListarPaginadoAsync` **When** se busca y se filtra **Then** busca en apellido,
     nombre o matrícula con el límite de 100 caracteres de hoy, filtra por especialidad y por estado de agenda
-    (Vigente, Programada, Pendiente de aprobación, Sin agenda, calculado como hoy con `SituacionDeAgenda`) y
-    ordena por médico (apellido, nombre), matrícula o especialidad.
+    (Vigente, Programada, Pendiente de aprobación, Sin agenda) y ordena por médico (apellido, nombre), matrícula o
+    especialidad. **Decisión del docente (sesión 17):** el filtro por estado de agenda se hace en la consulta
+    (la regla de `EstadoDeAgenda.Calcular` se escribe también en SQL) para que la paginación y el conteo sigan en
+    la base; una prueba verifica que la consulta y el dominio clasifican igual cada caso.
 45. **Given** `IGestionUsuariosPersonal.ListarPaginadoAsync` **When** se busca y se filtra **Then** busca en
     usuario o nombre, filtra por rol y por estado, y ordena por nombre o rol.
 46. **Given** `IConsultaTrazabilidad.ObtenerAsync(entidadTipo, entidadId)` **When** la entidad tiene registros
@@ -307,7 +355,9 @@ quedan como están.
     agenda **Then** muestra un badge: "Vigente" (verde) · "Programada · desde dd/mm/aaaa" (azul) · "Pendiente
     de aprobación" (ámbar) · "Sin agenda" (gris); con agenda vigente y otra aprobada a futuro, el badge
     "Vigente" y debajo, como texto de ayuda, "Cambia el dd/mm/aaaa". "Sin agenda (rige desde dd/MM)" ya no
-    aparece (B-3.9).
+    aparece (B-3.9). **Decisión del docente (sesión 17):** la fecha de "Cambia el" la devuelve el mismo cálculo
+    del dominio (`EstadoDeAgenda.Calcular`), en un campo opcional nuevo `SituacionDeAgenda.CambiaEl` (la aprobada
+    futura más próxima, sólo con `Vigente`); el estado que se calcula no cambia en ningún caso.
 62. Cada fila de A1 tiene "Editar" visible (lleva a la ficha en modo edición) y un `MenuDeAcciones` con
     "Vincular usuario" (lleva a la ficha en modo edición con el foco en "Usuario del sistema"). "Ver agenda"
     y "Desactivar" no se muestran: no existen todavía (B-3.10).
@@ -449,13 +499,13 @@ quedan como están.
 | B-4.17 / B-4.18 Guardando… y cambios sin guardar | 71, 35, 36 |
 | B-4.20 ancho del formulario | 33 |
 | B-4bis.1 a B-4bis.9 (A4) | 72 a 79 |
-| Interactividad (decisión D1) | 1 a 5 |
+| Interactividad (decisión D1) | 1 a 5, 94 |
 
 **Fuera de esta story (decisión D3, al backlog):** renombrar especialidad (B-2.10), desactivar médico y su
 filtro Activos/Inactivos (B-3.5, B-4.5), historial por registro (parte de B-4.2) y "Deshacer" (B-2.11, sólo
 Conviene). El bloqueo por turnos futuros (B-2.13) lo trae la 5.3; el diálogo ya lo soporta (AC 39, 85).
 
-### Tests (61 verificaciones)
+### Tests (64 verificaciones)
 
 Todas llevan `[Trait("Story", "3.3")]` y un `[Trait("AC", "n")]` por criterio cubierto.
 
@@ -519,13 +569,21 @@ Todas llevan `[Trait("Story", "3.3")]` y un `[Trait("AC", "n")]` por criterio cu
 | T56 | `Alta_AvisaHomonimo_SinBloquear` | 69 | integration | Existe "Pereyra, Martín José"; alta de "pereyra, martin jose" con otra matrícula | Aviso del AC 69; "Guardar igual" lo crea |
 | T57 | `Usuarios_ModalBadgesMenuConfirmaciones_YContrasenaEnDialogo` | 72, 73, 74, 75, 76, 77, 78, 79 | integration | A4 con usuarios en cada estado y la fila propia | Lo de cada AC; la contraseña sólo en el diálogo y ausente al cerrarlo |
 | T58 | `PaginasAbm_SinSesionOConOtroRol_SiguenEn302O403` [Theory] | 89 | integration | GET a A1, A2, A4 sin cookie y como recepcionista | 302 al ingreso; 403 con el texto de hoy |
+| T59 | `Calcular_VigenteConOtraAprobadaFutura_DevuelveCambiaEl` [Theory] | 61 | unit | Vigente sola; vigente + aprobada 02/11 y 16/11; casos sin vigente | `CambiaEl` = 02/11/2026 sólo en el segundo; el `Estado` y el `RigeDesde` no cambian en ninguno |
+| T60 | `FiltroDeAgendaEnLaBase_ClasificaIgualQueElDominio` [Theory] | 44 | integration | Testcontainers: un médico por cada caso de `EstadoDeAgendaTests` (a–h) más vigente con programada; filtro por cada estado | Cada médico aparece sólo bajo el filtro que coincide con `EstadoDeAgenda.Calcular` de sus agendas |
+| T61 | `OperacionesDelCircuito_UsanUnAlcanceCadaUna_YUnRechazoNoSeCuela` | 94 | integration | Dos operaciones a la vez; una edición de médico rechazada por el dominio y después otra válida de otro médico | Contextos distintos; el cambio rechazado no queda guardado |
 | R1 | Suite de Dominio y Aplicación existente sin cambios | 90 | integration | `dotnet test` de los dos proyectos | 0 fallas, sin archivos de prueba existentes modificados |
 | R2 | Pruebas HTTP de formularios reemplazadas | 92 | integration | Revisión de los cinco `FormName` en las pruebas | Ninguna prueba hace POST de esos formularios; sus comportamientos están en T48–T57 |
 | R3 | CI y cobertura | 93 | integration | CI del PR | Verde; líneas ≥ 80 % en Web |
 
-> 61 verificaciones: T1–T58 más R1–R3. Los casos de cada `[Theory]` se suman al cerrar. No hay E2E con Playwright (el proyecto `HospitalTurnos.E2E` llega con la
+> 64 verificaciones: T1–T61 más R1–R3 (T59, T60 y T61 los sumó el docente en la sesión 17). Los casos de cada `[Theory]` se suman al cerrar. No hay E2E con Playwright (el proyecto `HospitalTurnos.E2E` llega con la
 > 10.1); en su lugar, la **matriz en vivo** del Compose recorre un paso por AC de las secciones C, D, G, H,
 > I, J y los modos de falla visibles.
+
+> **Excepción declarada (AC 38):** que un diálogo con formulario se cierre con Esc sin romper la página depende de
+> que el formulario se capture en una variable local; bUnit no reproduce el último dibujo después de cerrar que
+> rompía la página. Lo cubre la prueba en vivo en Chrome (grupo `especialidades`, registrada con `smoke-run.sh`
+> en `.advisors/dod-runtime/`), además de T38 para el foco.
 
 #### Given/Fixture
 
@@ -539,23 +597,23 @@ Todas llevan `[Trait("Story", "3.3")]` y un `[Trait("AC", "n")]` por criterio cu
 
 ## Tasks / Subtasks
 
-- [ ] [SEQ] Task 1: Salvaguarda de estado — verificar lo de "Que existe hoy" contra `main` antes de tocar
+- [x] [SEQ] Task 1: Salvaguarda de estado — verificar lo de "Que existe hoy" contra `main` antes de tocar
   nada (AC: todos)
-- [ ] [SEQ] Task 2: Base interactiva (AC 1–5): `RevalidacionDeCircuito` registrado en `Program.cs`,
-  `ActorDelCircuito`, `LimiteDeErrores`. T1–T5.
-- [ ] [SEQ] Task 3: Hoja de estilos (AC 6–10): `tokens.css`, `app.css` reescrito, carga en `App.razor`.
+- [x] [SEQ] Task 2: Base interactiva (AC 1–5, 94): `RevalidacionDeCircuito` registrado en `Program.cs`,
+  `ActorDelCircuito`, `LimiteDeErrores`, `AlcancePorOperacion`. T1–T5, T61.
+- [x] [SEQ] Task 3: Hoja de estilos (AC 6–10): `tokens.css`, `app.css` reescrito, carga en `App.razor`.
   T6–T10.
-- [ ] [SEQ] Task 4: Marco y menú (AC 11–19): `MarcoPersonal`, `MenuDeUsuario`, `MigasDePan`, grupos en
+- [x] [SEQ] Task 4: Marco y menú (AC 11–19): `MarcoPersonal`, `MenuDeUsuario`, `MigasDePan`, grupos en
   `RutasPersonal` sin tocar `InicioDe`. T11–T18.
-- [ ] [SEQ] Task 5: Componentes comunes (AC 20, 22–41, 80, 83), cada uno con su prueba antes de seguir.
+- [x] [SEQ] Task 5: Componentes comunes (AC 20, 22–41, 80, 83), cada uno con su prueba antes de seguir.
   T19, T21–T41.
-- [ ] [SEQ] Task 6: Consultas de lectura (AC 42–46, 81, 82, 91). T42–T47.
-- [ ] [PAR] Task 7: Migrar A2 (AC 47–55, 84, 85). T48–T51.
-- [ ] [PAR] Task 8: Migrar A1 (AC 56–71, 86–88). T52–T56.
-- [ ] [PAR] Task 9: Migrar A4 (AC 72–79). T57.
+- [x] [SEQ] Task 6: Consultas de lectura (AC 42–46, 61, 81, 82, 91). T42–T47, T59, T60.
+- [x] [PAR] Task 7: Migrar A2 (AC 47–55, 84, 85). T48–T51.
+- [x] [PAR] Task 8: Migrar A1 (AC 56–71, 86–88). T52–T56.
+- [x] [PAR] Task 9: Migrar A4 (AC 72–79). T57.
 - [ ] [SEQ] Task 10: Reemplazar las pruebas HTTP de formularios y correr la suite (AC 89, 90, 92, 93). T58,
   R1–R3.
-- [ ] [SEQ] Task 11: Limpiar la base de demo y correr la matriz en vivo (AC 21). T20.
+- [x] [SEQ] Task 11: Limpiar la base de demo y correr la matriz en vivo (AC 21). T20.
 
 ### Task Dependencies
 
@@ -568,8 +626,9 @@ sus componentes tengan prueba en verde.
 
 #### En hospital-turnos (verificado 2026-10-17 contra `main` en `85c73b8`)
 
-- **`src/HospitalTurnos.Web/Program.cs:33-34,101-102`** — ya registra `AddCascadingAuthenticationState()`,
-  `AddInteractiveServerComponents()` y `AddInteractiveServerRenderMode()`. No hay que agregar el modo: sólo
+- **`src/HospitalTurnos.Web/Program.cs`** (`builder.Services.AddCascadingAuthenticationState()` y
+  `AddRazorComponents().AddInteractiveServerComponents()`, líneas 33-34; `MapRazorComponents<App>()
+  .AddInteractiveServerRenderMode()`, líneas 101-102) — ya registra los tres. No hay que agregar el modo: sólo
   usarlo por página. Ninguna página declara `@rendermode` hoy.
 - **`src/HospitalTurnos.Web/Personal/ValidadorSesionPersonal.cs`** — `ValidatePrincipal` revalida la cookie
   cada `SesionPersonal.IntervaloRevalidacion` con `IIngresoPersonal.SesionVigenteAsync(id, sello, ct)`. Corre
@@ -608,6 +667,21 @@ sus componentes tengan prueba en verde.
 | hospital-turnos (2.1) | `tests/HospitalTurnos.Web.Tests/Personal/MenuLateralTests.cs` | bUnit con `AuthenticationState` armado a mano. Se toma para todas las pruebas de componente. |
 | hospital-turnos (3.1) | `tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesPaginaTests.cs` | bUnit contra los casos de uso reales con Testcontainers. Se toma para T48–T57. |
 
+**Cómo reproducir las anclas de la plantilla** (no vive en el repo): en una carpeta temporal, con el SDK
+10.0.400,
+
+```bash
+dotnet new blazor --auth Individual --interactivity Server --all-interactive false -o plantilla
+sed -n 12,26p plantilla/Components/Account/IdentityRevalidatingAuthenticationStateProvider.cs
+grep -n "AuthenticationStateProvider" plantilla/Program.cs         # línea 16
+sed -n 1,3p plantilla/Components/Pages/Counter.razor              # @rendermode InteractiveServer
+sed -n 16,22p plantilla/Components/Layout/NavMenu.razor
+```
+
+Verificado el 2026-10-17 (sesión 17): las cuatro anclas coinciden. Ojo que se toma también: el proveedor vive
+lo que dura el circuito, así que abre un alcance nuevo (`IServiceScopeFactory.CreateAsyncScope()`) en cada
+revalidación para pedir los servicios con alcance (en la plantilla, `UserManager`; acá, `IIngresoPersonal`).
+
 El proyecto guía de la materia (`changomas-testing-csharp`) no tiene Blazor ni bUnit (verificado en la 2.1
 con `grep -rln -E "bunit|Bunit|razor"` → 0); por eso la referencia es la plantilla oficial.
 
@@ -636,11 +710,11 @@ con `grep -rln -E "bunit|Bunit|razor"` → 0); por eso la referencia es la plant
 
 | Accion | Archivo |
 |--------|---------|
-| Crear | Los 38 archivos de `files_to_create` (componentes en `Components/Comunes/`, `tokens.css`, revalidación, actor, consultas, pruebas) |
-| Modificar | `Program.cs` (registro de `RevalidacionDeCircuito`), `App.razor` (carga de `tokens.css`), `LayoutPersonal.razor` (usa `MarcoPersonal`), `MenuLateral.razor` (grupos, activo, sin "Salir"), `RutasPersonal.cs` (grupos, `InicioDe` explícito, `Pendientes`) |
+| Crear | Los archivos de `files_to_create` (componentes en `Components/Comunes/`, `tokens.css`, revalidación, actor, alcance por operación, consultas, pruebas) |
+| Modificar | `Program.cs` (registro de `RevalidacionDeCircuito`, `Notificaciones`, `AlcancePorOperacion` y `MenuDeAcciones.UnoAbierto`), `App.razor` (carga de `tokens.css`), `_Imports.razor` (los `using` de los componentes comunes), `LayoutPersonal.razor` (usa `MarcoPersonal`), `MenuLateral.razor` (grupos, activo, sin "Salir"), `RutasPersonal.cs` (grupos, `InicioDe` explícito, `Pendientes`) |
 | Modificar | Las cinco páginas ABM y `TablaMedicos.razor` / `CamposMedico.razor` (migración) |
 | Modificar | `ICatalogoEspecialidades`, `IGestionMedicos`, `IGestionUsuariosPersonal` y sus implementaciones (métodos paginados nuevos; los actuales quedan) |
-| Modificar | Las siete clases de prueba de Web listadas en `files_to_modify` |
+| Modificar | Las clases de prueba de Web listadas en `files_to_modify` |
 
 ### Lo que NO hay que hacer
 
@@ -661,7 +735,7 @@ con `grep -rln -E "bunit|Bunit|razor"` → 0); por eso la referencia es la plant
 dotnet test tests/HospitalTurnos.Dominio.Tests
 dotnet test tests/HospitalTurnos.Aplicacion.Tests
 dotnet test tests/HospitalTurnos.Web.Tests
-# Esperado: 0 fallas; dotnet test --filter "Story=3.3" lista T1–T58 (más los casos de cada [Theory])
+# Esperado: 0 fallas; dotnet test --filter "Story=3.3" lista T1–T61 (más los casos de cada [Theory])
 
 # 2. Compose y matriz en vivo
 docker compose up -d --build
@@ -693,15 +767,168 @@ docker compose exec db psql -U postgres -d turnos -c \
 - [Source: docs/project-context.md] — reglas que se respetan siempre.
 - [Source: docs/stories/2-1-ingreso-personal.md] — por qué S0 queda estático y la nota de revalidación.
 
+## Change Log
+
+| Fecha | Sesión | Cambio | Por qué |
+|---|---|---|---|
+| 2026-10-17 | 17 | Anclas de la plantilla oficial con el comando que las reproduce | El validador no podía comprobarlas desde el repo (VAL-C8); el docente eligió sumar el comando |
+| 2026-10-17 | 17 | AC 61: `SituacionDeAgenda.CambiaEl` desde el dominio; T59 | Decisión del docente: la fecha de "Cambia el" la da el mismo cálculo |
+| 2026-10-17 | 17 | AC 44: el filtro de agenda en la consulta; T60 | Decisión del docente: paginar y contar en la base; una prueba compara con el dominio |
+| 2026-10-17 | 17 | AC 8: también ingreso, cambio de contraseña, propuesta de agenda y hojas de `Layout/` | Decisión del docente: el criterio decía "ningún componente"; sólo estilos |
+| 2026-10-17 | 17 | AC 94 y T61: `AlcancePorOperacion`; arquitectura §5.1 | Decisión del docente: en el circuito un solo contexto chocaba y arrastraba guardados rechazados |
+| 2026-10-17 | 17 | `FormularioMedico`: la matrícula como atributo del campo | AC 34: el mensaje sale al salir del campo (lección de la 4.2) |
+| 2026-10-17 | 17 | AC 30: un solo menú "⋯" abierto por pantalla (`MenuDeAcciones.UnoAbierto`) | Decisión del docente tras la revisión: quedaban dos abiertos a la vez |
+| 2026-10-17 | 17 | AC 3: en A4, el rechazo de reactivar o desbloquear en un aviso arriba de la tabla | Decisión del docente tras la revisión: esas acciones no tienen diálogo (AC 77) |
+| 2026-10-17 | 17 | AC 36: los enlaces del marco y de las migas recargan la página y pregunta el navegador | Decisión del docente: la prueba en vivo mostró que con la navegación rápida se perdían los cambios sin aviso |
+| 2026-10-17 | 17 | `runtime_not_verifiable` para AC 5, 90, 92 y 93; nota de excepción del AC 38 | La prueba en vivo no puede verlos de forma honesta; los aprueba el docente |
+
 ## Dev Agent Record
 
 ### Agent Model Used
 
+Claude Opus 5.5 (`claude-opus-5-5`), sesión 17.
+
 ### Debug Log References
+
+- Corrida del pipeline: `.advisors/pipeline-runs/3.3-20261017183425/` (hallazgos en `findings.json`).
+- Prueba en vivo en Chrome: `.advisors/dod-runtime/3.3-smoke-ledger.jsonl` (7 grupos, 0 fallas) y `3.3-runtime-matrix.md`.
 
 ### Completion Notes List
 
 - Análisis de contexto completo: guía de desarrollo creada a partir del análisis de brechas y las decisiones
   D1–D4 del docente (2026-10-17).
+- Componentes comunes primero, cada uno con su prueba; después A2, A1 y A4 sin tocar la lógica de negocio.
+- Pruebas: Dominio 143, Aplicación 227 y Web 311, en verde. Cobertura de líneas en la CI local, medida antes
+  de los arreglos de la prueba en vivo: Web 95,2 %; Dominio y Aplicación 97,4 %. La CI del PR la vuelve a medir.
+- Revisores: cuatro vueltas (6, 4, 4 y 4 revisores); sin CRITICAL abiertos.
+- La prueba en vivo encontró 7 defectos que las pruebas de componente no veían (Esc con el formulario en
+  null, foco perdido al rechazar el guardado, menú "⋯" reabierto sin referencias, error de JS al devolver el
+  foco, pantalla en blanco con la base caída, navegación rápida que perdía cambios, tarjetas cortadas en el
+  celular); todos corregidos con su prueba o su control en vivo.
+- Guía del tester y revisión de legibilidad: `docs/qa/3.3-pasos.md`, `3.3-legibilidad.md` (16 marcas
+  resueltas) y `3.3-legibilidad-ui.md` (12 marcas: una arreglada, 11 aceptadas por el docente).
+- Base de demo limpia: T20 da 0 filas con "Sonda".
+- Pendiente: R3 (CI del PR) antes del merge.
 
 ### File List
+
+- (modificado) `docs/04-arquitectura.md`
+- (nuevo) `docs/qa/3.3-legibilidad-ui.md`
+- (nuevo) `docs/qa/3.3-legibilidad.md`
+- (nuevo) `docs/qa/3.3-pasos.md`
+- (modificado) `docs/stories/3-3-alinear-abm-con-guia-ux.md`
+- (nuevo) `src/HospitalTurnos.Aplicacion/Auditoria/IConsultaTrazabilidad.cs`
+- (modificado) `src/HospitalTurnos.Aplicacion/Catalogo/ICatalogoEspecialidades.cs`
+- (modificado) `src/HospitalTurnos.Aplicacion/Catalogo/IGestionMedicos.cs`
+- (nuevo) `src/HospitalTurnos.Aplicacion/Comun/ConsultaDeListado.cs`
+- (modificado) `src/HospitalTurnos.Aplicacion/Personal/IGestionUsuariosPersonal.cs`
+- (modificado) `src/HospitalTurnos.Dominio/Agendas/EstadoDeAgenda.cs`
+- (modificado) `src/HospitalTurnos.Dominio/Agendas/SituacionDeAgenda.cs`
+- (nuevo) `src/HospitalTurnos.Infraestructura/Auditoria/ConsultaTrazabilidadEnBase.cs`
+- (modificado) `src/HospitalTurnos.Infraestructura/Catalogo/CatalogoEspecialidadesEnBase.cs`
+- (modificado) `src/HospitalTurnos.Infraestructura/Catalogo/GestionMedicosEnBase.cs`
+- (modificado) `src/HospitalTurnos.Infraestructura/Identidad/GestionUsuariosPersonalIdentity.cs`
+- (modificado) `src/HospitalTurnos.Infraestructura/ServiciosDeInfraestructura.cs`
+- (modificado) `src/HospitalTurnos.Web/Components/_Imports.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/App.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/BarraDeFiltros.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/CampoDeFormulario.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/ColumnaAbm.cs`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/DialogoDeConfirmacion.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/DialogoModal.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/EstadoDeListado.cs`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/FiltroDeEstado.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/Formatos.cs`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/FormularioAbm.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/InsigniaDeEstado.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/LimiteDeErrores.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/MarcoPersonal.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/MenuDeAcciones.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/MenuDeUsuario.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/Miga.cs`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/MigasDePan.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/Notificaciones.cs`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/PaginaAbm.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/Paginador.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/PieDeTrazabilidad.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/SelectConBusqueda.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/TablaAbm.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/VistaDeDetalle.razor`
+- (nuevo) `src/HospitalTurnos.Web/Components/Comunes/ZonaDeNotificaciones.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Layout/MainLayout.razor.css`
+- (modificado) `src/HospitalTurnos.Web/Components/Layout/NavMenu.razor.css`
+- (modificado) `src/HospitalTurnos.Web/Components/Layout/ReconnectModal.razor.css`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/CamposMedico.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/Especialidades.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/FichaMedico.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/FormularioMedico.cs`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/MedicoNuevo.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/Medicos.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/TablaMedicos.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Agendas/EditorDeAgenda.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Agendas/MiPropuesta.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/CambiarContrasena.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/Ingreso.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/LayoutIngreso.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/LayoutPersonal.razor`
+- (modificado) `src/HospitalTurnos.Web/Components/Personal/MenuLateral.razor`
+- (nuevo) `src/HospitalTurnos.Web/Personal/ActorDelCircuito.cs`
+- (nuevo) `src/HospitalTurnos.Web/Personal/AlcancePorOperacion.cs`
+- (nuevo) `src/HospitalTurnos.Web/Personal/RevalidacionDeCircuito.cs`
+- (modificado) `src/HospitalTurnos.Web/Personal/RutasPersonal.cs`
+- (modificado) `src/HospitalTurnos.Web/Program.cs`
+- (modificado) `src/HospitalTurnos.Web/wwwroot/app.css`
+- (nuevo) `src/HospitalTurnos.Web/wwwroot/css/tokens.css`
+- (nuevo) `tests/HospitalTurnos.Aplicacion.Tests/Auditoria/ConsultaTrazabilidadTests.cs`
+- (nuevo) `tests/HospitalTurnos.Aplicacion.Tests/Catalogo/FiltroDeAgendaEnBaseTests.cs`
+- (nuevo) `tests/HospitalTurnos.Aplicacion.Tests/Catalogo/ListadosPaginadosTests.cs`
+- (nuevo) `tests/HospitalTurnos.Dominio.Tests/Agendas/CambioDeAgendaTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Ayudas/ContextoDeComponente.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesHttpTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesInteractivaTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Catalogo/EspecialidadesPaginaTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Catalogo/EstadoDeAgendaEnA1HttpTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Catalogo/MedicosHttpTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Catalogo/MedicosInteractivaTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Catalogo/TablaMedicosTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Comunes/BaseInteractivaTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Comunes/ComponentesComunesTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Comunes/HojaDeEstilosTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Comunes/MarcoPersonalTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Personal/CambioContrasenaHttpTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Personal/Dobles/GestionUsuariosConBaseCaida.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Personal/MenuLateralTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Personal/SesionYPermisosHttpTests.cs`
+- (nuevo) `tests/HospitalTurnos.Web.Tests/Personal/UsuariosInteractivaTests.cs`
+- (modificado) `tests/HospitalTurnos.Web.Tests/Personal/UsuariosPersonalHttpTests.cs`
+
+
+## Review Follow-ups (Advisors)
+
+<!-- tycon-pipeline: generado por Step 6/7. Cada item = finding advisor no resuelto (CRITICAL waived o WARNING). Al resolver el finding en el código, marcá [x]. Step 0/1 detecta los abiertos al retomar (pipeline.js followups-status). -->
+
+- [x] **[CRITICAL]** SPEC-C4 — `src/HospitalTurnos.Web/Components/Personal/Administracion/MedicoNuevo.razor` — El aviso de homónimo ahora exige otra matrícula (AC 69); T56 suma el caso de la misma matrícula <!-- fkey:SPEC-C4|src/HospitalTurnos.Web/Components/Personal/Administracion/MedicoNuevo.razor -->
+- [x] **[CRITICAL]** SPEC-C7 — `src/HospitalTurnos.Web/Components/Comunes/MenuDeAcciones.razor` — Decisión del docente: sumado al AC 30 (uno solo por pantalla) con prueba MenuDeAcciones_AbrirUnoCierraElOtro <!-- fkey:SPEC-C7|src/HospitalTurnos.Web/Components/Comunes/MenuDeAcciones.razor -->
+- [ ] **[CRITICAL]** ACCOV-C1 — `docs/stories/3-3-alinear-abm-con-guia-ux.md` — R1 y T20 verificados (smoke-run); R3 queda para la CI del PR antes del merge <!-- fkey:ACCOV-C1|docs/stories/3-3-alinear-abm-con-guia-ux.md -->
+- [x] **[WARNING]** SILENT-C5 — `src/HospitalTurnos.Web/Components/Comunes/BarraDeFiltros.razor` — Clase cerrada en los 7 sitios con try/catch y DispatchExceptionAsync <!-- fkey:SILENT-C5|src/HospitalTurnos.Web/Components/Comunes/BarraDeFiltros.razor -->
+- [x] **[WARNING]** SILENT-C5 — `src/HospitalTurnos.Web/Components/Comunes/PaginaAbm.razor` — try/catch y DispatchExceptionAsync <!-- fkey:SILENT-C5|src/HospitalTurnos.Web/Components/Comunes/PaginaAbm.razor -->
+- [x] **[WARNING]** SILENT-C5 — `src/HospitalTurnos.Web/Components/Personal/Administracion/Medicos.razor` — AlNavegar en A1, A2 y A4 con try/catch y DispatchExceptionAsync <!-- fkey:SILENT-C5|src/HospitalTurnos.Web/Components/Personal/Administracion/Medicos.razor -->
+- [x] **[WARNING]** SILENT-W7 — `src/HospitalTurnos.Web/Components/Comunes/ZonaDeNotificaciones.razor` — Ignora ObjectDisposed y entrega el resto a Blazor; mismo arreglo en MenuDeAcciones <!-- fkey:SILENT-W7|src/HospitalTurnos.Web/Components/Comunes/ZonaDeNotificaciones.razor -->
+- [x] **[WARNING]** ACCOV-C6 — `tests/HospitalTurnos.Web.Tests/Catalogo/MedicosInteractivaTests.cs` — T52 abre ?pagina=9 y ve la última página <!-- fkey:ACCOV-C6|tests/HospitalTurnos.Web.Tests/Catalogo/MedicosInteractivaTests.cs -->
+- [ ] **[WARNING]** ACCOV-W1 — `tests/HospitalTurnos.Web.Tests/Catalogo/MedicosInteractivaTests.cs` — Convención del repo: las pruebas migradas conservan la marca de su story original <!-- fkey:ACCOV-W1|tests/HospitalTurnos.Web.Tests/Catalogo/MedicosInteractivaTests.cs -->
+- [ ] **[WARNING]** ACCOV-W1 — `tests/HospitalTurnos.Web.Tests/Comunes/ComponentesComunesTests.cs` — T28 pide el error de carga en TablaAbm; la prueba en vivo lo ve en A1 <!-- fkey:ACCOV-W1|tests/HospitalTurnos.Web.Tests/Comunes/ComponentesComunesTests.cs -->
+- [x] **[WARNING]** TEST-W1 — `docs/stories/3-3-alinear-abm-con-guia-ux.md` — AC 21 / T20 registrado con smoke-run: 0 filas con Sonda en la base de demo tras limpiar <!-- fkey:TEST-W1|docs/stories/3-3-alinear-abm-con-guia-ux.md -->
+- [ ] **[WARNING]** TEST-W2 — `.advisors/tests-result.json` — Limitación del gate; la CI local da Web 95,2 % y Dominio+Aplicación 97,4 % <!-- fkey:TEST-W2|.advisors/tests-result.json -->
+- [x] **[WARNING]** VAL-W15 — `docs/stories/3-3-alinear-abm-con-guia-ux.md` — Declarados _Imports.razor y arquitectura; conteos y T1–T61 corregidos <!-- fkey:VAL-W15|docs/stories/3-3-alinear-abm-con-guia-ux.md -->
+- [x] **[WARNING]** SPEC-W5 — `docs/stories/3-3-alinear-abm-con-guia-ux.md` — Change Log de la sesión 17 <!-- fkey:SPEC-W5|docs/stories/3-3-alinear-abm-con-guia-ux.md -->
+- [x] **[WARNING]** SPEC-W2 — `src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor` — Decisión del docente: sumado al AC 3 (aviso arriba de la tabla en acciones sin confirmación) con prueba en A4 <!-- fkey:SPEC-W2|src/HospitalTurnos.Web/Components/Personal/Administracion/UsuariosPersonal.razor -->
+- [ ] **[WARNING]** VAL-W15 — `Sesiones/img/17-antes-*.png` — Las capturas del antes van al PR de cierre (Sesiones/), no al de la story: no se suben en este commit <!-- fkey:VAL-W15|Sesiones/img/17-antes-*.png -->
+- [x] **[CRITICAL]** RUNTIME — `src/HospitalTurnos.Web/Components/Personal/Administracion/Especialidades.razor` — Esc en un diálogo con formulario daba Model null: formulario capturado en variable local en A1, A2 y A4 <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Personal/Administracion/Especialidades.razor -->
+- [x] **[CRITICAL]** RUNTIME — `src/HospitalTurnos.Web/Components/Comunes/DialogoModal.razor` — JSException al devolver el foco a un control que ya no existe tumbaba el circuito <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Comunes/DialogoModal.razor -->
+- [x] **[CRITICAL]** RUNTIME — `src/HospitalTurnos.Web/Components/Personal/Administracion/Medicos.razor` — Con la base caída la carga inicial dejaba la pantalla en blanco: aviso y registro en las tres páginas de médicos <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Personal/Administracion/Medicos.razor -->
+- [x] **[WARNING]** RUNTIME — `src/HospitalTurnos.Web/Components/Comunes/FormularioAbm.razor` — El foco se perdía al rechazar el guardado: va al resumen de errores <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Comunes/FormularioAbm.razor -->
+- [x] **[WARNING]** RUNTIME — `src/HospitalTurnos.Web/Components/Comunes/MenuDeAcciones.razor` — Reabrir el menú vaciaba las referencias y el foco fallaba <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Comunes/MenuDeAcciones.razor -->
+- [x] **[WARNING]** RUNTIME — `src/HospitalTurnos.Web/Components/Comunes/MenuLateral.razor` — Decisión del docente (AC 36): los enlaces del marco recargan y el navegador avisa de cambios sin guardar <!-- fkey:RUNTIME|src/HospitalTurnos.Web/Components/Comunes/MenuLateral.razor -->
+- [x] **[WARNING]** RUNTIME — `src/HospitalTurnos.Web/wwwroot/app.css` — Revisión de legibilidad de la pantalla: en el celular las acciones de la tarjeta se salían de la pantalla y el badge se estiraba; arreglado con prueba (AC 29) y control en vivo de que todo entra en 375 px <!-- fkey:RUNTIME|src/HospitalTurnos.Web/wwwroot/app.css -->
+- [x] **[WARNING]** VAL-W3 — `docs/stories/3-3-alinear-abm-con-guia-ux.md` — La nota de excepción del AC 38 pasó debajo de la tabla de Tests <!-- fkey:VAL-W3|docs/stories/3-3-alinear-abm-con-guia-ux.md -->

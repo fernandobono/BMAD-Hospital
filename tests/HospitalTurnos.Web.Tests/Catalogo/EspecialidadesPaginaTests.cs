@@ -1,23 +1,21 @@
 using Bunit;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Catalogo;
+using HospitalTurnos.Aplicacion.Comun;
+using HospitalTurnos.Dominio.Auditoria;
 using HospitalTurnos.Dominio.Personal;
+using HospitalTurnos.Web.Components.Comunes;
 using HospitalTurnos.Web.Components.Personal.Administracion;
-using Microsoft.AspNetCore.Components.Forms;
+using HospitalTurnos.Web.Personal;
+using HospitalTurnos.Web.Tests.Ayudas;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace HospitalTurnos.Web.Tests.Catalogo;
 
-// El estado vacío no se puede ver por HTTP en una base compartida (siempre hay especialidades de otras
-// pruebas): se prueba como componente, con un catálogo de prueba que no tiene ninguna.
+// El estado vacío no se puede ver en una base compartida (siempre hay especialidades de otras pruebas): se prueba
+// como componente, con un catálogo de prueba que no tiene ninguna. Story 3.3: el vacío de la guía, con la acción.
 public class EspecialidadesPaginaTests : BunitContext
 {
-    private sealed class TokenDePrueba : AntiforgeryStateProvider
-    {
-        public override AntiforgeryRequestToken? GetAntiforgeryToken() =>
-            new("token-de-prueba", "__RequestVerificationToken");
-    }
-
     // Doble de prueba escrito a mano: un catálogo sin especialidades. Las escrituras no se usan acá.
     private sealed class CatalogoVacio : ICatalogoEspecialidades
     {
@@ -29,6 +27,11 @@ public class EspecialidadesPaginaTests : BunitContext
 
         public Task<EspecialidadResumen?> BuscarAsync(long id, CancellationToken ct) =>
             Task.FromResult<EspecialidadResumen?>(null);
+
+        public Task<PaginaDeResultados<EspecialidadFila>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct) =>
+            Task.FromResult(new PaginaDeResultados<EspecialidadFila>([], 0));
+
+        public Task<int> ContarMedicosAsync(long id, CancellationToken ct) => Task.FromResult(0);
 
         public Task<long> CrearAsync(ActorAuditoria actor, string nombre, CancellationToken ct) =>
             throw new InvalidOperationException("No se usa en esta prueba.");
@@ -43,19 +46,25 @@ public class EspecialidadesPaginaTests : BunitContext
     [Fact]
     [Trait("Story", "3.1")]
     [Trait("AC", "15")]
+    [Trait("Story", "3.3")]
+    [Trait("AC", "54")]
     public void PaginaEspecialidades_SinEspecialidades_MuestraElEstadoVacio()
     {
-        Services.AddSingleton<AntiforgeryStateProvider, TokenDePrueba>();
         Services.AddSingleton<ICatalogoEspecialidades, CatalogoVacio>();
-        var autorizacion = AddAuthorization();
-        autorizacion.SetAuthorized("lucia");
-        autorizacion.SetRoles(Roles.Administrador);
+        Services.AddSingleton<AlcancePorOperacion>();
+        Services.AddSingleton(TimeProvider.System);
+        Services.AddScoped<Notificaciones>();
+        JSInterop.Mode = JSRuntimeMode.Loose;
+        this.Como(new ActorAuditoria(Guid.NewGuid().ToString(), "Lucía Pérez", Roles.Administrador, CanalAuditoria.Personal));
 
         var pagina = Render<Especialidades>();
 
-        Assert.Contains("Todavía no hay especialidades. Agregá la primera con el formulario de arriba.", pagina.Markup);
+        pagina.WaitForAssertion(() =>
+            Assert.Equal("Todavía no hay especialidades. Creá la primera.", pagina.Find(".estado-vacio p").TextContent.Trim()));
         Assert.Empty(pagina.FindAll("table"));
-        Assert.NotNull(pagina.Find("input#nombre"));
-        Assert.Contains("Agregar", pagina.Find("form button[type=submit]").TextContent);
+        var accion = pagina.Find(".estado-vacio button");
+        Assert.Equal("Nueva especialidad", accion.TextContent.Trim());
+        accion.Click();
+        Assert.NotNull(pagina.Find("[role=dialog] input#nombre"));
     }
 }

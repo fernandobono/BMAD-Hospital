@@ -1,0 +1,32 @@
+@using HospitalTurnos.Web.Components.Personal
+
+@* El marco fijo del personal (guía "Estructura de la aplicación", story 3.3): barra superior con el nombre del
+   sistema y el menú de usuario; menú lateral a la izquierda y el contenido a la derecha. Bajo 992 px el menú
+   lateral se oculta detrás de "☰ Menú" (B-1.8). Estático: las páginas interactivas van adentro. *@
+<div class="marco">
+    <header class="barra-superior">
+        <div class="d-flex align-items-center gap-2">
+            <details class="menu-compacto">
+                <summary>☰ Menú</summary>
+                <div class="menu-compacto__panel">
+                    <MenuLateral />
+                </div>
+            </details>
+            <span class="barra-superior__marca">Las Acacias</span>
+        </div>
+        <MenuDeUsuario />
+    </header>
+    <div class="marco__cuerpo">
+        <aside class="menu-lateral-fijo">
+            <MenuLateral />
+        </aside>
+        <main class="contenido">
+            @ChildContent
+        </main>
+    </div>
+</div>
+
+@code {
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+}

@@ -1,0 +1,142 @@
+@typeparam TValor
+@implements IDisposable
+@implements FormularioAbm.ICampo
+@using System.Globalization
+@using System.Linq.Expressions
+
+@* Un campo de FormularioAbm (guía, "Campos" y "Validación"; AC 33 y 34): etiqueta arriba asociada con for, asterisco
+   en los obligatorios y "(opcional)" en el resto, ayuda debajo y el error debajo, en rojo, con ícono y enlazado con
+   aria-describedby. Valida al salir del campo. Con Opciones es un SelectConBusqueda. *@
+<div class="campo @(HayError ? "campo--con-error" : null)">
+    <label for="@Id" class="campo__etiqueta">@($"{Etiqueta} ")@if (Obligatorio)
+        {<span class="campo__obligatorio" aria-hidden="true">*</span>}
+        else
+        {<span class="campo__opcional">(opcional)</span>}</label>
+    @if (Opciones is null)
+    {
+        <input id="@Id" type="text" class="form-control" value="@Texto" autocomplete="off" aria-describedby="@DescritoPor"
+               aria-invalid="@(HayError ? "true" : null)" aria-required="@(Obligatorio ? "true" : null)" @ref="control"
+               @onchange="CambiarAsync" @onblur="AlSalir" />
+    }
+    else
+    {
+        <SelectConBusqueda @ref="select" Id="@Id" Valor="@Texto" Opciones="Opciones" TextoVacio="@TextoVacio" Etiqueta="@Etiqueta"
+                           DescritoPor="@DescritoPor" Invalido="HayError" Obligatorio="Obligatorio" ValorCambiado="CambiarTextoAsync"
+                           AlSalir="AlSalir" />
+    }
+    @if (Ayuda is not null)
+    {
+        <small id="@($"{Id}-ayuda")" class="campo__ayuda">@Ayuda</small>
+    }
+    @if (HayError)
+    {
+        <div id="@($"{Id}-error")" class="campo__error"><span aria-hidden="true">⚠</span> <span>@string.Join(" ", errores)</span></div>
+    }
+</div>
+
+@code {
+    [CascadingParameter]
+    private EditContext Contexto { get; set; } = default!;
+
+    [CascadingParameter]
+    private FormularioAbm? Formulario { get; set; }
+
+    [Parameter, EditorRequired]
+    public string Etiqueta { get; set; } = "";
+
+    [Parameter, EditorRequired]
+    public string Id { get; set; } = "";
+
+    [Parameter]
+    public bool Obligatorio { get; set; }
+
+    [Parameter]
+    public string? Ayuda { get; set; }
+
+    /// <summary>Con valor, el campo es un select (con buscador si pasa de 10 opciones).</summary>
+    [Parameter]
+    public IReadOnlyList<SelectConBusqueda.Opcion>? Opciones { get; set; }
+
+    [Parameter]
+    public string? TextoVacio { get; set; }
+
+    [Parameter]
+    public TValor? Valor { get; set; }
+
+    [Parameter]
+    public EventCallback<TValor?> ValorChanged { get; set; }
+
+    [Parameter, EditorRequired]
+    public Expression<Func<TValor?>> ValorExpression { get; set; } = default!;
+
+    public FieldIdentifier Campo { get; private set; }
+
+    private ElementReference control;
+    private SelectConBusqueda? select;
+    private IReadOnlyList<string> errores = [];
+
+    private bool HayError => errores.Count > 0;
+
+    private string? Texto => Valor switch
+    {
+        null => null,
+        IFormattable formateable => formateable.ToString(null, CultureInfo.InvariantCulture),
+        _ => Valor.ToString(),
+    };
+
+    private string? DescritoPor
+    {
+        get
+        {
+            var ids = new List<string>();
+            if (Ayuda is not null)
+                ids.Add($"{Id}-ayuda");
+            if (HayError)
+                ids.Add($"{Id}-error");
+            return ids.Count == 0 ? null : string.Join(' ', ids);
+        }
+    }
+
+    protected override void OnInitialized()
+    {
+        Campo = FieldIdentifier.Create(ValorExpression);
+        Contexto.OnValidationStateChanged += AlCambiarLaValidacion;
+        Formulario?.Registrar(this);
+    }
+
+    private void AlCambiarLaValidacion(object? remitente, ValidationStateChangedEventArgs e)
+    {
+        errores = Contexto.GetValidationMessages(Campo).ToList();
+        StateHasChanged();
+    }
+
+    public ValueTask EnfocarAsync() => select is not null ? select.EnfocarAsync() : control.FocusAsync();
+
+    private Task CambiarAsync(ChangeEventArgs e) => CambiarTextoAsync(e.Value?.ToString());
+
+    private async Task CambiarTextoAsync(string? texto)
+    {
+        await ValorChanged.InvokeAsync(Convertir(texto));
+        Formulario?.MarcarCambio();
+        Contexto.NotifyFieldChanged(Campo);   // valida este campo (DataAnnotationsValidator)
+    }
+
+    // Valida al salir del campo aunque no se haya cambiado (guía, "Validación").
+    private void AlSalir() => Contexto.NotifyFieldChanged(Campo);
+
+    private static TValor? Convertir(string? texto)
+    {
+        if (string.IsNullOrWhiteSpace(texto))
+            return typeof(TValor) == typeof(string) ? (TValor?)(object?)texto : default;
+        var tipo = Nullable.GetUnderlyingType(typeof(TValor)) ?? typeof(TValor);
+        if (tipo == typeof(Guid))
+            return Guid.TryParse(texto, out var guid) ? (TValor)(object)guid : default;
+        return BindConverter.TryConvertTo<TValor>(texto, CultureInfo.InvariantCulture, out var valor) ? valor : default;
+    }
+
+    public void Dispose()
+    {
+        Contexto.OnValidationStateChanged -= AlCambiarLaValidacion;
+        Formulario?.Quitar(this);
+    }
+}

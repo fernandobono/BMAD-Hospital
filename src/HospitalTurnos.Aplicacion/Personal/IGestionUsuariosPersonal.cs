@@ -1,4 +1,5 @@
 using HospitalTurnos.Aplicacion.Auditoria;
+using HospitalTurnos.Aplicacion.Comun;
 
 namespace HospitalTurnos.Aplicacion.Personal;
 
@@ -9,6 +10,13 @@ namespace HospitalTurnos.Aplicacion.Personal;
 public interface IGestionUsuariosPersonal
 {
     Task<IReadOnlyList<UsuarioPersonalFila>> ListarAsync(CancellationToken ct);
+
+    /// <summary>
+    /// A4 paginada en la base (story 3.3, AC 45): busca en usuario o nombre, filtra por "rol" y "estado" (activos,
+    /// inactivos, todos) y ordena por "nombre" o "rol".
+    /// </summary>
+    Task<PaginaDeResultados<UsuarioPersonalFila>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct);
+
     Task<AltaUsuarioPersonal> CrearAsync(NuevoUsuarioPersonal datos, ActorAuditoria actor, CancellationToken ct);
     Task DesactivarAsync(Guid usuarioId, ActorAuditoria actor, CancellationToken ct);
     Task ReactivarAsync(Guid usuarioId, ActorAuditoria actor, CancellationToken ct);

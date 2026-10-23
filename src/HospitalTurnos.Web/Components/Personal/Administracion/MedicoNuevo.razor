@@ -1,75 +1,129 @@
 @page "/personal/admin/medicos/nuevo"
 @layout LayoutPersonal
 @attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
-@using HospitalTurnos.Web.Errores
-@inject IGestionMedicos Gestion
-@inject ICatalogoEspecialidades Catalogo
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using System.Globalization
+@using System.Text
+@using HospitalTurnos.Dominio.Catalogo
+@inject AlcancePorOperacion Operaciones
 @inject NavigationManager Navegacion
+@inject ILogger<MedicoNuevo> Registro
+@using HospitalTurnos.Web.Errores
+@inject Notificaciones Avisos
 
-@* A1, el alta (UX §7, story 3.2), renderizado estático. La página atrapa SÓLO las excepciones del dominio y
-   muestra su mensaje en un cartel con el código del manejador global; lo inesperado sigue a ese manejador. *@
-<PageTitle>Nuevo médico · Las Acacias</PageTitle>
-
-<h1>Nuevo médico</h1>
-
-<p><a href="@RutasPersonal.Medicos">Volver a Médicos</a></p>
-
-@if (error is not null)
-{
-    <div class="alert alert-danger" role="alert">@error</div>
-}
-
-@if (especialidades.Count == 0)
-{
-    <p>No hay especialidades activas. Creá una en Especialidades antes de dar de alta un médico.</p>
-    <p><a href="@RutasPersonal.Especialidades">Ir a Especialidades</a></p>
-}
-@if (especialidades.Count > 0 || esEnvio)
-{
-    @* Con un envío se dibuja igual: un POST armado sin especialidades activas cae en el AC 9 (cartel 400). *@
-    <EditForm Model="Input" method="post" OnValidSubmit="GuardarAsync" FormName="medico" style="max-width: 32rem;">
-        <DataAnnotationsValidator />
-        <CamposMedico Input="Input!" Especialidades="especialidades" Usuarios="usuarios" />
-        <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Dar de alta</button>
-    </EditForm>
-}
+@* A1, el alta, con el estándar de la guía UX/UI (story 3.3, sección I): página propia (4 a 12 campos), "Guardar" y
+   "Cancelar", aviso de homónimo antes de guardar y, al guardar, la ficha en lectura con "Médico creado". *@
+<PaginaAbm Titulo="Nuevo médico" Migas="Migas">
+    @if (cargando)
+    {
+        <p class="cargando">Cargando…</p>
+    }
+    else if (falloLaCarga)
+    {
+        <div class="alert alert-danger" role="alert">@ManejadorGlobalDeErrores.MensajeGenerico</div>
+    }
+    else if (especialidades.Count == 0)
+    {
+        <div class="estado-vacio">
+            <span class="estado-vacio__icono" aria-hidden="true">☐</span>
+            <p class="mb-0">Primero creá una especialidad.</p>
+            <a href="@RutasPersonal.Especialidades">Ir a Especialidades</a>
+        </div>
+    }
+    else
+    {
+        <FormularioAbm @ref="formulario" Model="Input" AlGuardar="GuardarAsync" AlCancelar="Cancelar"
+                       AntesDeGuardar="RevisarHomonimoAsync" CampoDelError="FichaMedico.CampoDelError">
+            <CamposMedico Input="Input" Especialidades="especialidades" Usuarios="usuarios" />
+        </FormularioAbm>
+    }
+    @if (homonimo is { } otro)
+    {
+        @* Un aviso, no una regla (AC 69): "Guardar igual" lo crea; el dominio no cambia. Variable local: al cerrarse,
+           el diálogo se dibuja una última vez con lo que tenía. *@
+        <DialogoDeConfirmacion Titulo="@($"Ya hay un médico {Formatos.Persona(otro.Apellido, otro.Nombre)} ({otro.Matricula}). ¿Es otra persona?")"
+                               Consecuencia="Si es otra persona, guardalo igual. Si es la misma, cancelá y revisá el listado."
+                               TextoConfirmar="Guardar igual" Peligro="false" AlConfirmar="GuardarIgualAsync"
+                               AlCancelar="() => homonimo = null" />
+    }
+</PaginaAbm>
 
 @code {
+    private static readonly IReadOnlyList<Miga> Migas =
+        [new("Catálogos", RutasPersonal.Medicos), new("Médicos", RutasPersonal.Medicos), new("Nuevo médico", null)];
+
     [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+    private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
 
-    [SupplyParameterFromForm(FormName = "medico")]
-    private FormularioMedico? Input { get; set; }
-
+    private FormularioMedico Input { get; } = new();
+    private FormularioAbm? formulario;
     private IReadOnlyList<EspecialidadResumen> especialidades = [];
     private IReadOnlyList<OpcionUsuarioMedico> usuarios = [];
-    private string? error;
-    private bool esEnvio;
+    private MedicoListado? homonimo;
+    private bool cargando = true;
+    private bool falloLaCarga;
 
     protected override async Task OnInitializedAsync()
     {
-        Input ??= new();
-        esEnvio = HttpMethods.IsPost(HttpContext.Request.Method);
-        // En SSR la página se arma entera en cada pedido (GET y POST): las listas se cargan siempre.
-        especialidades = await Catalogo.ListarActivasAsync(HttpContext.RequestAborted);
-        usuarios = await Gestion.UsuariosParaVincularAsync(null, HttpContext.RequestAborted);
+        try
+        {
+            especialidades = await Operaciones.EjecutarAsync<ICatalogoEspecialidades, IReadOnlyList<EspecialidadResumen>>(
+                c => c.ListarActivasAsync(CancellationToken.None));
+            usuarios = await ConGestionAsync(g => g.UsuariosParaVincularAsync(null, CancellationToken.None));
+        }
+        catch (Exception e)
+        {
+            // Un error al iniciar la página no lo atrapa ningún límite: el mensaje genérico y el detalle al registro (AC 4).
+            Registro.LogError(e, "No se pudo cargar el alta de médicos");
+            falloLaCarga = true;
+        }
+        cargando = false;
+    }
+
+    // Cada operación en su propio alcance (AC 94).
+    private Task<T> ConGestionAsync<T>(Func<IGestionMedicos, Task<T>> operacion) => Operaciones.EjecutarAsync(operacion);
+
+    // Mismo apellido y nombre, sin tildes ni mayúsculas, y OTRA matrícula (AC 69; guía, "Validación": duplicados
+    // probables). Con la misma matrícula no es un homónimo: es la regla del dominio, que sale debajo del campo.
+    private async Task<bool> RevisarHomonimoAsync()
+    {
+        var apellido = Comparable(Input.Apellido);
+        var nombre = Comparable(Input.Nombre);
+        var matricula = Medico.NormalizarMatricula(Input.Matricula);
+        var plantel = await ConGestionAsync(g => g.ListarAsync(null, CancellationToken.None));
+        homonimo = plantel.FirstOrDefault(m => Comparable(m.Apellido) == apellido && Comparable(m.Nombre) == nombre
+                                               && Medico.NormalizarMatricula(m.Matricula) != matricula);
+        if (homonimo is not null)
+            StateHasChanged();   // lo pide el formulario: sin esto el aviso no se dibuja hasta el próximo evento de la página
+        return homonimo is null;
+    }
+
+    private async Task GuardarIgualAsync()
+    {
+        homonimo = null;
+        if (formulario is not null)
+            await formulario.GuardarAsync();
     }
 
     private async Task GuardarAsync()
     {
-        long id;
-        try
-        {
-            id = await Gestion.CrearAsync(Input!.ADatos(), ActorDeSesion.Desde(HttpContext.User), HttpContext.RequestAborted);
-        }
-        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
-        {
-            // UX §8: el cartel arriba del formulario con la regla; el código es el del manejador (409/400/404/403).
-            // FijarEstadoEnPagina difiere el 404: con Blazor .NET 10 una página SSR en 404 sale sin cuerpo.
-            ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
-            error = e.Message;
-            return;
-        }
-        Navegacion.NavigateTo($"{RutasPersonal.FichaMedico(id)}?resultado=alta");   // fuera del try (SSR)
+        var actor = await ActorDelCircuito.DesdeAsync(EstadoDeAutenticacion);
+        var datos = Input.ADatos();
+        var id = await ConGestionAsync(g => g.CrearAsync(datos, actor, CancellationToken.None));
+        Avisos.Mostrar("Médico creado");
+        Navegacion.NavigateTo(RutasPersonal.FichaMedico(id));
+    }
+
+    private void Cancelar() => Navegacion.NavigateTo(RutasPersonal.Medicos);
+
+    private static string Comparable(string? texto)
+    {
+        var limpio = string.Join(' ', (texto ?? "").Split(' ', StringSplitOptions.RemoveEmptyEntries)).ToUpperInvariant();
+        var separado = limpio.Normalize(NormalizationForm.FormD);
+        var sinTildes = new StringBuilder(separado.Length);
+        foreach (var letra in separado)
+            if (CharUnicodeInfo.GetUnicodeCategory(letra) != UnicodeCategory.NonSpacingMark)
+                sinTildes.Append(letra);
+        return sinTildes.ToString();
     }
 }

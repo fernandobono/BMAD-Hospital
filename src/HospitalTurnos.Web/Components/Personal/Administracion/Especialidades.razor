@@ -1,167 +1,200 @@
 @page "/personal/admin/especialidades"
 @layout LayoutPersonal
 @attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@implements IDisposable
 @using System.ComponentModel.DataAnnotations
-@using System.Globalization
-@using HospitalTurnos.Aplicacion.Catalogo
 @using HospitalTurnos.Dominio.Catalogo
-@using HospitalTurnos.Dominio.Excepciones
-@using HospitalTurnos.Web.Errores
-@inject ICatalogoEspecialidades Catalogo
+@inject AlcancePorOperacion Operaciones
+@inject NavigationManager Navegacion
+@inject Notificaciones Avisos
 
-@* A2 (UX §7, story 3.1), renderizado estático como A4. La página atrapa SÓLO las excepciones del dominio y
-   muestra su mensaje en un cartel con el código del manejador global; lo inesperado sigue a ese manejador. *@
-<PageTitle>Especialidades · Las Acacias</PageTitle>
+@* A2 con el estándar de la guía UX/UI (story 3.3, sección G): listado con buscador y filtro en la URL, alta en un
+   modal, desactivar y reactivar desde el menú "⋯" con confirmación. Interactiva en el servidor (ADR-08). Las reglas,
+   los mensajes y la auditoría son los de la 3.1: esta pantalla sólo los presenta. *@
+<PaginaAbm @ref="pagina" Titulo="Especialidades" Total="total" Migas="Migas" TextoNuevo="Nueva especialidad" AlNuevo="AbrirAlta">
+    <BarraDeFiltros Buscar="@estado.Buscar" BuscarCambiado="Buscar" Placeholder="Buscar por nombre"
+                    FiltrosActivos="@estado.FiltrosActivos(_ => null, femenino: true)" AlLimpiar="Limpiar">
+        <FiltroDeEstado Valor="@estado.Estado" ValorCambiado="CambiarEstado" Femenino="true" />
+    </BarraDeFiltros>
 
-<h1>Especialidades</h1>
+    <TablaAbm @ref="tabla" TFila="EspecialidadFila" Columnas="Columnas" Consultar="ConsultarAsync" Clave="estado"
+              Orden="@estado.Orden" OrdenCambiado="Ordenar" Entidad="especialidades"
+              TextoVacio="Todavía no hay especialidades. Creá la primera." Buscado="@estado.Buscar" HayFiltros="estado.TieneFiltros"
+              AlLimpiar="Limpiar" Pagina="estado.Pagina" Tamano="estado.Tamano" PaginaCambiada="IrAPagina"
+              TamanoCambiado="CambiarTamano" TotalCambiado="t => total = t">
+        <AccionVacio>
+            <button type="button" class="btn btn-primary" @onclick="AbrirAlta">Nueva especialidad</button>
+        </AccionVacio>
+        <Acciones Context="fila">
+            <MenuDeAcciones Registro="@fila.Nombre" Opciones="OpcionesDe(fila)" AlElegirDesde="r => origen = r" />
+        </Acciones>
+        <Tarjeta Context="fila">
+            <strong>@fila.Nombre</strong>
+            <InsigniaDeEstado Texto="@(fila.Activa ? "Activa" : "Inactiva")"
+                              Variante="@(fila.Activa ? InsigniaDeEstado.Tono.Activo : InsigniaDeEstado.Tono.Inactivo)" />
+        </Tarjeta>
+    </TablaAbm>
 
-@if (alerta is not null)
-{
-    <div class="alert alert-danger" role="alert">@alerta</div>
-}
-@if (estado is not null)
-{
-    <div class="alert alert-success" role="status">@estado</div>
-}
-
-<section class="mb-4" style="max-width: 32rem;">
-    <h2 class="h5">Agregar una especialidad</h2>
-    <EditForm Model="Alta" method="post" OnValidSubmit="CrearAsync" FormName="alta-especialidad">
-        <DataAnnotationsValidator />
-        <div class="mb-3">
-            <label for="nombre" class="form-label">Nombre</label>
-            <InputText id="nombre" class="form-control" @bind-Value="Alta!.Nombre" autocomplete="off" />
-            <ValidationMessage For="() => Alta!.Nombre" class="text-danger" />
-        </div>
-        <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Agregar</button>
-    </EditForm>
-</section>
-
-@if (filas.Count == 0)
-{
-    <p>Todavía no hay especialidades. Agregá la primera con el formulario de arriba.</p>
-}
-else
-{
-    @* Un solo formulario para todas las filas: el navegador envía sólo el botón pulsado (Accion = tipo:id). *@
-    <form method="post" @formname="acciones-especialidades" @onsubmit="EjecutarAccionAsync">
-        <AntiforgeryToken />
-        <table class="table align-middle" style="max-width: 40rem;">
-            <thead>
-                <tr><th>Nombre</th><th>Estado</th><th>Acción</th></tr>
-            </thead>
-            <tbody>
-                @foreach (var fila in filas)
-                {
-                    <tr>
-                        <td>@fila.Nombre</td>
-                        <td>@(fila.Activa ? "Activa" : "Desactivada")</td>
-                        <td>
-                            @if (fila.Activa)
-                            {
-                                <button type="submit" class="btn btn-sm btn-outline-danger" name="Accion" value="desactivar:@fila.Id">Desactivar</button>
-                            }
-                            else
-                            {
-                                <button type="submit" class="btn btn-sm btn-outline-primary" name="Accion" value="reactivar:@fila.Id">Reactivar</button>
-                            }
-                        </td>
-                    </tr>
-                }
-            </tbody>
-        </table>
-    </form>
-}
+    @* Variables locales y no los campos: al cerrarse, el diálogo se dibuja una última vez y su contenido tiene que
+       ver el formulario que tenía, no el campo ya en null. *@
+    @if (alta is { } formularioAlta)
+    {
+        <DialogoModal Titulo="Nueva especialidad" AlCerrar="CerrarAlta" Origen="pagina?.BotonNuevo">
+            <FormularioAbm Model="formularioAlta" AlGuardar="CrearAsync" AlCancelar="CerrarAlta">
+                <CampoDeFormulario TValor="string" Etiqueta="Nombre" Id="nombre" Obligatorio="true" @bind-Valor="formularioAlta.Nombre" />
+            </FormularioAbm>
+        </DialogoModal>
+    }
+    @if (confirmacion is { } pedido)
+    {
+        <DialogoDeConfirmacion Titulo="@pedido.Titulo" Consecuencia="@pedido.Consecuencia"
+                               TextoConfirmar="@pedido.Verbo" Peligro="pedido.Peligro"
+                               AlConfirmar="pedido.Accion" AlCancelar="() => confirmacion = null" Origen="origen" />
+    }
+</PaginaAbm>
 
 @code {
+    private const string Ruta = RutasPersonal.Especialidades;
+    private static readonly ReglasDeListado Reglas = new("nombre", ["nombre", "medicos"]);
+    private static readonly IReadOnlyList<Miga> Migas = [new("Catálogos", RutasPersonal.Medicos), new("Especialidades", null)];
+
     [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
+    private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
 
-    [SupplyParameterFromForm(FormName = "alta-especialidad")]
-    private FormularioAlta? Alta { get; set; }
+    private sealed record Confirmacion(string Titulo, string Consecuencia, string Verbo, bool Peligro, Func<Task> Accion);
 
-    [SupplyParameterFromForm(FormName = "acciones-especialidades")]
-    private string? Accion { get; set; }
+    private readonly CancellationTokenSource cancelacion = new();
+    private PaginaAbm? pagina;
+    private TablaAbm<EspecialidadFila>? tabla;
+    private EstadoDeListado estado = EstadoDeListado.PorDefecto(Reglas);
+    private int? total;
+    private FormularioAlta? alta;
+    private Confirmacion? confirmacion;
+    private ElementReference? origen;
 
-    private IReadOnlyList<EspecialidadResumen> filas = [];
-    private string? estado;
-    private string? alerta;
+    // La columna Estado sólo con "Todas": con un solo estado repetiría lo mismo en cada fila (AC 50).
+    private IReadOnlyList<ColumnaAbm<EspecialidadFila>> Columnas =>
+    [
+        new("Nombre", f => @<text>@f.Nombre</text>, Orden: "nombre"),
+        new("Médicos asociados", f => @<text>@f.MedicosAsociados</text>, Orden: "medicos", Numero: true),
+        new("Estado", f => @<InsigniaDeEstado Texto="@(f.Activa ? "Activa" : "Inactiva")"
+                                              Variante="@(f.Activa ? InsigniaDeEstado.Tono.Activo : InsigniaDeEstado.Tono.Inactivo)" />,
+            Visible: estado.Estado == "todos"),
+    ];
 
-    private const string AccionDesconocida = "No reconocemos esa acción. Recargá la página.";
-
-    protected override async Task OnInitializedAsync()
+    protected override void OnInitialized()
     {
-        Alta ??= new();
-        // OnInitializedAsync corre ANTES del manejador del formulario: cada manejador vuelve a cargar.
-        await CargarAsync();
+        estado = EstadoDeListado.Leer(Navegacion.Uri, Reglas);
+        Navegacion.LocationChanged += AlNavegar;
     }
 
-    private async Task CargarAsync() => filas = await Catalogo.ListarAsync(Cancelacion);
+    // Atrás y Adelante del navegador: el listado vuelve a lo que dice la dirección (AC 26).
+    private void AlNavegar(object? remitente, LocationChangedEventArgs e) => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            estado = EstadoDeListado.Leer(e.Location, Reglas);
+            StateHasChanged();
+        }
+        catch (Exception error)
+        {
+            await DispatchExceptionAsync(error);   // nadie espera esta tarea: el error no se pierde
+        }
+    });
 
-    // En bUnit (T23) no hay pedido HTTP; en la app siempre lo hay.
-    private CancellationToken Cancelacion => HttpContext?.RequestAborted ?? CancellationToken.None;
+    private void Navegar(EstadoDeListado nuevo)
+    {
+        estado = nuevo;
+        Navegacion.NavigateTo(nuevo.Url(Ruta, Reglas));
+    }
 
+    private void Buscar(string? texto) => Navegar(estado with { Buscar = texto, Pagina = 1 });
+    private void CambiarEstado(string valor) => Navegar(estado with { Estado = valor, Pagina = 1 });
+    private void Ordenar(string orden) => Navegar(estado with { Orden = orden, Pagina = 1 });
+    private void IrAPagina(int numero) => Navegar(estado with { Pagina = numero });
+    private void CambiarTamano(int tamano) => Navegar(estado with { Tamano = tamano, Pagina = 1 });
+    private void Limpiar() => Navegar(estado.Limpio(Reglas));
+
+    // Cada consulta y cada acción en su propio alcance (AC 94): la tabla y el diálogo nunca comparten el contexto.
+    private Task<T> ConCatalogoAsync<T>(Func<ICatalogoEspecialidades, Task<T>> operacion) =>
+        Operaciones.EjecutarAsync(operacion);
+
+    private Task ConCatalogoAsync(Func<ICatalogoEspecialidades, Task> operacion) => Operaciones.EjecutarAsync(operacion);
+
+    private Task<PaginaDeResultados<EspecialidadFila>> ConsultarAsync(CancellationToken ct)
+    {
+        var consulta = estado.AConsulta();
+        return ConCatalogoAsync(c => c.ListarPaginadoAsync(consulta, ct));
+    }
+
+    private IReadOnlyList<MenuDeAcciones.Opcion> OpcionesDe(EspecialidadFila fila) => fila.Activa
+        ? [new("Desactivar", EventCallback.Factory.Create(this, () => ConfirmarDesactivarAsync(fila)))]
+        : [new("Reactivar", EventCallback.Factory.Create(this, () => ConfirmarReactivar(fila)))];
+
+    private async Task ConfirmarDesactivarAsync(EspecialidadFila fila)
+    {
+        var medicos = await ConCatalogoAsync(c => c.ContarMedicosAsync(fila.Id, cancelacion.Token));
+        var quienes = medicos switch
+        {
+            0 => "Ningún médico la tiene asignada",
+            1 => "1 médico la tiene asignada",
+            _ => $"{medicos} médicos la tienen asignada",
+        };
+        confirmacion = new($"¿Desactivar {fila.Nombre}?", $"{quienes}; no podrá elegirse en nuevos médicos.",
+            "Desactivar especialidad", Peligro: true, async () =>
+            {
+                var actor = await ActorDelCircuito.DesdeAsync(EstadoDeAutenticacion);
+                await ConCatalogoAsync(c => c.DesactivarAsync(actor, fila.Id, cancelacion.Token));
+                await TerminarAsync("Especialidad desactivada");
+            });
+    }
+
+    private void ConfirmarReactivar(EspecialidadFila fila) =>
+        confirmacion = new($"¿Reactivar {fila.Nombre}?", "Vuelve a ofrecerse al dar de alta o editar un médico.",
+            "Reactivar especialidad", Peligro: false, async () =>
+            {
+                var actor = await ActorDelCircuito.DesdeAsync(EstadoDeAutenticacion);
+                await ConCatalogoAsync(c => c.ReactivarAsync(actor, fila.Id, cancelacion.Token));
+                await TerminarAsync("Especialidad reactivada");
+            });
+
+    private async Task TerminarAsync(string aviso)
+    {
+        confirmacion = null;
+        Avisos.Mostrar(aviso);
+        if (tabla is not null)
+            await tabla.RecargarAsync();
+    }
+
+    private void AbrirAlta() => alta = new FormularioAlta();
+
+    private void CerrarAlta() => alta = null;
+
+    // Los errores del dominio (duplicada, desactivada con ese nombre) quedan en el modal, con lo tipeado (AC 84).
     private async Task CrearAsync()
     {
-        try
-        {
-            var id = await Catalogo.CrearAsync(ActorDeSesion.Desde(HttpContext.User), Alta!.Nombre!, Cancelacion);
-            await CargarAsync();
-            estado = $"Especialidad {NombreDe(id)} agregada.";
-            Alta = new();   // el campo vuelve vacío
-            return;
-        }
-        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
-        {
-            MostrarCartel(e);   // lo tipeado queda en el campo
-        }
-        await CargarAsync();
+        var actor = await ActorDelCircuito.DesdeAsync(EstadoDeAutenticacion);
+        var nombre = alta!.Nombre!;
+        await ConCatalogoAsync(c => c.CrearAsync(actor, nombre, cancelacion.Token));
+        alta = null;
+        Avisos.Mostrar("Especialidad creada");
+        if (tabla is not null)
+            await tabla.RecargarAsync();
     }
 
-    private async Task EjecutarAccionAsync()
+    public void Dispose()
     {
-        try
-        {
-            var partes = (Accion ?? "").Split(':', 2);
-            if (partes.Length != 2 || !long.TryParse(partes[1], NumberStyles.None, CultureInfo.InvariantCulture, out var id))
-                throw new ReglaDeNegocioException(AccionDesconocida);
-            var actor = ActorDeSesion.Desde(HttpContext.User);
-            switch (partes[0])
-            {
-                case "desactivar":
-                    await Catalogo.DesactivarAsync(actor, id, Cancelacion);
-                    estado = $"Especialidad {NombreDe(id)} desactivada.";
-                    break;
-                case "reactivar":
-                    await Catalogo.ReactivarAsync(actor, id, Cancelacion);
-                    estado = $"Especialidad {NombreDe(id)} reactivada.";
-                    break;
-                default:
-                    throw new ReglaDeNegocioException(AccionDesconocida);
-            }
-        }
-        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
-        {
-            MostrarCartel(e);
-        }
-        await CargarAsync();
-    }
-
-    // El nombre tal como quedó guardado (las filas ya cargadas lo tienen).
-    private string? NombreDe(long id) => filas.FirstOrDefault(f => f.Id == id)?.Nombre;
-
-    // El código del manejador global y el mensaje en un cartel arriba del formulario (decisión 1 del docente).
-    private void MostrarCartel(Exception e)
-    {
-        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
-        alerta = e.Message;
+        Navegacion.LocationChanged -= AlNavegar;
+        cancelacion.Cancel();
+        cancelacion.Dispose();
     }
 
     private sealed class FormularioAlta
     {
         private string? nombre;
 
-        // Sin espacios en los extremos antes de validar; el dominio repite la regla (AC 1 y 8).
+        // Sin espacios en los extremos antes de validar; el dominio repite la regla (AC 1 y 8 de la 3.1).
         [Required(ErrorMessage = "Ingresá el nombre de la especialidad.")]
         [StringLength(Especialidad.LargoMaximo, ErrorMessage = "El nombre de la especialidad tiene como máximo 80 caracteres.")]
         public string? Nombre { get => nombre; set => nombre = value?.Trim(); }

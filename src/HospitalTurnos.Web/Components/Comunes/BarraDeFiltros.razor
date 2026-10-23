@@ -1,0 +1,111 @@
+@implements IDisposable
+@inject TimeProvider Reloj
+
+@* La barra de filtros (guía, "Barra de filtros"; AC 23 y 24): buscador con etiqueta visible y un placeholder que
+   dice qué busca; filtra 300 ms después de la última tecla (con el reloj inyectado) o en el acto con Enter. Los
+   filtros activos y "Limpiar filtros" aparecen sólo si hay alguno aplicado. *@
+<div class="filter-bar" role="search">
+    <div class="filter-bar__campo filter-bar__campo--buscador">
+        <label for="buscar" class="form-label mb-0">@Etiqueta</label>
+        <input id="buscar" type="search" class="form-control" placeholder="@Placeholder" value="@texto" autocomplete="off"
+               aria-describedby="@(ErrorBuscador is null ? null : "buscar-error")" aria-invalid="@(ErrorBuscador is null ? null : "true")"
+               @oninput="AlEscribir" @onkeydown="AlPulsarAsync" />
+        @if (ErrorBuscador is not null)
+        {
+            <div id="buscar-error" class="campo__error"><span aria-hidden="true">⚠</span> @ErrorBuscador</div>
+        }
+    </div>
+    @ChildContent
+</div>
+@if (FiltrosActivos.Count > 0)
+{
+    <div class="filtros-activos">
+        <span>Filtros:</span>
+        @foreach (var filtro in FiltrosActivos)
+        {
+            <span class="filtros-activos__filtro">@filtro</span>
+        }
+        <button type="button" class="btn btn-link p-0" @onclick="AlLimpiar">Limpiar filtros</button>
+    </div>
+}
+
+@code {
+    public static readonly TimeSpan Espera = TimeSpan.FromMilliseconds(300);
+
+    [Parameter]
+    public string? Buscar { get; set; }
+
+    [Parameter]
+    public EventCallback<string?> BuscarCambiado { get; set; }
+
+    [Parameter]
+    public string Etiqueta { get; set; } = "Buscar";
+
+    [Parameter]
+    public string? Placeholder { get; set; }
+
+    /// <summary>El aviso debajo del buscador (p. ej. "La búsqueda tiene como máximo 100 caracteres.", AC 82).</summary>
+    [Parameter]
+    public string? ErrorBuscador { get; set; }
+
+    [Parameter]
+    public IReadOnlyList<string> FiltrosActivos { get; set; } = [];
+
+    [Parameter]
+    public EventCallback AlLimpiar { get; set; }
+
+    /// <summary>Los demás filtros (selects) junto al buscador.</summary>
+    [Parameter]
+    public RenderFragment? ChildContent { get; set; }
+
+    private string? texto;
+    private string? ultimoBuscar;
+    private ITimer? espera;
+
+    protected override void OnParametersSet()
+    {
+        // Sólo cuando cambia desde afuera (Limpiar filtros, Atrás): no pisa lo que se está escribiendo.
+        if (Buscar != ultimoBuscar)
+        {
+            texto = Buscar;
+            ultimoBuscar = Buscar;
+        }
+    }
+
+    private void AlEscribir(ChangeEventArgs e)
+    {
+        texto = e.Value?.ToString();
+        espera?.Dispose();
+        espera = Reloj.CreateTimer(_ => _ = InvokeAsync(EnviarDesdeLaEsperaAsync), null, Espera, Timeout.InfiniteTimeSpan);
+    }
+
+    private async Task AlPulsarAsync(KeyboardEventArgs e)
+    {
+        if (e.Key == "Enter")
+            await EnviarAsync();
+    }
+
+    // Desde el temporizador nadie espera la tarea: un error se entrega a Blazor (límite de errores o registro), no se pierde.
+    private async Task EnviarDesdeLaEsperaAsync()
+    {
+        try
+        {
+            await EnviarAsync();
+        }
+        catch (Exception e)
+        {
+            await DispatchExceptionAsync(e);
+        }
+    }
+
+    private Task EnviarAsync()
+    {
+        espera?.Dispose();
+        espera = null;
+        var valor = string.IsNullOrWhiteSpace(texto) ? null : texto;
+        ultimoBuscar = valor;
+        return BuscarCambiado.InvokeAsync(valor);
+    }
+
+    public void Dispose() => espera?.Dispose();
+}

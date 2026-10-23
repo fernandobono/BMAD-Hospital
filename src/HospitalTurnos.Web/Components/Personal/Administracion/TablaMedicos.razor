@@ -1,50 +1,78 @@
-@using System.Globalization
-@* La tabla de A1 (story 3.2). Traduce una SituacionDeAgenda completa a su texto (AC 4, siempre texto, nunca
-   sólo color): la 4.1 cambia el cálculo, no esta tabla. También los dos vacíos del AC 3. *@
-@if (Medicos.Count == 0)
-{
-    @if (string.IsNullOrWhiteSpace(Buscado))
-    {
-        <p>Todavía no hay médicos cargados. Usá «Nuevo médico» para dar de alta el primero.</p>
-    }
-    else
-    {
-        <p>No hay médicos que coincidan con «@Buscado». Probá con otro apellido o matrícula.</p>
-    }
-}
-else
-{
-    <table class="table align-middle">
-        <thead>
-            <tr><th>Médico</th><th>Matrícula</th><th>Especialidad</th><th>Estado de agenda</th></tr>
-        </thead>
-        <tbody>
-            @foreach (var medico in Medicos)
-            {
-                <tr>
-                    <td><a href="@RutasPersonal.FichaMedico(medico.Id)">@medico.Apellido, @medico.Nombre</a></td>
-                    <td>@medico.Matricula</td>
-                    <td>@medico.Especialidad</td>
-                    <td>@TextoDe(medico.Agenda)</td>
-                </tr>
-            }
-        </tbody>
-    </table>
-}
+@* La tabla de A1 con el estándar de la guía (story 3.3, sección H): columnas Médico (enlace a la ficha), Matrícula,
+   Especialidad y Estado de agenda como badge, más "Editar" visible y el menú "⋯". Traduce cada SituacionDeAgenda
+   completa del cálculo de la 4.1 a su badge (AC 61): la 4.1 cambia el cálculo, no esta tabla. *@
+<TablaAbm TFila="MedicoListado" Columnas="Columnas" Consultar="Consultar" Clave="Estado" Orden="@Estado.Orden"
+          OrdenCambiado="OrdenCambiado" Entidad="médicos" TextoVacio="Todavía no hay médicos. Creá el primero."
+          Buscado="@Estado.Buscar" HayFiltros="Estado.TieneFiltros" AlLimpiar="AlLimpiar" Pagina="Estado.Pagina"
+          Tamano="Estado.Tamano" PaginaCambiada="PaginaCambiada" TamanoCambiado="TamanoCambiado" TotalCambiado="TotalCambiado">
+    <AccionVacio>
+        <button type="button" class="btn btn-primary" @onclick="AlNuevo">Nuevo médico</button>
+    </AccionVacio>
+    <Acciones Context="medico">
+        <a class="btn btn-outline-secondary btn-sm" href="@($"{RutasPersonal.FichaMedico(medico.Id)}?modo=editar")">Editar</a>
+        <MenuDeAcciones Registro="@Formatos.Persona(medico.Apellido, medico.Nombre)" Opciones="OpcionesDe(medico)" />
+    </Acciones>
+    <Tarjeta Context="medico">
+        <a href="@RutasPersonal.FichaMedico(medico.Id)">@Formatos.Persona(medico.Apellido, medico.Nombre)</a>
+        @Agenda(medico.Agenda)
+    </Tarjeta>
+</TablaAbm>
 
 @code {
     [Parameter, EditorRequired]
-    public IReadOnlyList<MedicoListado> Medicos { get; set; } = [];
+    public EstadoDeListado Estado { get; set; } = default!;
+
+    [Parameter, EditorRequired]
+    public Func<CancellationToken, Task<PaginaDeResultados<MedicoListado>>> Consultar { get; set; } = default!;
 
     [Parameter]
-    public string? Buscado { get; set; }
+    public EventCallback<string> OrdenCambiado { get; set; }
 
-    public static string TextoDe(SituacionDeAgenda agenda) => agenda switch
+    [Parameter]
+    public EventCallback<int> PaginaCambiada { get; set; }
+
+    [Parameter]
+    public EventCallback<int> TamanoCambiado { get; set; }
+
+    [Parameter]
+    public EventCallback<int> TotalCambiado { get; set; }
+
+    [Parameter]
+    public EventCallback AlLimpiar { get; set; }
+
+    [Parameter]
+    public EventCallback AlNuevo { get; set; }
+
+    [Inject]
+    private NavigationManager Navegacion { get; set; } = default!;
+
+    private static readonly IReadOnlyList<ColumnaAbm<MedicoListado>> Columnas =
+    [
+        new("Médico", m => @<a href="@RutasPersonal.FichaMedico(m.Id)">@Formatos.Persona(m.Apellido, m.Nombre)</a>, Orden: "medico"),
+        new("Matrícula", m => @<text>@m.Matricula</text>, Orden: "matricula"),
+        new("Especialidad", m => @<text>@m.Especialidad</text>, Orden: "especialidad"),
+        new("Estado de agenda", m => Agenda(m.Agenda)),
+    ];
+
+    // "Vincular usuario" lleva a la ficha en edición con el foco en "Usuario del sistema". "Ver agenda" y "Desactivar"
+    // no se muestran: todavía no existen (AC 62; desactivar médico quedó en el backlog, decisión D3).
+    private IReadOnlyList<MenuDeAcciones.Opcion> OpcionesDe(MedicoListado medico) =>
+    [
+        new("Vincular usuario", EventCallback.Factory.Create(this,
+            () => Navegacion.NavigateTo($"{RutasPersonal.FichaMedico(medico.Id)}?modo=vincular"))),
+    ];
+
+    /// <summary>El estado de agenda como badge, con "Cambia el …" debajo cuando ya hay otra aprobada (AC 61).</summary>
+    public static RenderFragment Agenda(SituacionDeAgenda agenda) => agenda switch
     {
-        { Estado: EstadoAgendaMedico.SinAgenda, RigeDesde: { } desde } =>
-            $"Sin agenda (rige desde {desde.ToString("dd/MM", CultureInfo.InvariantCulture)})",
-        { Estado: EstadoAgendaMedico.Vigente } => "Vigente",
-        { Estado: EstadoAgendaMedico.PropuestaPendiente } => "Propuesta pendiente",
-        _ => "Sin agenda",
+        { Estado: EstadoAgendaMedico.PropuestaPendiente } =>
+            @<InsigniaDeEstado Texto="Pendiente de aprobación" Variante="InsigniaDeEstado.Tono.Pendiente" />,
+        { Estado: EstadoAgendaMedico.Vigente, CambiaEl: { } cambia } =>
+            @<span><InsigniaDeEstado Texto="Vigente" Variante="InsigniaDeEstado.Tono.Vigente" /><small class="tabla-abm__ayuda">Cambia el @Formatos.Fecha(cambia)</small></span>,
+        { Estado: EstadoAgendaMedico.Vigente } =>
+            @<InsigniaDeEstado Texto="Vigente" Variante="InsigniaDeEstado.Tono.Vigente" />,
+        { RigeDesde: { } desde } =>
+            @<InsigniaDeEstado Texto="@($"Programada · desde {Formatos.Fecha(desde)}")" Variante="InsigniaDeEstado.Tono.Programada" />,
+        _ => @<InsigniaDeEstado Texto="Sin agenda" Variante="InsigniaDeEstado.Tono.Inactivo" />,
     };
 }

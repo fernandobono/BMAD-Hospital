@@ -1,0 +1,34 @@
+@implements IDisposable
+@inject Notificaciones Avisos
+
+@* La región aria-live existe siempre: así el lector de pantalla anuncia cada notificación nueva (guía,
+   Accesibilidad). Arriba a la derecha; cada una se va sola a los 4 segundos (AC 20). *@
+<div class="zona-de-notificaciones" aria-live="polite" role="status">
+    @foreach (var aviso in Avisos.Visibles)
+    {
+        <div class="notificacion" @key="aviso.Id"><span aria-hidden="true">✓</span> @aviso.Texto</div>
+    }
+</div>
+
+@code {
+    protected override void OnInitialized() => Avisos.Cambiaron += AlCambiar;
+
+    // Llega desde el hilo del temporizador y nadie espera la tarea. Si el componente ya se descartó no hay nada que
+    // dibujar; cualquier otro error se entrega a Blazor en vez de perderse.
+    private void AlCambiar() => _ = InvokeAsync(async () =>
+    {
+        try
+        {
+            StateHasChanged();
+        }
+        catch (ObjectDisposedException)
+        {
+        }
+        catch (Exception e)
+        {
+            await DispatchExceptionAsync(e);
+        }
+    });
+
+    public void Dispose() => Avisos.Cambiaron -= AlCambiar;
+}

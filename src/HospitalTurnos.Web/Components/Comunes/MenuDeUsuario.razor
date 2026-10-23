@@ -1,0 +1,32 @@
+@using System.Security.Claims
+@using HospitalTurnos.Aplicacion.Personal
+
+@* El menú de usuario de la barra superior (B-1.2): "Cerrar sesión" deja de estar suelto junto al nombre. Un
+   <details> nativo: se abre con clic o Enter sin JavaScript propio. Cerrar sesión sigue siendo un POST con
+   antifalsificación a Salir (2.1), por eso el marco queda estático. *@
+<details class="menu-de-usuario">
+    <summary>@nombre <span aria-hidden="true">▾</span></summary>
+    <div class="menu-de-usuario__panel">
+        @* Recarga la página: el navegador avisa si la pantalla tiene cambios sin guardar (AC 36). *@
+        <a class="menu-de-usuario__opcion" href="@RutasPersonal.CambiarContrasena" data-enhance-nav="false">Cambiar contraseña</a>
+        <form method="post" action="@RutasPersonal.Salir">
+            <AntiforgeryToken />
+            <button type="submit" class="menu-de-usuario__opcion">Cerrar sesión</button>
+        </form>
+    </div>
+</details>
+
+@code {
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
+
+    private string nombre = "";
+
+    protected override async Task OnParametersSetAsync()
+    {
+        if (EstadoDeAutenticacion is null)
+            return;
+        var usuario = (await EstadoDeAutenticacion).User;
+        nombre = usuario.FindFirstValue(ClaimsPersonal.NombreCompleto) ?? usuario.Identity?.Name ?? "";
+    }
+}

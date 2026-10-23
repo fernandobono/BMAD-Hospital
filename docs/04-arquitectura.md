@@ -138,6 +138,12 @@ componente, con Bootstrap 5 personalizado vía `--bs-*`).
   de NFR-09 y el detalle va al registro técnico.
 - La sesión del personal se revalida también dentro del circuito (vencimiento por inactividad y usuario
   desactivado, AC 25 de la 2.1): un usuario desactivado o con la sesión vencida vuelve al ingreso.
+- **Un alcance de servicios por operación** (decisión del docente, sesión 17, story 3.3): el alcance de un
+  circuito dura lo que la pestaña, y con él el `HospitalDbContext`. Por eso cada consulta o acción de una página
+  interactiva pide su caso de uso a `AlcancePorOperacion`, que abre un alcance propio y lo descarta al terminar,
+  igual que un pedido HTTP. Así dos consultas a la vez (la tabla y un filtro) no comparten el contexto, y un
+  guardado que el dominio rechaza no queda en memoria para colarse en el siguiente. Las páginas no inyectan
+  los casos de uso directamente.
 - Las consultas de los listados devuelven **una página y el total** (`ConsultaDeListado` → `PaginaDeResultados<T>`)
   y paginan en la base: es lectura, no agrega reglas.
 - Las pruebas de componentes usan bUnit con eventos (clic, tecla, `blur`); la accesibilidad de cada

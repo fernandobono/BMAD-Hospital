@@ -2,6 +2,8 @@ using System.Globalization;
 using HospitalTurnos.Aplicacion.Agendas;
 using HospitalTurnos.Aplicacion.Auditoria;
 using HospitalTurnos.Aplicacion.Catalogo;
+using HospitalTurnos.Aplicacion.Comun;
+using HospitalTurnos.Dominio.Agendas;
 using HospitalTurnos.Aplicacion.Personal;
 using HospitalTurnos.Dominio.Auditoria;
 using HospitalTurnos.Dominio.Catalogo;
@@ -25,7 +27,8 @@ public sealed class GestionMedicosEnBase(
     IAuditoria auditoria,
     ICatalogoEspecialidades catalogo,
     IActorVigente actorVigente,
-    IConsultaAgendas consultaAgendas) : IGestionMedicos
+    IConsultaAgendas consultaAgendas,
+    TimeProvider reloj) : IGestionMedicos
 {
     private const string SinPermiso = "Sólo un administrador puede dar de alta o modificar médicos.";
     private const string NoExiste = "No existe el médico pedido.";
@@ -36,17 +39,7 @@ public sealed class GestionMedicosEnBase(
 
     public async Task<IReadOnlyList<MedicoListado>> ListarAsync(string? buscar, CancellationToken ct)
     {
-        var consulta = contexto.Medicos.AsNoTracking();
-        var texto = buscar?.Trim();
-        if (!string.IsNullOrEmpty(texto) && texto.Length <= IGestionMedicos.LargoMaximoBusqueda)
-        {
-            // Con ESCAPE '\': % y _ dejan de ser comodines (AC 2). El patrón viaja como parámetro.
-            var patron = $"%{Escapar(texto)}%";
-            consulta = consulta.Where(m => EF.Functions.ILike(m.Apellido, patron, "\\")
-                || EF.Functions.ILike(m.Nombre, patron, "\\")
-                || EF.Functions.ILike(m.Matricula, patron, "\\"));
-        }
-        var filas = await consulta
+        var filas = await Buscando(contexto.Medicos.AsNoTracking(), buscar)
             .Join(contexto.Especialidades, m => m.EspecialidadId, e => e.Id, (m, e) => new { m, Especialidad = e.Nombre })
             .OrderBy(x => x.m.Apellido).ThenBy(x => x.m.Nombre)
             .Select(x => new { x.m.Id, x.m.Apellido, x.m.Nombre, x.m.Matricula, x.Especialidad })
@@ -55,6 +48,72 @@ public sealed class GestionMedicosEnBase(
         var agendas = await consultaAgendas.EstadosDeAgendaAsync(filas.Select(x => x.Id).ToList(), ct);
         return filas.Select(x => new MedicoListado(x.Id, x.Apellido, x.Nombre, x.Matricula, x.Especialidad, agendas[x.Id]))
             .ToList();
+    }
+
+    // Apellido, nombre o matrícula; un texto de más de 100 caracteres no filtra (la pantalla avisa, AC 2 de la 3.2).
+    private static IQueryable<Medico> Buscando(IQueryable<Medico> medicos, string? buscar)
+    {
+        var texto = buscar?.Trim();
+        if (string.IsNullOrEmpty(texto) || texto.Length > IGestionMedicos.LargoMaximoBusqueda)
+            return medicos;
+        // Con ESCAPE '\': % y _ dejan de ser comodines (AC 2). El patrón viaja como parámetro.
+        var patron = $"%{Escapar(texto)}%";
+        return medicos.Where(m => EF.Functions.ILike(m.Apellido, patron, "\\")
+            || EF.Functions.ILike(m.Nombre, patron, "\\")
+            || EF.Functions.ILike(m.Matricula, patron, "\\"));
+    }
+
+    public async Task<PaginaDeResultados<MedicoListado>> ListarPaginadoAsync(ConsultaDeListado consulta, CancellationToken ct)
+    {
+        var medicos = Buscando(contexto.Medicos.AsNoTracking(), consulta.Buscar);
+        if (long.TryParse(consulta.Filtro("especialidad"), NumberStyles.None, CultureInfo.InvariantCulture, out var especialidadId))
+            medicos = medicos.Where(m => m.EspecialidadId == especialidadId);
+        medicos = PorEstadoDeAgenda(medicos, consulta.Filtro("agenda"));
+
+        var filas = medicos.Join(contexto.Especialidades, m => m.EspecialidadId, e => e.Id,
+            (m, e) => new { m.Id, m.Apellido, m.Nombre, m.Matricula, Especialidad = e.Nombre });
+        var total = await filas.CountAsync(ct);
+        var ordenadas = (consulta.CampoDeOrden, consulta.Descendente) switch
+        {
+            ("matricula", false) => filas.OrderBy(f => f.Matricula),
+            ("matricula", true) => filas.OrderByDescending(f => f.Matricula),
+            ("especialidad", false) => filas.OrderBy(f => f.Especialidad).ThenBy(f => f.Apellido).ThenBy(f => f.Nombre),
+            ("especialidad", true) => filas.OrderByDescending(f => f.Especialidad).ThenBy(f => f.Apellido).ThenBy(f => f.Nombre),
+            (_, true) => filas.OrderByDescending(f => f.Apellido).ThenByDescending(f => f.Nombre),
+            _ => filas.OrderBy(f => f.Apellido).ThenBy(f => f.Nombre),
+        };
+        var pagina = await ordenadas.Skip(consulta.Saltear(total)).Take(consulta.Tamano).ToListAsync(ct);
+        // El estado que se MUESTRA lo calcula el dominio, una consulta para la página (AC 30 de la 4.1).
+        var agendas = await consultaAgendas.EstadosDeAgendaAsync(pagina.Select(f => f.Id).ToList(), ct);
+        var items = pagina.Select(f => new MedicoListado(f.Id, f.Apellido, f.Nombre, f.Matricula, f.Especialidad, agendas[f.Id])).ToList();
+        return new PaginaDeResultados<MedicoListado>(items, total);
+    }
+
+    /// <summary>
+    /// El filtro por estado de agenda EN LA BASE (story 3.3, decisión del docente: paginar y contar ahí). Es la regla
+    /// de EstadoDeAgenda.Calcular escrita en SQL: la pendiente gana; si no, vigente es una aprobada que ya rige (la
+    /// que rige es una aprobada con VigenteDesde ≤ hoy); programada, sólo aprobadas futuras; sin agenda, ninguna
+    /// aprobada. FiltroDeAgendaEnBaseTests verifica que las dos clasifiquen igual: si cambia una, cambia la otra.
+    /// </summary>
+    private IQueryable<Medico> PorEstadoDeAgenda(IQueryable<Medico> medicos, string? agenda)
+    {
+        var hoy = DateOnly.FromDateTime(reloj.GetLocalNow().DateTime);   // fecha del hospital, como ConsultaAgendasEnBase
+        var agendas = contexto.AgendasMedico;
+        return agenda switch
+        {
+            "pendiente" => medicos.Where(m => agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Enviada)),
+            "vigente" => medicos.Where(m =>
+                !agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Enviada)
+                && agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Aprobada && a.VigenteDesde <= hoy)),
+            "programada" => medicos.Where(m =>
+                !agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Enviada)
+                && !agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Aprobada && a.VigenteDesde <= hoy)
+                && agendas.Any(a => a.MedicoId == m.Id && a.Estado == EstadoPropuesta.Aprobada && a.VigenteDesde > hoy)),
+            "sin-agenda" => medicos.Where(m =>
+                !agendas.Any(a => a.MedicoId == m.Id
+                                  && (a.Estado == EstadoPropuesta.Enviada || a.Estado == EstadoPropuesta.Aprobada))),
+            _ => medicos,
+        };
     }
 
     public async Task<DatosFichaMedico?> ObtenerAsync(long id, CancellationToken ct)

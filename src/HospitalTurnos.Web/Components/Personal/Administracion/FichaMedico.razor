@@ -1,134 +1,169 @@
 @page "/personal/admin/medicos/{Id:long}"
 @layout LayoutPersonal
 @attribute [Authorize(Roles = HospitalTurnos.Dominio.Personal.Roles.Administrador)]
-@using HospitalTurnos.Dominio.Excepciones
-@using HospitalTurnos.Web.Errores
-@inject IGestionMedicos Gestion
-@inject ICatalogoEspecialidades Catalogo
+@rendermode @(new InteractiveServerRenderMode(prerender: false))
+@using HospitalTurnos.Aplicacion.Auditoria
+@using HospitalTurnos.Dominio.Catalogo
+@inject AlcancePorOperacion Operaciones
 @inject NavigationManager Navegacion
+@inject Notificaciones Avisos
+@inject ILogger<FichaMedico> Registro
+@using HospitalTurnos.Web.Errores
 
-@* A1, la ficha y la edición (UX §7, story 3.2), renderizado estática. Mismo manejo de errores que el alta.
-   La agenda vigente y "Corregir agenda" los agrega la 4.4 (decisión 10). *@
-@if (noExiste)
+@* A1, la ficha, con el estándar de la guía UX/UI (story 3.3, sección I): se abre en lectura con "Editar"; al editar
+   aparecen "Guardar" y "Cancelar". El encabezado lleva el badge de agenda y el pie, quién la creó y modificó.
+   La agenda vigente y "Corregir agenda" los agrega la 4.4 (decisión 10 de la 3.2). *@
+@if (cargando)
 {
-    <PageTitle>Médicos · Las Acacias</PageTitle>
-    <h1>Médicos</h1>
-    <div class="alert alert-danger" role="alert">@MedicoInexistente</div>
-    <p><a href="@RutasPersonal.Medicos">Volver a Médicos</a></p>
+    <p class="cargando">Cargando…</p>
+}
+else if (falloLaCarga)
+{
+    <PaginaAbm Titulo="Médicos" Migas="MigasSinMedico">
+        <div class="alert alert-danger" role="alert">@ManejadorGlobalDeErrores.MensajeGenerico</div>
+    </PaginaAbm>
+}
+else if (ficha is null)
+{
+    <PaginaAbm Titulo="Médicos" Migas="MigasSinMedico">
+        <div class="estado-vacio">
+            <span class="estado-vacio__icono" aria-hidden="true">☐</span>
+            <p class="mb-0">No existe el médico pedido.</p>
+            <a href="@RutasPersonal.Medicos">Ir a Médicos</a>
+        </div>
+    </PaginaAbm>
 }
 else
 {
-    <PageTitle>@Titulo · Las Acacias</PageTitle>
-    @if (ficha is not null)
-    {
-        <h1>@ficha.Datos.Apellido, @ficha.Datos.Nombre</h1>
-    }
-
-    <p><a href="@RutasPersonal.Medicos">Volver a Médicos</a></p>
-
-    @if (estado is not null)
-    {
-        <div class="alert alert-success" role="status">@estado</div>
-    }
-    @if (error is not null)
-    {
-        <div class="alert alert-danger" role="alert">@error</div>
-    }
-
-    @if (ficha is not null)
-    {
-        <p>Estado de agenda: <strong>@TablaMedicos.TextoDe(ficha.Agenda)</strong></p>
-    }
-
-    @* Input es null en el primer dibujo de un GET, mientras se lee el médico. *@
-    @if (Input is not null)
-    {
-        <EditForm Model="Input" method="post" OnValidSubmit="GuardarAsync" FormName="medico" style="max-width: 32rem;">
-            <DataAnnotationsValidator />
-            <CamposMedico Input="Input" Especialidades="especialidades" Usuarios="usuarios" />
-            <button type="submit" class="btn btn-primary" style="background-color: #1F5FA8;">Guardar cambios</button>
-        </EditForm>
-    }
+    <PaginaAbm Titulo="@Nombre" Migas="Migas">
+        <Encabezado>@TablaMedicos.Agenda(ficha.Agenda)</Encabezado>
+        <ChildContent>
+            @if (Input is null && ficha is { } leida)
+            {
+                <VistaDeDetalle AlEditar="() => Editar(null)">
+                    <ChildContent>
+                        <section class="vista-de-detalle__seccion">
+                            <h2>Datos</h2>
+                            <dl>
+                                <dt>Nombre</dt><dd>@leida.Datos.Nombre</dd>
+                                <dt>Apellido</dt><dd>@leida.Datos.Apellido</dd>
+                                <dt>Matrícula</dt><dd>@leida.Datos.Matricula</dd>
+                                <dt>Especialidad</dt><dd>@(leida.EspecialidadActiva ? leida.Especialidad : $"{leida.Especialidad} (desactivada)")</dd>
+                            </dl>
+                        </section>
+                        <section class="vista-de-detalle__seccion">
+                            <h2>Usuario del sistema</h2>
+                            <p class="mb-1">@UsuarioVinculado</p>
+                            <p class="ayuda mb-0">Vinculalo para que el médico pueda ver y gestionar su agenda.</p>
+                        </section>
+                    </ChildContent>
+                    <Pie><PieDeTrazabilidad Traza="traza" /></Pie>
+                </VistaDeDetalle>
+            }
+            else if (Input is { } formulario)
+            {
+                @* Variable local: al guardar o cancelar, el formulario se dibuja una última vez con lo que tenía. *@
+                <FormularioAbm Model="formulario" AlGuardar="GuardarAsync" AlCancelar="Leer" CampoDelError="CampoDelError"
+                               CampoInicial="@campoInicial">
+                    <CamposMedico Input="formulario" Especialidades="especialidades" Usuarios="usuarios" />
+                </FormularioAbm>
+            }
+        </ChildContent>
+    </PaginaAbm>
 }
 
 @code {
-    private const string MedicoInexistente = "No existe el médico pedido.";
-
-    [CascadingParameter]
-    private HttpContext HttpContext { get; set; } = default!;
-
     [Parameter]
     public long Id { get; set; }
 
-    [SupplyParameterFromForm(FormName = "medico")]
-    private FormularioMedico? Input { get; set; }
-
-    [SupplyParameterFromQuery(Name = "resultado")]
-    private string? Resultado { get; set; }
+    [CascadingParameter]
+    private Task<AuthenticationState>? EstadoDeAutenticacion { get; set; }
 
     private DatosFichaMedico? ficha;
+    private Trazabilidad? traza;
+    private FormularioMedico? Input;
     private IReadOnlyList<EspecialidadResumen> especialidades = [];
     private IReadOnlyList<OpcionUsuarioMedico> usuarios = [];
-    private string? estado;
-    private string? error;
-    private bool noExiste;
+    private string? campoInicial;
+    private bool cargando = true;
+    private bool falloLaCarga;
 
-    private string Titulo => ficha is null ? "Médicos" : $"{ficha.Datos.Apellido}, {ficha.Datos.Nombre}";
+    private string Nombre => ficha is null ? "" : Formatos.Persona(ficha.Datos.Apellido, ficha.Datos.Nombre);
 
-    protected override async Task OnInitializedAsync()
+    private IReadOnlyList<Miga> Migas => [new("Catálogos", RutasPersonal.Medicos), new("Médicos", RutasPersonal.Medicos), new(Nombre, null)];
+
+    private static readonly IReadOnlyList<Miga> MigasSinMedico = [new("Catálogos", RutasPersonal.Medicos), new("Médicos", null)];
+
+    private string UsuarioVinculado => ficha?.Datos.UsuarioPersonalId is { } id
+        ? usuarios.FirstOrDefault(u => u.Id == id) is { } u ? $"{u.NombreCompleto} ({u.Usuario})" : "Vinculado"
+        : "Sin usuario";
+
+    /// <summary>
+    /// El error del dominio que va debajo de un campo (AC 68): la matrícula. Los demás (especialidad desactivada,
+    /// usuario tomado mientras se editaba, AC 88) van al resumen del formulario, con su texto de hoy.
+    /// </summary>
+    public static string? CampoDelError(Exception error) =>
+        error.Message.StartsWith("Ya hay un médico con la matrícula", StringComparison.Ordinal)
+        || error.Message == Medico.MensajeMatricula
+            ? nameof(FormularioMedico.Matricula)
+            : null;
+
+    protected override async Task OnParametersSetAsync()
     {
-        ficha = await Gestion.ObtenerAsync(Id, HttpContext.RequestAborted);
-        if (ficha is null && !HttpMethods.IsPost(HttpContext.Request.Method))
+        try
         {
-            NoExiste(new NoEncontradoException(MedicoInexistente));   // AC 18 en GET
+            await CargarAsync();
+        }
+        catch (Exception e)
+        {
+            // Un error al iniciar la página no lo atrapa ningún límite: el mensaje genérico y el detalle al registro (AC 4).
+            Registro.LogError(e, "No se pudo cargar la ficha del médico");
+            falloLaCarga = true;
+            cargando = false;
             return;
         }
-        // En un POST el formulario se dibuja igual: el envío lo resuelve el caso de uso (AC 18 en POST).
-        Input ??= ficha is null ? new() : FormularioMedico.Desde(ficha.Datos);
-        especialidades = await Catalogo.ListarActivasAsync(HttpContext.RequestAborted);
-        // La especialidad del médico, aunque hoy esté desactivada: el formulario muestra el valor real (AC 15).
-        if (ficha is { EspecialidadActiva: false })
-            especialidades = [.. especialidades, new EspecialidadResumen(ficha.Datos.EspecialidadId, ficha.Especialidad, false)];
-        usuarios = await Gestion.UsuariosParaVincularAsync(Id, HttpContext.RequestAborted);
-        // Sólo los tres textos fijos: nunca se muestra lo que venga en la consulta.
-        estado = Resultado switch
-        {
-            "alta" => "Médico dado de alta.",
-            "edicion" => "Cambios guardados.",
-            "sin-cambios" => "No había cambios para guardar.",
-            _ => null,
-        };
+        // Desde A1: "Editar" abre la edición y "Vincular usuario", la edición con el foco en el usuario (AC 62).
+        var modo = new Uri(Navegacion.Uri).Query;
+        if (ficha is not null && modo.Contains("modo=editar", StringComparison.Ordinal))
+            Editar(null);
+        else if (ficha is not null && modo.Contains("modo=vincular", StringComparison.Ordinal))
+            Editar(nameof(FormularioMedico.UsuarioPersonalId));
+        cargando = false;
     }
+
+    private async Task CargarAsync()
+    {
+        // Cada lectura en su propio alcance (AC 94).
+        ficha = await Operaciones.EjecutarAsync<IGestionMedicos, DatosFichaMedico?>(g => g.ObtenerAsync(Id, CancellationToken.None));
+        if (ficha is null)
+            return;
+        usuarios = await Operaciones.EjecutarAsync<IGestionMedicos, IReadOnlyList<OpcionUsuarioMedico>>(
+            g => g.UsuariosParaVincularAsync(Id, CancellationToken.None));
+        var entidadId = Id.ToString(System.Globalization.CultureInfo.InvariantCulture);
+        traza = await Operaciones.EjecutarAsync<IConsultaTrazabilidad, Trazabilidad?>(t => t.ObtenerAsync("Medico", entidadId, CancellationToken.None));
+        // Las activas, más la actual aunque esté desactivada: guardar sin tocarla no la cambia (3.2).
+        var activas = await Operaciones.EjecutarAsync<ICatalogoEspecialidades, IReadOnlyList<EspecialidadResumen>>(
+            c => c.ListarActivasAsync(CancellationToken.None));
+        especialidades = activas.Any(e => e.Id == ficha.Datos.EspecialidadId)
+            ? activas
+            : [new EspecialidadResumen(ficha.Datos.EspecialidadId, ficha.Especialidad, ficha.EspecialidadActiva), .. activas];
+    }
+
+    private void Editar(string? campo)
+    {
+        campoInicial = campo;
+        Input = FormularioMedico.Desde(ficha!.Datos);
+    }
+
+    private void Leer() => Input = null;
 
     private async Task GuardarAsync()
     {
-        bool guardo;
-        try
-        {
-            guardo = await Gestion.EditarAsync(Id, Input!.ADatos(), ActorDeSesion.Desde(HttpContext.User),
-                HttpContext.RequestAborted);
-        }
-        catch (NoEncontradoException e)
-        {
-            NoExiste(e);
-            return;
-        }
-        catch (Exception e) when (ManejadorGlobalDeErrores.EsEsperable(e))   // sólo las del dominio
-        {
-            // UX §8: el cartel arriba del formulario con la regla; el código es el del manejador (409/400/403).
-            ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
-            estado = null;
-            error = e.Message;
-            return;
-        }
-        Navegacion.NavigateTo($"{RutasPersonal.FichaMedico(Id)}?resultado={(guardo ? "edicion" : "sin-cambios")}");   // fuera del try (SSR)
-    }
-
-    // El 404 con su texto y el enlace (AC 18). Nunca StatusCode = 404 a mano: con Blazor .NET 10 la página
-    // saldría sin cuerpo; FijarEstadoEnPagina lo fija al empezar a enviar la respuesta.
-    private void NoExiste(NoEncontradoException e)
-    {
-        ManejadorGlobalDeErrores.FijarEstadoEnPagina(HttpContext, e);
-        noExiste = true;
+        var actor = await ActorDelCircuito.DesdeAsync(EstadoDeAutenticacion);
+        var datos = Input!.ADatos();
+        var guardo = await Operaciones.EjecutarAsync<IGestionMedicos, bool>(g => g.EditarAsync(Id, datos, actor, CancellationToken.None));
+        Avisos.Mostrar(guardo ? "Médico actualizado" : "No había cambios para guardar");
+        Input = null;
+        await CargarAsync();
     }
 }
