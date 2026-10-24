@@ -33,6 +33,10 @@ followed_up_by:
     date: "2026-10-17"
     type: "extension"
     summary: "A2 pasa al estándar de la guía UX/UI: modal de alta, filtros, menú de acciones y confirmación de baja"
+  - id: "3.4"
+    date: "2026-10-23"
+    type: "extension"
+    summary: "A2 suma Editar en cada fila: renombrar una especialidad activa o inactiva, con su auditoría y control de concurrencia"
 ---
 
 # Story 3.1: Especialidades: alta, desactivación y reactivación (pantalla A2)

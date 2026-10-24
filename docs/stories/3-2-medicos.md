@@ -44,6 +44,10 @@ followed_up_by:
     date: "2026-10-17"
     type: "extension"
     summary: "A1 pasa al estándar: listado con filtros, orden, paginación y badges; ficha en modo lectura"
+  - id: "3.5"
+    date: "2026-10-23"
+    type: "extension"
+    summary: "Los médicos pasan a tener baja lógica: desactivar y reactivar desde A1 (menú de la fila y sección final de la ficha), con filtro Activos/Inactivos/Todos"
 ---
 
 # Story 3.2: Médicos: alta, edición y listado con estado de agenda; vínculo con el usuario médico
