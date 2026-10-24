@@ -18,6 +18,11 @@ followup_of:
     type: "extension"
     summary: "A4 pasa al estándar: modal de alta, badges, menú de acciones y confirmaciones"
 followup_reason: cambio-de-requisito
+followed_up_by:
+  - id: "9.2"
+    date: "2026-10-23"
+    type: "extension"
+    summary: "La ficha del médico suma el Historial que la 3.3 dejó fuera por la decisión D3 (parte de B-4.2)"
 runtime_not_verifiable:
   - ac: 5
     reason: "La revalidación corre cada 5 minutos (SesionPersonal.IntervaloRevalidacion). Verlo en vivo obliga a esperar ese tiempo real, y la regla del curso es probar el tiempo siempre con el reloj inyectado. T5 adelanta el reloj falso el intervalo y verifica que el circuito navega al ingreso."

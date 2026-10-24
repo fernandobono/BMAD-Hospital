@@ -7,7 +7,7 @@
 # Épicas: backlog · in-progress · done
 
 generated: 2026-10-17
-last_updated: 2026-10-17
+last_updated: 2026-10-23
 project: Gestión de turnos — Hospital Municipal Las Acacias
 story_location: docs/stories
 
@@ -32,13 +32,15 @@ development_status:
   2-3-contrasena-olvidada: done
   4-2-propuesta-agenda: done
   3-3-alinear-abm-con-guia-ux: done   # PR #18 mergeado (7951d55)
+  # 3.4 y 3.5 salen del análisis de brechas (decisión D3). Orden decidido por el docente (sesión 18):
+  # la 3.4 ya; la 3.5 después de la 4.4, para decidir qué pasa con la agenda de un médico inactivo
+  # sin reabrir la 4.3 ni la 4.4. Revisión en docs/stories/revision-sesion-18.md.
+  3-4-renombrar-especialidad: ready-for-dev
   4-3-aprobacion-propuestas: ready-for-dev
   4-4-correccion-urgencia: ready-for-dev
+  3-5-desactivar-medico: ready-for-dev
   epic-5: in-progress
   5-1-pacientes: ready-for-dev
-  # Del análisis de brechas de la guía UX/UI (decisión D3); entran al S3 por decisión del docente (sesión 17).
-  3-4-renombrar-especialidad: backlog
-  3-5-desactivar-medico: backlog
 
   # S4
   2-4-email-personal: backlog
@@ -68,7 +70,7 @@ development_status:
   8-2-agenda-recepcion: backlog
   epic-9: backlog
   9-1-consulta-auditoria: backlog
-  9-2-historial-por-registro: backlog   # depende de la 9.1; entra al S6 por decisión del docente (sesión 17)
+  9-2-historial-por-registro: ready-for-dev   # depende de la 9.1; entra al S6 por decisión del docente (sesión 17); escrita en la sesión 18
 
   # S7
   epic-10: backlog
