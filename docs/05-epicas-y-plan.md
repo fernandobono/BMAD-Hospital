@@ -62,8 +62,8 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 | 3.1 | Especialidades: alta y desactivación (si no hay turnos futuros). | FR-12 | 6 |
 | 3.2 | Médicos: alta, edición y listado con estado de agenda; vínculo con usuario médico. | FR-13 | 8 |
 | 3.3 | Alinear A1, A2, A4 y el marco del personal con la guía UX/UI (componentes comunes, pantallas interactivas). *Agregada el 2026-10-17 (cambio de rumbo: la guía pasa a ser obligatoria).* | NFR-05, UX §0, ADR-08 | 61 |
-| 3.4 | Renombrar una especialidad. *Backlog, sin sprint (análisis de brechas, decisión D3).* | FR-12 | — |
-| 3.5 | Desactivar y reactivar un médico, con filtro Activos/Inactivos en A1. *Backlog, sin sprint (decisión D3).* | FR-13 | — |
+| 3.4 | Renombrar una especialidad. *Sale del análisis de brechas (decisión D3); entra en el S3 por decisión del docente (2026-10-17, sesión 17).* | FR-12 | — |
+| 3.5 | Desactivar y reactivar un médico, con filtro Activos/Inactivos en A1. *Decisión D3; entra en el S3 por decisión del docente (2026-10-17, sesión 17).* | FR-13 | — |
 
 ### E4 — Agendas
 
@@ -116,7 +116,7 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 | Story | Título | Requisitos | Pruebas (est.) |
 |---|---|---|---|
 | 9.1 | Consulta de auditoría con filtros, sólo lectura. | FR-34, FR-35 | 6 |
-| 9.2 | Historial por registro en las fichas (pestaña Historial de la guía). *Backlog, sin sprint (decisión D3).* | FR-34 | — |
+| 9.2 | Historial por registro en las fichas (pestaña Historial de la guía). Depende de la 9.1. *Decisión D3; entra en el S6 por decisión del docente (2026-10-17, sesión 17).* | FR-34 | — |
 
 ### E10 — Calidad final
 
@@ -126,7 +126,7 @@ entrada: docs/02-prd.md (v1.2) · docs/03-ux.md (v1.0) · docs/04-arquitectura.m
 | 10.2 | Prueba de carga con 30 usuarios simultáneos. | NFR-01 | 2 |
 | 10.3 | Respaldo diario y procedimiento de restauración probado. | NFR-08 | 1 |
 
-**Total: 38 stories planificadas (+3 en backlog sin sprint) · ~259 pruebas estimadas + 61 de la 3.3.**
+**Total: 41 stories planificadas · ~259 pruebas estimadas + 61 de la 3.3.**
 
 > **Cambio de rumbo (2026-10-17, sesión 16):** la guía UX/UI pasa a ser obligatoria. La 3.3 entra en el S3
 > antes de la 4.3 y el orden de trabajo queda en `docs/sprint-status.yaml`. Toda story con UI lleva el
@@ -144,12 +144,12 @@ sin agendas, ni avisar sin bandeja de emails.
 |---|---|---|---|---|
 | **S1** | La base andando: se levanta todo, se entra como personal. | 1.1, 1.2, 1.3, 1.4, 1.5, 2.1 | 34 → **77 reales** | **11 h 45 medido** |
 | **S2** | El hospital se puede configurar. | 2.2, 3.1, 3.2, 4.1 | 36 → **129 reales** | **6 h 31 medido** |
-| **S3** | Los médicos tienen agenda aprobada. | 2.3, 4.2, **3.3**, 4.3, 4.4, 5.1 | 38 + 61 | ~9 h 55 + 3.3 |
+| **S3** | Los médicos tienen agenda aprobada. | 2.3, 4.2, **3.3**, 4.3, 4.4, 5.1, **3.4**, **3.5** | 38 + 61 + 3.4/3.5 | ~9 h 55 + 3.3 + 3.4/3.5 |
 | **S4** | La recepción da y cancela turnos. *Primera versión usable.* | 2.4, 2.5, 5.2, 5.3, 5.4, 5.5 | 46 | ~12 h 00 |
 | **S5** | El paciente saca turnos por la web. | 6.1, 6.2, 6.3, 6.4, 6.5, 6.6 | 45 | ~11 h 45 |
-| **S6** | Licencias, agendas del día y auditoría. | 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 9.1 | 47 | ~12 h 15 |
+| **S6** | Licencias, agendas del día y auditoría. | 7.1, 7.2, 7.3, 7.4, 8.1, 8.2, 9.1, **9.2** | 47 + 9.2 | ~12 h 15 + 9.2 |
 | **S7** | Listo para producción. | 10.1, 10.2, 10.3 | 13 | ~3 h 25 |
-| | | **37 stories** | **~259** | **~67 h 35** (18 h 16 medidas + ~49 h 20) |
+| | | **41 stories** | **~259** | **~67 h 35** (18 h 16 medidas + ~49 h 20) |
 
 **Velocidad medida** (retrospectivas en `docs/retrospectiva-sprint-1.md` y
 `docs/retrospectiva-sprint-2.md`): el S1 tardó 11 h 45 de reloj para 34 pruebas estimadas (21 min por

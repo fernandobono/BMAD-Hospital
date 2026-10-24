@@ -2,7 +2,7 @@
 epic: 3
 story: "3.3"
 title: "Alinear pantallas ABM existentes con la guía UX/UI (A1 Médicos, A2 Especialidades, A4 Usuarios del personal y marco del personal)"
-status: review
+status: done
 sprint: 3
 priority: "P0"
 approach: "[ADAPT]"
@@ -123,7 +123,7 @@ files_to_modify:
 
 # Story 3.3: Alinear pantallas ABM existentes con la guía UX/UI
 
-Status: in-progress
+Status: done
 
 ## Story
 
